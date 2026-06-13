@@ -1,0 +1,18 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+
+enum InventoryLocation { pantry fridge freezer }
+enum InventoryStatus { available low consumed discarded }
+enum MealType { breakfast lunch dinner snack }
+enum MealSource { manual food recipe }
+
+model User { id String @id @default(uuid()) email String @unique passwordHash String? createdAt DateTime @default(now()) updatedAt DateTime @updatedAt profile UserProfile? macroGoals MacroGoal[] inventoryItems InventoryItem[] mealLogs MealLog[] }
+model UserProfile { id String @id @default(uuid()) userId String @unique user User @relation(fields: [userId], references: [id], onDelete: Cascade) birthDate DateTime? sex String heightCm Float? weightKg Float? activityLevel String goal String mealsPerDay Int @default(4) preferredUnits Json? dietaryPreferences Json? allergies Json? ingredientsToAvoid Json? }
+model MacroGoal { id String @id @default(uuid()) userId String user User @relation(fields: [userId], references: [id], onDelete: Cascade) calories Int proteinG Int carbsG Int fatG Int proteinPct Int carbsPct Int fatPct Int effectiveFrom DateTime @default(now()) }
+model Food { id String @id @default(uuid()) userId String? name String category String servingSize Float? servingUnit String? caloriesPer100g Float? proteinPer100g Float? carbsPer100g Float? fatPer100g Float? isFrequent Boolean @default(false) }
+model InventoryItem { id String @id @default(uuid()) userId String user User @relation(fields: [userId], references: [id], onDelete: Cascade) foodId String? name String location InventoryLocation category String quantity Float unit String expirationDate DateTime? caloriesPer100g Float? proteinPer100g Float? carbsPer100g Float? fatPer100g Float? status InventoryStatus @default(available) createdAt DateTime @default(now()) updatedAt DateTime @updatedAt transactions InventoryTransaction[] }
+model MealLog { id String @id @default(uuid()) userId String user User @relation(fields: [userId], references: [id], onDelete: Cascade) date DateTime mealType MealType source MealSource recipeId String? notes String? createdAt DateTime @default(now()) items MealLogItem[] }
+model MealLogItem { id String @id @default(uuid()) mealLogId String mealLog MealLog @relation(fields: [mealLogId], references: [id], onDelete: Cascade) foodId String? inventoryItemId String? name String quantity Float unit String calories Float proteinG Float carbsG Float fatG Float }
+model Recipe { id String @id @default(uuid()) userId String? name String mealType String servings Int instructions Json caloriesTotal Float proteinTotalG Float carbsTotalG Float fatTotalG Float generated Boolean @default(false) createdAt DateTime @default(now()) ingredients RecipeIngredient[] }
+model RecipeIngredient { id String @id @default(uuid()) recipeId String recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade) inventoryItemId String? foodId String? name String quantity Float unit String substitutionGroup String? }
+model InventoryTransaction { id String @id @default(uuid()) inventoryItemId String inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade) userId String type String quantityDelta Float unit String reason String? mealLogId String? recipeId String? createdAt DateTime @default(now()) }

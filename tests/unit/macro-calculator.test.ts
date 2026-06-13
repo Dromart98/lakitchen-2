@@ -1,0 +1,3 @@
+import { describe, expect, it } from "vitest";
+import { calculateMacroGoals } from "@/modules/nutrition/macro-calculator";
+describe("calculateMacroGoals", () => { it("calculates editable macro goals", () => { const goals = calculateMacroGoals({ age: 30, sex: "male", weightKg: 80, heightCm: 180, activityLevel: "moderate", goal: "maintenance" }); expect(goals.calories).toBeGreaterThan(2000); expect(goals.proteinG).toBeGreaterThan(0); }); it("rejects percentages that do not sum 100", () => { expect(() => calculateMacroGoals({ age: 30, sex: "female", weightKg: 65, heightCm: 165, activityLevel: "light", goal: "fat_loss", proteinPct: 40, carbsPct: 40, fatPct: 40 })).toThrow(); }); });

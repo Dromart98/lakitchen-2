@@ -1,0 +1,3 @@
+import type { MacroTotals } from "@/modules/nutrition/nutrition.types";
+export function sumMacros(items: MacroTotals[]): MacroTotals { return items.reduce((acc, item) => ({ calories: acc.calories + item.calories, proteinG: acc.proteinG + item.proteinG, carbsG: acc.carbsG + item.carbsG, fatG: acc.fatG + item.fatG }), { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 }); }
+export function remainingMacros(goal: MacroTotals, consumed: MacroTotals): MacroTotals { return { calories: Math.max(0, goal.calories - consumed.calories), proteinG: Math.max(0, goal.proteinG - consumed.proteinG), carbsG: Math.max(0, goal.carbsG - consumed.carbsG), fatG: Math.max(0, goal.fatG - consumed.fatG) }; }

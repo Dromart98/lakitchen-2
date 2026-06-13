@@ -1,0 +1,3 @@
+import { daysUntilExpiration } from "@/modules/inventory/inventory.rules";
+import type { InventoryItem } from "@/modules/inventory/inventory.types";
+export function ExpiringList({ items }: { items: InventoryItem[] }) { return <div className="card"><h2>Próximos a caducar</h2>{items.length === 0 ? <p className="muted">No hay productos urgentes.</p> : <div className="grid">{items.map((item) => <div key={item.id}><span className="pill">{item.location}</span><strong style={{display:"block",marginTop:8}}>{item.name}</strong><span className="muted">Caduca en {daysUntilExpiration(item)} día(s)</span></div>)}</div>}</div>; }
