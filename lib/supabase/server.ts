@@ -1,18 +1,10 @@
+import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 import { getSupabaseConfig } from "./env";
 
-async function loadSupabaseSsr() {
-  const importModule = new Function("specifier", "return import(specifier)") as (
-    specifier: string,
-  ) => Promise<typeof import("@supabase/ssr")>;
-
-  return importModule("@supabase/ssr");
-}
-
 export async function createClient() {
   const cookieStore = await cookies();
-  const { createServerClient } = await loadSupabaseSsr();
   const { supabaseUrl, supabasePublishableKey } = getSupabaseConfig();
 
   return createServerClient(supabaseUrl, supabasePublishableKey, {
