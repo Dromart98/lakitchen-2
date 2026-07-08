@@ -38,11 +38,7 @@ function getInitialValues(profile: NutritionProfileRow | null): NutritionProfile
 
 export default async function NutritionProfilePage() {
   const supabase = await createClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-
-  if (userError) {
-    console.warn("Supabase could not read the nutrition profile auth user:", userError.message);
-  }
+  const { data: userData } = await supabase.auth.getUser();
 
   if (!userData.user) redirect("/login");
 
