@@ -5,8 +5,12 @@ import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   const cookieStore = await cookies();
+  const allCookies: Array<{ name: string }> = cookieStore.getAll();
+  const supabaseCookieNames = allCookies
+    .map((cookie) => cookie.name)
+    .filter((name) => name.toLowerCase().includes("supabase"));
   const headerStore = await headers();
   const supabase = await createClient();
 
