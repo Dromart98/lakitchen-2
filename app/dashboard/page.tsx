@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-
 import { RecipeSuggestion } from "@/components/dashboard/RecipeSuggestion";
 import { ExpiringList } from "@/components/inventory/ExpiringList";
 import { MacroProgress } from "@/components/nutrition/MacroProgress";
@@ -8,19 +6,14 @@ import { consumedToday, inventory, todayGoal } from "@/lib/demo-data";
 import { getExpiringItems } from "@/modules/inventory/inventory.rules";
 import { remainingMacros } from "@/modules/meals/meal-summary";
 import { generateRecipe } from "@/modules/recipes/recipe-generator.service";
+import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.getUser();
-
-  if (error) {
-    console.warn("Supabase could not read the dashboard auth user:", error.message);
-  }
-
-  if (!data.user) {
-    redirect("/login");
-  }
+  await requireAuthenticatedUser(supabase, "dashboard");
 
   const remaining = remainingMacros(todayGoal, consumedToday);
   const expiring = getExpiringItems(inventory);
