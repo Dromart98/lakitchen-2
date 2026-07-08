@@ -1,20 +1,63 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState, type FormEvent } from "react";
 
-import type { AuthActionState } from "@/app/login/actions";
-import { signInAction, signUpAction } from "@/app/login/actions";
+import { createClient } from "@/lib/supabase/client";
 
-const initialState: AuthActionState = {};
+type AuthState = {
+  error?: string;
+  message?: string;
+};
+
+type AuthMode = "sign-in" | "sign-up";
 
 export function LoginForm() {
-  const [signInState, signInFormAction, isSignInPending] = useActionState(signInAction, initialState);
-  const [signUpState, signUpFormAction, isSignUpPending] = useActionState(signUpAction, initialState);
-  const state = signInState.error || signInState.message ? signInState : signUpState;
-  const isPending = isSignInPending || isSignUpPending;
+  const [state, setState] = useState<AuthState>({});
+  const [pendingMode, setPendingMode] = useState<AuthMode | null>(null);
+  const isPending = pendingMode !== null;
+
+  async function handleAuth(mode: AuthMode, formData: FormData) {
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+
+    if (!email || !password) {
+      setState({ error: "Email y contraseña son obligatorios." });
+      return;
+    }
+
+    setPendingMode(mode);
+    setState({});
+
+    const supabase = createClient();
+    const { data, error } = mode === "sign-in"
+      ? await supabase.auth.signInWithPassword({ email, password })
+      : await supabase.auth.signUp({ email, password });
+
+    if (error) {
+      setState({ error: error.message });
+      setPendingMode(null);
+      return;
+    }
+
+    if (data.session) {
+      window.location.assign("/dashboard");
+      return;
+    }
+
+    setState({ message: "Revisa tu email para confirmar la cuenta antes de iniciar sesión." });
+    setPendingMode(null);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const mode = submitter?.value === "sign-up" ? "sign-up" : "sign-in";
+    await handleAuth(mode, new FormData(event.currentTarget));
+  }
 
   return (
-    <form action={signInFormAction} className="card auth-form">
+    <form onSubmit={handleSubmit} className="card auth-form">
       <div>
         <p className="pill">Lakitchenapp V2</p>
         <h1>Accede a tu cocina</h1>
@@ -35,11 +78,11 @@ export function LoginForm() {
       {state.message ? <p className="auth-message success" role="status">{state.message}</p> : null}
 
       <div className="auth-actions">
-        <button className="button" type="submit" disabled={isPending}>
-          {isPending ? "Procesando..." : "Iniciar sesión"}
+        <button className="button" type="submit" name="authMode" value="sign-in" disabled={isPending}>
+          {pendingMode === "sign-in" ? "Procesando..." : "Iniciar sesión"}
         </button>
-        <button className="button secondary" type="submit" disabled={isPending} formAction={signUpFormAction}>
-          Crear cuenta
+        <button className="button secondary" type="submit" name="authMode" value="sign-up" disabled={isPending}>
+          {pendingMode === "sign-up" ? "Procesando..." : "Crear cuenta"}
         </button>
       </div>
     </form>
