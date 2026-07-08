@@ -12,7 +12,11 @@ import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
+  const { data, error } = await supabase.auth.getUser();
+
+  if (error) {
+    console.warn("Supabase could not read the dashboard auth user:", error.message);
+  }
 
   if (!data.user) {
     redirect("/login");
