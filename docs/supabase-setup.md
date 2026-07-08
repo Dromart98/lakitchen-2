@@ -49,7 +49,7 @@ The Supabase packages used by this project are lowercase npm scopes:
 - `@supabase/supabase-js`
 - `@supabase/ssr`
 
-If TypeScript falls back to `types/supabase-shims.d.ts`, treat that file as temporary. It exists only for environments where the npm registry blocks downloading `@supabase/ssr`. Once `npm install` succeeds and the real package types are available in `node_modules`, remove the shim so the app uses Supabase's real published types.
+Incorrect uppercase package names such as `@Supabase/ssr` or `@Supabase/supabase-js` must not be used; npm package scopes for Supabase are lowercase. Do not add a local `types/supabase-shims.d.ts` fallback. The project should rely on the real published Supabase package types from `node_modules`; if installation is blocked by the npm registry, keep the failure visible instead of masking it with temporary shims.
 
 ## Security notes
 
