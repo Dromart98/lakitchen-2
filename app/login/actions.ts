@@ -29,11 +29,13 @@ export async function signInAction(_previousState: AuthActionState, formData: Fo
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(credentials);
+  const { data, error } = await supabase.auth.signInWithPassword(credentials);
 
   if (error) {
     return { error: "No se ha podido iniciar sesión. Revisa el email y la contraseña." };
   }
+
+  console.info("Supabase sign-in completed:", { userPresent: Boolean(data.user), sessionPresent: Boolean(data.session) });
 
   revalidatePath("/", "layout");
   redirect("/dashboard");
