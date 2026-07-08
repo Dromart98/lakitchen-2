@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-
 import { NutritionProfileForm, type NutritionProfileFormValues } from "@/components/nutrition-profile/NutritionProfileForm";
+import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 
 type NutritionProfileRow = {
@@ -36,19 +35,21 @@ function getInitialValues(profile: NutritionProfileRow | null): NutritionProfile
   };
 }
 
+export const dynamic = "force-dynamic";
+
 export default async function NutritionProfilePage() {
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) redirect("/login");
-
-  const user = userData.user;
+  const user = await requireAuthenticatedUser(supabase, "nutrition profile");
 
   const { data: profile, error } = await (supabase as any)
     .from("user_nutrition_profiles")
     .select("age, sex, height_cm, weight_kg, goal, activity_level, target_calories, target_protein_g, target_carbs_g, target_fat_g")
     .eq("user_id", user.id)
     .maybeSingle() as { data: NutritionProfileRow | null; error: { message: string } | null };
+
+  if (error) {
+    console.warn("Supabase could not load the nutrition profile row:", error.message);
+  }
 
   return (
     <main className="shell">
