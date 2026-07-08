@@ -1,30 +1,20 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useActionState } from "react";
 
 import type { AuthActionState } from "@/app/login/actions";
 import { signInAction, signUpAction } from "@/app/login/actions";
 
+const initialState: AuthActionState = {};
+
 export function LoginForm() {
-  const formRef = useRef<HTMLFormElement>(null);
-  const [state, setState] = useState<AuthActionState>({});
-  const [isPending, startTransition] = useTransition();
-
-  function runAction(action: (formData: FormData) => Promise<AuthActionState>) {
-    const form = formRef.current;
-
-    if (!form) return;
-
-    const formData = new FormData(form);
-
-    startTransition(async () => {
-      const nextState = await action(formData);
-      setState(nextState);
-    });
-  }
+  const [signInState, signInFormAction, isSignInPending] = useActionState(signInAction, initialState);
+  const [signUpState, signUpFormAction, isSignUpPending] = useActionState(signUpAction, initialState);
+  const state = signInState.error || signInState.message ? signInState : signUpState;
+  const isPending = isSignInPending || isSignUpPending;
 
   return (
-    <form ref={formRef} className="card auth-form" onSubmit={(event) => event.preventDefault()}>
+    <form action={signInFormAction} className="card auth-form">
       <div>
         <p className="pill">Lakitchenapp V2</p>
         <h1>Accede a tu cocina</h1>
@@ -45,10 +35,10 @@ export function LoginForm() {
       {state.message ? <p className="auth-message success" role="status">{state.message}</p> : null}
 
       <div className="auth-actions">
-        <button className="button" type="button" disabled={isPending} onClick={() => runAction(signInAction)}>
+        <button className="button" type="submit" disabled={isPending}>
           {isPending ? "Procesando..." : "Iniciar sesión"}
         </button>
-        <button className="button secondary" type="button" disabled={isPending} onClick={() => runAction(signUpAction)}>
+        <button className="button secondary" type="submit" disabled={isPending} formAction={signUpFormAction}>
           Crear cuenta
         </button>
       </div>

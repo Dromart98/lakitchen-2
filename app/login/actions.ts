@@ -21,7 +21,7 @@ function getCredentials(formData: FormData) {
   return { email, password };
 }
 
-export async function signInAction(formData: FormData): Promise<AuthActionState> {
+export async function signInAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const credentials = getCredentials(formData);
 
   if ("error" in credentials) {
@@ -37,9 +37,10 @@ export async function signInAction(formData: FormData): Promise<AuthActionState>
 
   revalidatePath("/", "layout");
   redirect("/dashboard");
+  throw new Error("Login redirect did not complete.");
 }
 
-export async function signUpAction(formData: FormData): Promise<AuthActionState> {
+export async function signUpAction(_previousState: AuthActionState, formData: FormData): Promise<AuthActionState> {
   const credentials = getCredentials(formData);
 
   if ("error" in credentials) {
@@ -57,6 +58,7 @@ export async function signUpAction(formData: FormData): Promise<AuthActionState>
 
   if (data.session) {
     redirect("/dashboard");
+    throw new Error("Signup redirect did not complete.");
   }
 
   return { message: "Cuenta creada. Revisa tu email si Supabase requiere confirmación antes de entrar." };
