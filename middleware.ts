@@ -6,6 +6,7 @@ import { getSupabaseConfig } from "./lib/supabase/env";
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
+  let applySupabaseCookies = () => {};
   const { supabaseUrl, supabasePublishableKey } = getSupabaseConfig();
 
   const supabase = createServerClient(supabaseUrl, supabasePublishableKey, {
@@ -14,9 +15,11 @@ export async function middleware(request: NextRequest) {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        applySupabaseCookies = () => {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        };
       },
     },
   });
@@ -25,8 +28,10 @@ export async function middleware(request: NextRequest) {
 
   if (error) {
     console.warn("Supabase middleware could not refresh the auth user:", error.message);
+    return response;
   }
 
+  applySupabaseCookies();
   return response;
 }
 
