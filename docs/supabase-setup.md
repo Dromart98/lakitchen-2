@@ -58,3 +58,9 @@ If TypeScript falls back to `types/supabase-shims.d.ts`, treat that file as temp
 - Do not use `SUPABASE_SERVICE_ROLE_KEY` in frontend code.
 - Do not add `SUPABASE_SERVICE_ROLE_KEY` to `.env.example` for the MVP client/server setup.
 - If a service role key is ever needed for backend-only jobs, it must stay server-only and must never be exposed through `NEXT_PUBLIC_` variables.
+
+## User nutrition profile table
+
+Run the migration in `supabase/migrations/20260708000000_create_user_nutrition_profiles.sql` with the Supabase CLI, or paste that file into the Supabase SQL Editor if the table does not exist yet.
+
+The migration creates `public.user_nutrition_profiles`, links each row to `auth.users(id)`, enables Row Level Security, and adds policies so authenticated users can only select, insert, and update their own nutrition profile. It also adds a unique constraint on `user_id` so the app can upsert one profile per user.
