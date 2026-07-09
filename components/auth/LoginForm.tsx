@@ -14,6 +14,7 @@ type AuthMode = "sign-in" | "sign-up";
 export function LoginForm() {
   const [state, setState] = useState<AuthState>({});
   const [pendingMode, setPendingMode] = useState<AuthMode | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const isPending = pendingMode !== null;
 
   async function handleAuth(mode: AuthMode, formData: FormData) {
@@ -71,7 +72,18 @@ export function LoginForm() {
 
       <label className="field" htmlFor="password">
         <span>Contraseña</span>
-        <input id="password" name="password" type="password" autoComplete="current-password" required minLength={6} placeholder="Mínimo 6 caracteres" />
+        <span className="password-field">
+          <input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required minLength={6} placeholder="Mínimo 6 caracteres" />
+          <button
+            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            aria-pressed={showPassword}
+            className="password-toggle"
+            type="button"
+            onClick={() => setShowPassword((visible) => !visible)}
+          >
+            {showPassword ? "Ocultar" : "Mostrar"}
+          </button>
+        </span>
       </label>
 
       {state.error ? <p className="auth-message error" role="alert">{state.error}</p> : null}
