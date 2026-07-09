@@ -82,7 +82,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
     console.warn("Supabase could not load the dashboard meal logs:", mealLogsError.message);
   }
 
-  const mealsToday = mealLogs ?? [];
+  const mealsToday = mealLogsError ? [] : mealLogs ?? [];
   const consumedToday = sumMacros(mealsToday.map((meal) => ({
     calories: meal.calories,
     proteinG: meal.protein_g,
