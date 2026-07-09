@@ -317,6 +317,10 @@ h3 {
   gap: 14px;
 }
 
+.meal-log-form {
+  display: grid;
+  gap: 14px;
+}
 .card ul {
   margin: 14px 0 18px;
   padding-left: 20px;
