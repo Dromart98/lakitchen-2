@@ -79,7 +79,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   }
 
   if (mealLogsError) {
-    console.warn("Supabase could not load the dashboard meal logs:", mealLogsError.message);
+    console.warn("Dashboard meal logs could not be loaded; using empty fallback.");
   }
 
   const mealsToday = mealLogsError ? [] : mealLogs ?? [];
