@@ -205,6 +205,9 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
           </div>
         )}
       </section>
+      <p className="muted" style={{ fontSize: 12, marginTop: 16 }}>
+        Build check: no-meal-error-banner-v1
+      </p>
     </main>
   );
 }
