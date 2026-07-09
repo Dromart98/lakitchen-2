@@ -54,26 +54,61 @@ export default async function DashboardPage() {
     <main className="shell">
       <div className="topbar">
         <h1>Lakitchen</h1>
-        <form action="/auth/signout" method="post"><button className="logout-link" type="submit">Cerrar sesión</button></form>
+        <form action="/auth/signout" method="post">
+          <button className="logout-link" type="submit">Cerrar sesión</button>
+        </form>
       </div>
+
       <p className="muted">Dashboard mobile-first para macros, inventario y recetas.</p>
-      <div className="dashboard-actions"><Link className="button nav-button" href="/nutrition-profile">Configurar perfil nutricional</Link></div>
-      {error ? <p className="auth-message error" role="alert">Supabase no pudo cargar tu perfil nutricional: {error.message}</p> : null}
+
+      <div className="dashboard-actions">
+        <Link className="button nav-button" href="/nutrition-profile">
+          Configurar perfil nutricional
+        </Link>
+      </div>
+
+      {error ? (
+        <p className="auth-message error" role="alert">
+          Supabase no pudo cargar tu perfil nutricional: {error.message}
+        </p>
+      ) : null}
+
       {goal && remaining ? (
         <section className="grid cards">
-          <MacroProgress consumed={consumedToday} goal={goal}/>
-          <div className="card"><h2>Restante</h2><p>{remaining.calories} kcal</p><p className="muted">P {remaining.proteinG}g · C {remaining.carbsG}g · G {remaining.fatG}g</p></div>
+          <MacroProgress consumed={consumedToday} goal={goal} />
+          <div className="card">
+            <h2>Restante</h2>
+            <p>{remaining.calories} kcal</p>
+            <p className="muted">
+              P {remaining.proteinG}g · C {remaining.carbsG}g · G {remaining.fatG}g
+            </p>
+          </div>
         </section>
       ) : (
         <section className="card">
           <h2>Configura tu perfil nutricional</h2>
-          <p className="muted">Aún no hay objetivos diarios guardados para tu usuario. Completa tu perfil para ver calorías, proteína, carbohidratos y grasas personalizados.</p>
-          <Link className="button nav-button" href="/nutrition-profile">Crear perfil nutricional</Link>
+          <p className="muted">
+            Aún no hay objetivos diarios guardados para tu usuario. Completa tu perfil para ver calorías,
+            proteína, carbohidratos y grasas personalizados.
+          </p>
+          <Link className="button nav-button" href="/nutrition-profile">
+            Crear perfil nutricional
+          </Link>
         </section>
       )}
+
       <section className="grid cards" style={{ marginTop: 16 }}>
-        <ExpiringList items={expiring}/>
-        {recipe ? <RecipeSuggestion recipe={recipe}/> : <div className="card"><h2>Receta sugerida</h2><p className="muted">Configura tu perfil nutricional para generar una sugerencia con tus macros restantes.</p></div>}
+        <ExpiringList items={expiring} />
+        {recipe ? (
+          <RecipeSuggestion recipe={recipe} />
+        ) : (
+          <div className="card">
+            <h2>Receta sugerida</h2>
+            <p className="muted">
+              Configura tu perfil nutricional para generar una sugerencia con tus macros restantes.
+            </p>
+          </div>
+        )}
       </section>
     </main>
   );
