@@ -72,7 +72,7 @@ export function LoginForm() {
 
       <label className="field" htmlFor="password">
         <span>Contraseña</span>
-        <span className="password-field">
+        <span className="password-input-wrap">
           <input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required minLength={6} placeholder="Mínimo 6 caracteres" />
           <button
             aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
