@@ -40,6 +40,13 @@ function getProfileGoal(profile: NutritionProfileTargetsRow | null): MacroTotals
   return { calories, proteinG, carbsG, fatG };
 }
 
+const emptyConsumedToday: MacroTotals = {
+  calories: 0,
+  proteinG: 0,
+  carbsG: 0,
+  fatG: 0,
+};
+
 export const dynamic = "force-dynamic";
 
 function getMealErrorMessage(code: string | undefined) {
@@ -85,7 +92,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   const resolvedSearchParams = await searchParams;
   const mealErrorMessage = getMealErrorMessage(resolvedSearchParams?.mealError);
   const goal = getProfileGoal(profile ?? null);
-  const remaining = goal ? remainingMacros(goal, consumedToday) : null;
+  const remaining = goal ? remainingMacros(goal, emptyConsumedToday) : null;
   const expiring = getExpiringItems(inventory);
   const recipe = remaining ? generateRecipe({ items: inventory, mealType: "dinner", macroTarget: remaining }) : null;
 
@@ -120,7 +127,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
 
       {goal && remaining ? (
         <section className="grid cards">
-          <MacroProgress consumed={consumedToday} goal={goal} />
+          <MacroProgress consumed={emptyConsumedToday} goal={goal} />
           <div className="card">
             <h2>Restante</h2>
             <p>{remaining.calories} kcal</p>
