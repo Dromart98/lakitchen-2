@@ -78,9 +78,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
     console.warn("Supabase could not load the dashboard nutrition profile:", error.message);
   }
 
-  if (mealLogsError) {
-    console.warn("Dashboard meal logs could not be loaded; using empty fallback.");
-  }
 
   const mealsToday = mealLogsError ? [] : mealLogs ?? [];
   const consumedToday = sumMacros(mealsToday.map((meal) => ({
