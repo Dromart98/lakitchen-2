@@ -111,9 +111,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
         <Link className="button nav-button" href="/nutrition-profile">
           Configurar perfil nutricional
         </Link>
-        <Link className="button nav-button" href="/inventory">
-          Inventario
-        </Link>
       </div>
 
       {error ? (
