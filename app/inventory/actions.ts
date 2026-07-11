@@ -27,7 +27,7 @@ function getOptionalExpirationDate(formData: FormData) {
     return null;
   }
 
-  const parsedDate = new Date(`${rawValue}T00:00:00`);
+  const parsedDate = new Date(`${rawValue}T00:00:00.000Z`);
   if (Number.isNaN(parsedDate.getTime()) || rawValue !== parsedDate.toISOString().slice(0, 10)) {
     redirect("/inventory?inventoryError=invalid-expires-at");
   }
