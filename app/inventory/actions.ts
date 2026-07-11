@@ -39,7 +39,7 @@ function getOptionalExpirationDate(formData: FormData) {
   return rawValue;
 }
 
-export async function addInventoryItemAction(formData: FormData) {
+function getValidatedInventoryFields(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const location = String(formData.get("location") ?? "");
   const quantity = Number(formData.get("quantity"));
@@ -66,6 +66,18 @@ export async function addInventoryItemAction(formData: FormData) {
   }
 
   const expiresAt = getOptionalExpirationDate(formData);
+
+  return {
+    name,
+    location,
+    quantity,
+    unit,
+    expiresAt,
+  };
+}
+
+export async function addInventoryItemAction(formData: FormData) {
+  const { name, location, quantity, unit, expiresAt } = getValidatedInventoryFields(formData);
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "inventory item creation");
 
@@ -85,6 +97,46 @@ export async function addInventoryItemAction(formData: FormData) {
 
   revalidatePath("/inventory");
   redirect("/inventory?inventorySuccess=item-created");
+}
+
+export async function updateInventoryItemAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "").trim();
+
+  if (!isUuid(id)) {
+    redirect("/inventory?inventoryError=update-not-found");
+  }
+
+  const { name, location, quantity, unit, expiresAt } = getValidatedInventoryFields(formData);
+  const supabase = await createClient();
+  const user = await requireAuthenticatedUser(supabase, "inventory item update");
+
+  const { data, error } = await (supabase as any)
+    .from("inventory_items")
+    .update({
+      name,
+      location,
+      quantity,
+      unit,
+      expires_at: expiresAt,
+    })
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .select("id") as {
+      data: { id: string }[] | null;
+      error: { message: string } | null;
+    };
+
+  if (error) {
+    console.warn("Supabase could not update the inventory item:", error.message);
+    redirect("/inventory?inventoryError=update-failed");
+  }
+
+  if (!data?.length) {
+    redirect("/inventory?inventoryError=update-not-found");
+  }
+
+  revalidatePath("/inventory");
+  redirect("/inventory?inventorySuccess=item-updated");
 }
 
 export async function deleteInventoryItemAction(formData: FormData) {
