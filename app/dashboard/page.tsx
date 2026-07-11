@@ -114,6 +114,9 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
         <Link className="button nav-button" href="/inventory">
           Inventario
         </Link>
+        <a className="button nav-button" href="/shopping-list">
+          Lista de la compra
+        </a>
       </div>
 
       {error ? (
