@@ -78,6 +78,9 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
     console.warn("Supabase could not load the dashboard nutrition profile:", error.message);
   }
 
+  if (mealLogsError) {
+    console.warn("Supabase could not load the dashboard meal logs:", mealLogsError.message);
+  }
 
   const mealsToday = mealLogsError ? [] : mealLogs ?? [];
   const consumedToday = sumMacros(mealsToday.map((meal) => ({
@@ -113,12 +116,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
       {error ? (
         <p className="auth-message error" role="alert">
           Supabase no pudo cargar tu perfil nutricional: {error.message}
-        </p>
-      ) : null}
-
-      {mealLogsError ? (
-        <p className="auth-message error" role="alert">
-          Supabase no pudo cargar tus comidas de hoy: {mealLogsError.message}
         </p>
       ) : null}
 
