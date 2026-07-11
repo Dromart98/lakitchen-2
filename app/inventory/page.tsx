@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 
-import { addInventoryItemAction } from "./actions";
+import { addInventoryItemAction, deleteInventoryItemAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -44,10 +44,13 @@ const inventoryErrorMessages: Record<string, string> = {
   "invalid-unit": "Selecciona una unidad válida.",
   "invalid-expires-at": "Introduce una fecha de caducidad válida.",
   "save-failed": "No se pudo guardar el producto. Inténtalo de nuevo.",
+  "delete-not-found": "Este producto ya no está disponible.",
+  "delete-failed": "No se pudo eliminar el producto. Inténtalo de nuevo.",
 };
 
 const inventorySuccessMessages: Record<string, string> = {
   "item-created": "Producto añadido al inventario correctamente.",
+  "item-deleted": "Producto eliminado correctamente.",
 };
 
 const expirationFormatter = new Intl.DateTimeFormat("es-ES", {
@@ -175,6 +178,10 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                       {item.quantity} {item.unit}
                       <br />
                       <span className="muted">{formatExpirationDate(item.expires_at)}</span>
+                      <form action={deleteInventoryItemAction} className="meal-log-form">
+                        <input name="id" type="hidden" value={item.id} />
+                        <button className="button" type="submit">Eliminar</button>
+                      </form>
                     </li>
                   ))}
                 </ul>

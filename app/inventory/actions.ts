@@ -20,6 +20,10 @@ function isInventoryUnit(value: string): value is InventoryUnit {
   return inventoryUnits.includes(value as InventoryUnit);
 }
 
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 function getOptionalExpirationDate(formData: FormData) {
   const rawValue = String(formData.get("expires_at") ?? "").trim();
 
@@ -81,4 +85,37 @@ export async function addInventoryItemAction(formData: FormData) {
 
   revalidatePath("/inventory");
   redirect("/inventory?inventorySuccess=item-created");
+}
+
+export async function deleteInventoryItemAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "").trim();
+
+  if (!isUuid(id)) {
+    redirect("/inventory?inventoryError=delete-not-found");
+  }
+
+  const supabase = await createClient();
+  const user = await requireAuthenticatedUser(supabase, "inventory item deletion");
+
+  const { data, error } = await (supabase as any)
+    .from("inventory_items")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .select("id") as {
+      data: { id: string }[] | null;
+      error: { message: string } | null;
+    };
+
+  if (error) {
+    console.warn("Supabase could not delete the inventory item:", error.message);
+    redirect("/inventory?inventoryError=delete-failed");
+  }
+
+  if (!data?.length) {
+    redirect("/inventory?inventoryError=delete-not-found");
+  }
+
+  revalidatePath("/inventory");
+  redirect("/inventory?inventorySuccess=item-deleted");
 }
