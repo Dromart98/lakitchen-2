@@ -3,6 +3,8 @@ import Link from "next/link";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 
+import { addInventoryItemAction } from "./actions";
+
 export const dynamic = "force-dynamic";
 
 type InventoryLocation = "pantry" | "fridge" | "freezer";
@@ -23,10 +25,29 @@ type InventoryGroup = {
   items: InventoryItemRow[];
 };
 
+type InventoryPageSearchParams = {
+  inventoryError?: string;
+  inventorySuccess?: string;
+};
+
 const locationLabels: Record<InventoryLocation, string> = {
   pantry: "Despensa",
   fridge: "Nevera",
   freezer: "Congelador",
+};
+
+const inventoryErrorMessages: Record<string, string> = {
+  "name-required": "El nombre del producto es obligatorio.",
+  "name-too-long": "El nombre no puede superar los 120 caracteres.",
+  "invalid-location": "Selecciona una ubicación válida.",
+  "invalid-quantity": "La cantidad debe ser un número mayor que cero.",
+  "invalid-unit": "Selecciona una unidad válida.",
+  "invalid-expires-at": "Introduce una fecha de caducidad válida.",
+  "save-failed": "No se pudo guardar el producto. Inténtalo de nuevo.",
+};
+
+const inventorySuccessMessages: Record<string, string> = {
+  "item-created": "Producto añadido al inventario correctamente.",
 };
 
 const expirationFormatter = new Intl.DateTimeFormat("es-ES", {
@@ -49,7 +70,7 @@ function groupInventoryItems(items: InventoryItemRow[]): InventoryGroup[] {
   }));
 }
 
-export default async function InventoryPage() {
+export default async function InventoryPage({ searchParams }: { searchParams?: Promise<InventoryPageSearchParams> }) {
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "inventory");
 
@@ -70,6 +91,13 @@ export default async function InventoryPage() {
 
   const items = error ? [] : data ?? [];
   const groupedItems = groupInventoryItems(items);
+  const resolvedSearchParams = await searchParams;
+  const inventoryErrorMessage = resolvedSearchParams?.inventoryError
+    ? inventoryErrorMessages[resolvedSearchParams.inventoryError]
+    : null;
+  const inventorySuccessMessage = resolvedSearchParams?.inventorySuccess
+    ? inventorySuccessMessages[resolvedSearchParams.inventorySuccess]
+    : null;
 
   return (
     <main className="shell">
@@ -82,6 +110,46 @@ export default async function InventoryPage() {
           Volver al dashboard
         </Link>
       </div>
+
+      <section className="card form-section">
+        <h2>Añadir producto</h2>
+        <p className="muted">Registra productos en tu despensa, nevera o congelador.</p>
+        {inventoryErrorMessage ? <p className="auth-message error" role="alert">{inventoryErrorMessage}</p> : null}
+        {inventorySuccessMessage ? <p className="auth-message success" role="status">{inventorySuccessMessage}</p> : null}
+        <form action={addInventoryItemAction} className="meal-log-form">
+          <label className="field" htmlFor="inventory-name">
+            <span>Nombre</span>
+            <input id="inventory-name" name="name" type="text" maxLength={120} required placeholder="Arroz integral" />
+          </label>
+          <label className="field" htmlFor="inventory-location">
+            <span>Ubicación</span>
+            <select id="inventory-location" name="location" required defaultValue="pantry">
+              <option value="pantry">Despensa</option>
+              <option value="fridge">Nevera</option>
+              <option value="freezer">Congelador</option>
+            </select>
+          </label>
+          <label className="field" htmlFor="inventory-quantity">
+            <span>Cantidad</span>
+            <input id="inventory-quantity" name="quantity" type="number" min="0.000001" step="any" required placeholder="1" />
+          </label>
+          <label className="field" htmlFor="inventory-unit">
+            <span>Unidad</span>
+            <select id="inventory-unit" name="unit" required defaultValue="ud">
+              <option value="ud">ud</option>
+              <option value="g">g</option>
+              <option value="kg">kg</option>
+              <option value="ml">ml</option>
+              <option value="l">l</option>
+            </select>
+          </label>
+          <label className="field" htmlFor="inventory-expires-at">
+            <span>Caducidad (opcional)</span>
+            <input id="inventory-expires-at" name="expires_at" type="date" />
+          </label>
+          <button className="button" type="submit">Añadir producto</button>
+        </form>
+      </section>
 
       {error ? (
         <section className="card" role="alert">
