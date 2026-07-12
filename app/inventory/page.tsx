@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 
-import { addInventoryItemAction, deleteInventoryItemAction, updateInventoryItemAction } from "./actions";
+import { addInventoryItemAction, consumeInventoryItemAction, deleteInventoryItemAction, updateInventoryItemAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +47,9 @@ const inventoryErrorMessages: Record<string, string> = {
   "update-not-found": "Este producto ya no está disponible.",
   "update-failed": "No se pudo actualizar el producto. Inténtalo de nuevo.",
   "delete-not-found": "Este producto ya no está disponible.",
+  "consume-not-found": "Este producto ya no está disponible.",
+  "consume-too-much": "La cantidad indicada supera el stock disponible.",
+  "consume-failed": "No se pudo actualizar el inventario. Inténtalo de nuevo.",
   "delete-failed": "No se pudo eliminar el producto. Inténtalo de nuevo.",
 };
 
@@ -54,6 +57,8 @@ const inventorySuccessMessages: Record<string, string> = {
   "item-created": "Producto añadido al inventario correctamente.",
   "item-updated": "Producto actualizado correctamente.",
   "item-deleted": "Producto eliminado correctamente.",
+  "item-consumed": "Cantidad descontada correctamente.",
+  "item-consumed-completely": "Producto consumido por completo y eliminado del inventario.",
 };
 
 const expirationFormatter = new Intl.DateTimeFormat("es-ES", {
@@ -185,6 +190,17 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                         <input name="id" type="hidden" value={item.id} />
                         <button className="button" type="submit">Eliminar</button>
                       </form>
+                      <details>
+                        <summary>Descontar cantidad</summary>
+                        <form action={consumeInventoryItemAction} className="meal-log-form">
+                          <input name="id" type="hidden" value={item.id} />
+                          <label className="field" htmlFor={`inventory-consumed-quantity-${item.id}`}>
+                            <span>Cantidad consumida</span>
+                            <input id={`inventory-consumed-quantity-${item.id}`} name="consumed_quantity" type="number" min="0.000001" step="any" required />
+                          </label>
+                          <button className="button" type="submit">Confirmar consumo</button>
+                        </form>
+                      </details>
                       <details>
                         <summary>Editar</summary>
                         <form action={updateInventoryItemAction} className="meal-log-form">
