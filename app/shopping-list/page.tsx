@@ -7,6 +7,8 @@ import {
   addShoppingListItemAction,
   deleteShoppingListItemAction,
   setShoppingListItemPurchasedAction,
+  transferShoppingListItemToInventoryAction,
+  updateShoppingListItemAction,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -30,9 +32,13 @@ const shoppingListErrorMessages: Record<string, string> = {
   "name-too-long": "El nombre no puede superar los 120 caracteres.",
   "invalid-quantity": "La cantidad debe ser un número mayor que cero.",
   "invalid-unit": "Selecciona una unidad válida.",
+  "invalid-location": "Selecciona una ubicación válida.",
+  "invalid-expires-at": "Introduce una fecha de caducidad válida.",
   "item-not-found": "Este producto ya no está disponible.",
   "save-failed": "No se pudo guardar el producto. Inténtalo de nuevo.",
   "update-failed": "No se pudo actualizar el producto. Inténtalo de nuevo.",
+  "transfer-not-available": "Este producto no está disponible para transferir.",
+  "transfer-failed": "No se pudo añadir el producto al inventario. Inténtalo de nuevo.",
   "delete-failed": "No se pudo eliminar el producto. Inténtalo de nuevo.",
 };
 
@@ -41,6 +47,8 @@ const shoppingListSuccessMessages: Record<string, string> = {
   "item-purchased": "Producto marcado como comprado.",
   "item-pending": "Producto devuelto a pendientes.",
   "item-deleted": "Producto eliminado correctamente.",
+  "item-updated": "Producto actualizado correctamente.",
+  "item-transferred": "Producto añadido al inventario correctamente.",
 };
 
 function ShoppingListGroup({ items, title }: { items: ShoppingListItemRow[]; title: string }) {
@@ -65,6 +73,67 @@ function ShoppingListGroup({ items, title }: { items: ShoppingListItemRow[]; tit
                 <input name="id" type="hidden" value={item.id} />
                 <button className="button" type="submit">Eliminar</button>
               </form>
+              {item.is_purchased ? (
+                <details>
+                  <summary>Pasar al inventario</summary>
+                  <form action={transferShoppingListItemToInventoryAction} className="meal-log-form">
+                    <input name="id" type="hidden" value={item.id} />
+                    <label className="field" htmlFor={`shopping-list-transfer-location-${item.id}`}>
+                      <span>Ubicación</span>
+                      <select id={`shopping-list-transfer-location-${item.id}`} name="location" required defaultValue="pantry">
+                        <option value="pantry">Despensa</option>
+                        <option value="fridge">Nevera</option>
+                        <option value="freezer">Congelador</option>
+                      </select>
+                    </label>
+                    <label className="field" htmlFor={`shopping-list-transfer-expires-at-${item.id}`}>
+                      <span>Fecha de caducidad (opcional)</span>
+                      <input id={`shopping-list-transfer-expires-at-${item.id}`} name="expires_at" type="date" />
+                    </label>
+                    <button className="button" type="submit">Añadir al inventario</button>
+                  </form>
+                </details>
+              ) : null}
+              <details>
+                <summary>Editar</summary>
+                <form action={updateShoppingListItemAction} className="meal-log-form">
+                  <input name="id" type="hidden" value={item.id} />
+                  <label className="field" htmlFor={`shopping-list-name-${item.id}`}>
+                    <span>Nombre</span>
+                    <input
+                      id={`shopping-list-name-${item.id}`}
+                      name="name"
+                      type="text"
+                      maxLength={120}
+                      required
+                      defaultValue={item.name}
+                    />
+                  </label>
+                  <label className="field" htmlFor={`shopping-list-quantity-${item.id}`}>
+                    <span>Cantidad</span>
+                    <input
+                      id={`shopping-list-quantity-${item.id}`}
+                      name="quantity"
+                      type="number"
+                      min="0.000001"
+                      step="any"
+                      required
+                      defaultValue={item.quantity}
+                    />
+                  </label>
+                  <label className="field" htmlFor={`shopping-list-unit-${item.id}`}>
+                    <span>Unidad</span>
+                    <select id={`shopping-list-unit-${item.id}`} name="unit" required defaultValue={item.unit}>
+                      <option value="ud">ud</option>
+                      <option value="g">g</option>
+                      <option value="kg">kg</option>
+                      <option value="ml">ml</option>
+                      <option value="l">l</option>
+                    </select>
+                  </label>
+                  <button className="button" type="submit">Guardar cambios</button>
+                </form>
+              </details>
             </li>
           ))}
         </ul>
