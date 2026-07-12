@@ -5,6 +5,7 @@ import { MacroProgress } from "@/components/nutrition/MacroProgress";
 import { inventory } from "@/lib/demo-data";
 import { getExpiringItems } from "@/modules/inventory/inventory.rules";
 import { remainingMacros, sumMacros } from "@/modules/meals/meal-summary";
+import { MEAL_TYPE_LABELS, MEAL_TYPES, normalizeMealType } from "@/modules/meals/meal-types";
 import { addMealLogAction, deleteMealLogAction } from "./actions";
 import type { MacroTotals } from "@/modules/nutrition/nutrition.types";
 import { generateRecipe } from "@/modules/recipes/recipe-generator.service";
@@ -26,6 +27,7 @@ type DailyMealLogRow = {
   carbs_g: number;
   fat_g: number;
   created_at: string;
+  meal_type: string | null;
 };
 
 function getProfileGoal(profile: NutritionProfileTargetsRow | null): MacroTotals | null {
@@ -47,6 +49,7 @@ function getMealErrorMessage(code: string | undefined) {
   if (code === "meal-name-required") return "Escribe un nombre para la comida.";
   if (code === "meal-name-too-long") return "El nombre de la comida no puede superar los 120 caracteres.";
   if (code === "invalid-macros") return "Los macros deben ser números enteros de 0 o más.";
+  if (code === "invalid-meal-type") return "Selecciona un tipo de comida válido.";
   if (code === "meal-not-found") return "No se encontró la comida de hoy.";
   if (code === "save-failed") return "No se pudo guardar la comida. Inténtalo de nuevo.";
   if (code === "delete-failed") return "No se pudo eliminar la comida. Inténtalo de nuevo.";
@@ -72,7 +75,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   const today = new Date().toISOString().slice(0, 10);
   const { data: mealLogs, error: mealLogsError } = await (supabase as any)
     .from("daily_meal_logs")
-    .select("id, name, calories, protein_g, carbs_g, fat_g, created_at")
+    .select("id, name, calories, protein_g, carbs_g, fat_g, created_at, meal_type")
     .eq("user_id", user.id)
     .eq("consumed_on", today)
     .order("created_at", { ascending: false }) as { data: DailyMealLogRow[] | null; error: { message: string } | null };
@@ -86,6 +89,11 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   }
 
   const mealsToday = mealLogsError ? [] : mealLogs ?? [];
+  const groupedMeals = MEAL_TYPES.map((mealType) => ({
+    mealType,
+    label: MEAL_TYPE_LABELS[mealType],
+    meals: mealsToday.filter((meal) => normalizeMealType(meal.meal_type) === mealType),
+  })).filter((group) => group.meals.length > 0);
   const consumedToday = sumMacros(mealsToday.map((meal) => ({
     calories: meal.calories,
     proteinG: meal.protein_g,
@@ -164,6 +172,15 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
               <span>Nombre</span>
               <input id="meal-name" name="name" type="text" required placeholder="Pollo con arroz" />
             </label>
+            <label className="field" htmlFor="meal-type">
+              <span>Tipo de comida</span>
+              <select id="meal-type" name="meal_type" required defaultValue="">
+                <option value="" disabled>Selecciona un tipo</option>
+                {MEAL_TYPES.map((mealType) => (
+                  <option key={mealType} value={mealType}>{MEAL_TYPE_LABELS[mealType]}</option>
+                ))}
+              </select>
+            </label>
             <label className="field" htmlFor="meal-calories">
               <span>Calorías</span>
               <input id="meal-calories" name="calories" type="number" min="0" step="1" required defaultValue="0" />
@@ -187,17 +204,24 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
         <div className="card">
           <h2>Comidas registradas hoy</h2>
           {mealsToday.length ? (
-            <ul>
-              {mealsToday.map((meal) => (
-                <li key={meal.id}>
-                  <strong>{meal.name}</strong> · {meal.calories} kcal · P {meal.protein_g}g · C {meal.carbs_g}g · G {meal.fat_g}g
-                  <form action={deleteMealLogAction} style={{ display: "inline", marginLeft: 8 }}>
-                    <input type="hidden" name="id" value={meal.id} />
-                    <button className="button" type="submit">Eliminar</button>
-                  </form>
-                </li>
+            <div>
+              {groupedMeals.map((group) => (
+                <section key={group.mealType} style={{ marginTop: 12 }}>
+                  <h3>{group.label}</h3>
+                  <ul>
+                    {group.meals.map((meal) => (
+                      <li key={meal.id}>
+                        <strong>{meal.name}</strong> · {meal.calories} kcal · P {meal.protein_g}g · C {meal.carbs_g}g · G {meal.fat_g}g
+                        <form action={deleteMealLogAction} style={{ display: "inline", marginLeft: 8 }}>
+                          <input type="hidden" name="id" value={meal.id} />
+                          <button className="button" type="submit">Eliminar</button>
+                        </form>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               ))}
-            </ul>
+            </div>
           ) : (
             <p className="muted">Aún no has registrado comidas hoy.</p>
           )}
