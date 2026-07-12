@@ -5,49 +5,23 @@ import { redirect } from "next/navigation";
 
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { isMealType } from "@/modules/meals/meal-types";
+import { isMealLogId, validateMealLogInput } from "@/modules/meals/meal-validation";
 
 const DASHBOARD_PATH = "/dashboard";
 
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+function redirectMealValidationError(error: string, destination = DASHBOARD_PATH): never {
+  redirect(`${destination}?mealError=${error}`);
 }
 
-function readNonNegativeInteger(formData: FormData, field: string) {
-  const rawValue = formData.get(field);
-
-  if (rawValue === null || String(rawValue).trim() === "") {
-    redirect(`${DASHBOARD_PATH}?mealError=invalid-macros`);
-  }
-
-  const value = Number(rawValue);
-  if (!Number.isInteger(value) || value < 0) {
-    redirect(`${DASHBOARD_PATH}?mealError=invalid-macros`);
-  }
-  return value;
-}
 
 export async function addMealLogAction(formData: FormData) {
-  const name = String(formData.get("name") ?? "").trim();
+  const mealInput = validateMealLogInput(formData);
 
-  if (!name) {
-    redirect(`${DASHBOARD_PATH}?mealError=meal-name-required`);
+  if ("error" in mealInput) {
+    redirectMealValidationError(mealInput.error);
   }
 
-  if (name.length > 120) {
-    redirect(`${DASHBOARD_PATH}?mealError=meal-name-too-long`);
-  }
-
-  const mealType = String(formData.get("meal_type") ?? "").trim();
-
-  if (!isMealType(mealType)) {
-    redirect(`${DASHBOARD_PATH}?mealError=invalid-meal-type`);
-  }
-
-  const calories = readNonNegativeInteger(formData, "calories");
-  const proteinG = readNonNegativeInteger(formData, "protein_g");
-  const carbsG = readNonNegativeInteger(formData, "carbs_g");
-  const fatG = readNonNegativeInteger(formData, "fat_g");
+  const { name, mealType, calories, proteinG, carbsG, fatG } = mealInput.value;
   const consumedOn = new Date().toISOString().slice(0, 10);
 
   const supabase = await createClient();
@@ -73,10 +47,59 @@ export async function addMealLogAction(formData: FormData) {
   redirect(`${DASHBOARD_PATH}?mealSuccess=meal-created`);
 }
 
+export async function updateMealLogAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "").trim();
+
+  if (!isMealLogId(id)) {
+    redirect(`${DASHBOARD_PATH}?mealError=meal-not-found`);
+  }
+
+  const mealInput = validateMealLogInput(formData);
+  const editPath = `${DASHBOARD_PATH}/meals/${id}/edit`;
+
+  if ("error" in mealInput) {
+    redirectMealValidationError(mealInput.error, editPath);
+  }
+
+  const { name, mealType, calories, proteinG, carbsG, fatG } = mealInput.value;
+  const supabase = await createClient();
+  const user = await requireAuthenticatedUser(supabase, "dashboard meal update");
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data, error } = await (supabase as any)
+    .from("daily_meal_logs")
+    .update({
+      name,
+      meal_type: mealType,
+      calories,
+      protein_g: proteinG,
+      carbs_g: carbsG,
+      fat_g: fatG,
+    })
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .eq("consumed_on", today)
+    .select("id") as { data: { id: string }[] | null; error: { message: string } | null };
+
+  if (error) {
+    console.warn("Supabase could not update the dashboard meal log:", error.message);
+    redirect(`${editPath}?mealError=update-failed`);
+  }
+
+  if (!data?.length) {
+    redirect(`${DASHBOARD_PATH}?mealError=meal-not-found`);
+  }
+
+  revalidatePath(DASHBOARD_PATH);
+  revalidatePath("/meal-history");
+  revalidatePath("/weekly-summary");
+  redirect(`${DASHBOARD_PATH}?mealSuccess=meal-updated`);
+}
+
 export async function deleteMealLogAction(formData: FormData) {
   const id = String(formData.get("id") ?? "").trim();
 
-  if (!isUuid(id)) {
+  if (!isMealLogId(id)) {
     redirect(`${DASHBOARD_PATH}?mealError=meal-not-found`);
   }
 
