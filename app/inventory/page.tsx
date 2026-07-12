@@ -25,9 +25,14 @@ type InventoryGroup = {
   items: InventoryItemRow[];
 };
 
+type InventoryExpirationFilter = "all" | "expired" | "today" | "next-7-days" | "no-date";
+
 type InventoryPageSearchParams = {
   inventoryError?: string;
   inventorySuccess?: string;
+  query?: string;
+  location?: string;
+  expiration?: string;
 };
 
 const locationLabels: Record<InventoryLocation, string> = {
@@ -35,6 +40,16 @@ const locationLabels: Record<InventoryLocation, string> = {
   fridge: "Nevera",
   freezer: "Congelador",
 };
+
+const inventoryLocations = ["pantry", "fridge", "freezer"] as const;
+
+const expirationFilters: { value: InventoryExpirationFilter; label: string }[] = [
+  { value: "all", label: "Todos" },
+  { value: "expired", label: "Caducados" },
+  { value: "today", label: "Caducan hoy" },
+  { value: "next-7-days", label: "Próximos 7 días" },
+  { value: "no-date", label: "Sin fecha de caducidad" },
+];
 
 const inventoryErrorMessages: Record<string, string> = {
   "name-required": "El nombre del producto es obligatorio.",
@@ -112,11 +127,32 @@ function getExpirationAlertItems(items: InventoryItemRow[], todayKey: string) {
 }
 
 function groupInventoryItems(items: InventoryItemRow[]): InventoryGroup[] {
-  return (["pantry", "fridge", "freezer"] as const).map((location) => ({
+  return inventoryLocations.map((location) => ({
     location,
     label: locationLabels[location],
     items: items.filter((item) => item.location === location),
   }));
+}
+
+function isInventoryLocation(value: string | undefined): value is InventoryLocation {
+  return inventoryLocations.some((location) => location === value);
+}
+
+function isExpirationFilter(value: string | undefined): value is InventoryExpirationFilter {
+  return expirationFilters.some((filter) => filter.value === value);
+}
+
+function matchesExpirationFilter(item: InventoryItemRow, expirationFilter: InventoryExpirationFilter, todayKey: string) {
+  if (expirationFilter === "all") return true;
+  if (expirationFilter === "no-date") return !item.expires_at;
+  if (!item.expires_at) return false;
+
+  const dayDifference = getExpirationDayDifference(item.expires_at, todayKey);
+
+  if (expirationFilter === "expired") return dayDifference < 0;
+  if (expirationFilter === "today") return dayDifference === 0;
+
+  return dayDifference > 0 && dayDifference <= 7;
 }
 
 export default async function InventoryPage({ searchParams }: { searchParams?: Promise<InventoryPageSearchParams> }) {
@@ -139,10 +175,20 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
   }
 
   const items = error ? [] : data ?? [];
-  const groupedItems = groupInventoryItems(items);
   const todayKey = toUtcDateKey(new Date());
   const expirationAlertItems = getExpirationAlertItems(items, todayKey);
   const resolvedSearchParams = await searchParams;
+  const query = resolvedSearchParams?.query?.trim() ?? "";
+  const selectedLocation: InventoryLocation | "all" = isInventoryLocation(resolvedSearchParams?.location) ? resolvedSearchParams.location : "all";
+  const selectedExpiration: InventoryExpirationFilter = isExpirationFilter(resolvedSearchParams?.expiration) ? resolvedSearchParams.expiration : "all";
+  const normalizedQuery = query.toLocaleLowerCase("es-ES");
+  const filteredItems = items.filter((item) => {
+    const matchesQuery = normalizedQuery ? item.name.toLocaleLowerCase("es-ES").includes(normalizedQuery) : true;
+    const matchesLocation = selectedLocation === "all" ? true : item.location === selectedLocation;
+
+    return matchesQuery && matchesLocation && matchesExpirationFilter(item, selectedExpiration, todayKey);
+  });
+  const groupedItems = groupInventoryItems(filteredItems);
   const inventoryErrorMessage = resolvedSearchParams?.inventoryError
     ? inventoryErrorMessages[resolvedSearchParams.inventoryError]
     : null;
@@ -202,6 +248,41 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
         </form>
       </section>
 
+      <section className="card form-section">
+        <h2>Buscar y filtrar</h2>
+        <form action="/inventory" method="get" className="meal-log-form">
+          <label className="field" htmlFor="inventory-query">
+            <span>Buscar por nombre</span>
+            <input id="inventory-query" name="query" type="search" placeholder="Arroz" defaultValue={query} />
+          </label>
+          <label className="field" htmlFor="inventory-location-filter">
+            <span>Ubicación</span>
+            <select id="inventory-location-filter" name="location" defaultValue={selectedLocation}>
+              <option value="all">Todas</option>
+              {inventoryLocations.map((location) => (
+                <option key={location} value={location}>
+                  {locationLabels[location]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field" htmlFor="inventory-expiration-filter">
+            <span>Caducidad</span>
+            <select id="inventory-expiration-filter" name="expiration" defaultValue={selectedExpiration}>
+              {expirationFilters.map((filter) => (
+                <option key={filter.value} value={filter.value}>
+                  {filter.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="button" type="submit">Aplicar filtros</button>
+          <Link className="logout-link" href="/inventory">
+            Limpiar filtros
+          </Link>
+        </form>
+      </section>
+
       {error ? (
         <section className="card" role="alert">
           <h2>No se pudo cargar el inventario</h2>
@@ -230,6 +311,12 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                   </li>
                 ))}
               </ul>
+            </section>
+          ) : null}
+
+          {filteredItems.length === 0 ? (
+            <section className="card">
+              <p className="muted">No hay productos que coincidan con estos filtros.</p>
             </section>
           ) : null}
 

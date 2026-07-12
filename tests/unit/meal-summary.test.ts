@@ -21,4 +21,11 @@ describe("meal macro summary", () => {
       fatG: 48,
     });
   });
+
+  it("does not return negative remaining macros when consumed totals exceed the goal", () => {
+    expect(remainingMacros(
+      { calories: 500, proteinG: 30, carbsG: 40, fatG: 20 },
+      { calories: 700, proteinG: 45, carbsG: 60, fatG: 25 },
+    )).toEqual({ calories: 0, proteinG: 0, carbsG: 0, fatG: 0 });
+  });
 });
