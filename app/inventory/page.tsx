@@ -75,8 +75,18 @@ const expirationFormatter = new Intl.DateTimeFormat("es-ES", {
 
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
 
-function getDateKey(date: Date) {
+function getUtcDateKey(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+function getUtcDayNumber(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+
+  return Date.UTC(year, month - 1, day) / millisecondsPerDay;
+}
+
+function formatFutureExpirationLabel(daysUntilExpiration: number) {
+  return daysUntilExpiration === 1 ? "Caduca en 1 día" : `Caduca en ${daysUntilExpiration} días`;
 }
 
 function getExpirationStatus(expiresAt: string | null, todayKey: string): ExpirationStatus {
@@ -84,24 +94,23 @@ function getExpirationStatus(expiresAt: string | null, todayKey: string): Expira
     return { label: "Sin fecha de caducidad", daysUntilExpiration: null, shouldAlert: false };
   }
 
-  const expirationTime = Date.parse(`${expiresAt}T00:00:00.000Z`);
-  const todayTime = Date.parse(`${todayKey}T00:00:00.000Z`);
-  const daysUntilExpiration = Math.round((expirationTime - todayTime) / millisecondsPerDay);
+  const expirationKey = getUtcDateKey(new Date(`${expiresAt}T00:00:00.000Z`));
+  const daysUntilExpiration = getUtcDayNumber(expirationKey) - getUtcDayNumber(todayKey);
 
-  if (daysUntilExpiration < 0) {
+  if (expirationKey < todayKey) {
     return { label: "Caducado", daysUntilExpiration, shouldAlert: true };
   }
 
-  if (daysUntilExpiration === 0) {
+  if (expirationKey === todayKey) {
     return { label: "Caduca hoy", daysUntilExpiration, shouldAlert: true };
   }
 
   if (daysUntilExpiration <= 7) {
-    return { label: `Caduca en ${daysUntilExpiration} días`, daysUntilExpiration, shouldAlert: true };
+    return { label: formatFutureExpirationLabel(daysUntilExpiration), daysUntilExpiration, shouldAlert: true };
   }
 
   return {
-    label: expirationFormatter.format(new Date(`${expiresAt}T00:00:00`)),
+    label: expirationFormatter.format(new Date(`${expirationKey}T00:00:00`)),
     daysUntilExpiration,
     shouldAlert: false,
   };
@@ -135,7 +144,7 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
   }
 
   const items = error ? [] : data ?? [];
-  const todayKey = getDateKey(new Date());
+  const todayKey = getUtcDateKey(new Date());
   const groupedItems = groupInventoryItems(items);
   const expirationAlerts = items
     .filter((item) => getExpirationStatus(item.expires_at, todayKey).shouldAlert)
