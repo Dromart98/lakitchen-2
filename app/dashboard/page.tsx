@@ -53,12 +53,14 @@ function getMealErrorMessage(code: string | undefined) {
   if (code === "meal-not-found") return "No se encontró la comida de hoy.";
   if (code === "save-failed") return "No se pudo guardar la comida. Inténtalo de nuevo.";
   if (code === "delete-failed") return "No se pudo eliminar la comida. Inténtalo de nuevo.";
+  if (code === "load-edit-failed") return "No se pudo cargar la comida para editar. Inténtalo de nuevo.";
   return null;
 }
 
 function getMealSuccessMessage(code: string | undefined) {
   if (code === "meal-created") return "Comida registrada correctamente.";
   if (code === "meal-deleted") return "Comida eliminada correctamente.";
+  if (code === "meal-updated") return "Comida actualizada correctamente.";
   return null;
 }
 
@@ -218,6 +220,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
                     {group.meals.map((meal) => (
                       <li key={meal.id}>
                         <strong>{meal.name}</strong> · {meal.calories} kcal · P {meal.protein_g}g · C {meal.carbs_g}g · G {meal.fat_g}g
+                        <Link className="button" href={`/dashboard/meals/${meal.id}/edit`} style={{ marginLeft: 8 }}>Editar</Link>
                         <form action={deleteMealLogAction} style={{ display: "inline", marginLeft: 8 }}>
                           <input type="hidden" name="id" value={meal.id} />
                           <button className="button" type="submit">Eliminar</button>
