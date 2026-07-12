@@ -91,36 +91,42 @@ export default async function MealHistoryPage({ searchParams }: { searchParams?:
         </div>
       </section>
 
-      <section className="grid cards" style={{ marginTop: 16 }}>
-        <div className="card">
-          <h2>Resumen diario</h2>
-          <p>{totals.calories} kcal</p>
-          <p className="muted">P {totals.proteinG}g · C {totals.carbsG}g · G {totals.fatG}g</p>
-          <p className="muted">{getMealCountLabel(meals.length)}</p>
-        </div>
-      </section>
-
       {mealLogsError ? (
-        <p className="auth-message error" role="alert">No se pudo cargar el historial de comidas. Inténtalo de nuevo.</p>
-      ) : meals.length ? (
-        <section className="grid cards" style={{ marginTop: 16 }}>
-          {groupedMeals.map((group) => (
-            <div className="card" key={group.mealType}>
-              <h2>{group.label}</h2>
-              <ul>
-                {group.meals.map((meal) => (
-                  <li key={meal.id}>
-                    <strong>{meal.name}</strong> · {meal.calories} kcal · P {meal.protein_g}g · C {meal.carbs_g}g · G {meal.fat_g}g
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+        <section className="card" style={{ marginTop: 16 }}>
+          <p className="auth-message error" role="alert">No se pudo cargar el historial de comidas. Inténtalo de nuevo.</p>
         </section>
       ) : (
-        <section className="card" style={{ marginTop: 16 }}>
-          <p className="muted">No hay comidas registradas en esta fecha.</p>
-        </section>
+        <>
+          <section className="grid cards" style={{ marginTop: 16 }}>
+            <div className="card">
+              <h2>Resumen diario</h2>
+              <p>{totals.calories} kcal</p>
+              <p className="muted">P {totals.proteinG}g · C {totals.carbsG}g · G {totals.fatG}g</p>
+              <p className="muted">{getMealCountLabel(meals.length)}</p>
+            </div>
+          </section>
+
+          {meals.length ? (
+            <section className="grid cards" style={{ marginTop: 16 }}>
+              {groupedMeals.map((group) => (
+                <div className="card" key={group.mealType}>
+                  <h2>{group.label}</h2>
+                  <ul>
+                    {group.meals.map((meal) => (
+                      <li key={meal.id}>
+                        <strong>{meal.name}</strong> · {meal.calories} kcal · P {meal.protein_g}g · C {meal.carbs_g}g · G {meal.fat_g}g
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </section>
+          ) : (
+            <section className="card" style={{ marginTop: 16 }}>
+              <p className="muted">No hay comidas registradas en esta fecha.</p>
+            </section>
+          )}
+        </>
       )}
     </main>
   );
