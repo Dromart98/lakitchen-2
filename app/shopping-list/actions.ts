@@ -63,6 +63,44 @@ export async function addShoppingListItemAction(formData: FormData) {
   redirect("/shopping-list?shoppingListSuccess=item-created");
 }
 
+export async function updateShoppingListItemAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "").trim();
+
+  if (!isUuid(id)) {
+    redirect("/shopping-list?shoppingListError=item-not-found");
+  }
+
+  const { name, quantity, unit } = getValidatedShoppingListFields(formData);
+  const supabase = await createClient();
+  const user = await requireAuthenticatedUser(supabase, "shopping list item update");
+
+  const { data, error } = await (supabase as any)
+    .from("shopping_list_items")
+    .update({
+      name,
+      quantity,
+      unit,
+    })
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .select("id") as {
+      data: { id: string }[] | null;
+      error: { message: string } | null;
+    };
+
+  if (error) {
+    console.warn("Supabase could not update the shopping list item:", error.message);
+    redirect("/shopping-list?shoppingListError=update-failed");
+  }
+
+  if (!data?.length) {
+    redirect("/shopping-list?shoppingListError=item-not-found");
+  }
+
+  revalidatePath("/shopping-list");
+  redirect("/shopping-list?shoppingListSuccess=item-updated");
+}
+
 export async function setShoppingListItemPurchasedAction(formData: FormData) {
   const id = String(formData.get("id") ?? "").trim();
   const rawIsPurchased = String(formData.get("is_purchased") ?? "");

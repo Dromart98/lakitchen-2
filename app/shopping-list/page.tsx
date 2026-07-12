@@ -7,6 +7,7 @@ import {
   addShoppingListItemAction,
   deleteShoppingListItemAction,
   setShoppingListItemPurchasedAction,
+  updateShoppingListItemAction,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +42,7 @@ const shoppingListSuccessMessages: Record<string, string> = {
   "item-purchased": "Producto marcado como comprado.",
   "item-pending": "Producto devuelto a pendientes.",
   "item-deleted": "Producto eliminado correctamente.",
+  "item-updated": "Producto actualizado correctamente.",
 };
 
 function ShoppingListGroup({ items, title }: { items: ShoppingListItemRow[]; title: string }) {
@@ -65,6 +67,46 @@ function ShoppingListGroup({ items, title }: { items: ShoppingListItemRow[]; tit
                 <input name="id" type="hidden" value={item.id} />
                 <button className="button" type="submit">Eliminar</button>
               </form>
+              <details>
+                <summary>Editar</summary>
+                <form action={updateShoppingListItemAction} className="meal-log-form">
+                  <input name="id" type="hidden" value={item.id} />
+                  <label className="field" htmlFor={`shopping-list-name-${item.id}`}>
+                    <span>Nombre</span>
+                    <input
+                      id={`shopping-list-name-${item.id}`}
+                      name="name"
+                      type="text"
+                      maxLength={120}
+                      required
+                      defaultValue={item.name}
+                    />
+                  </label>
+                  <label className="field" htmlFor={`shopping-list-quantity-${item.id}`}>
+                    <span>Cantidad</span>
+                    <input
+                      id={`shopping-list-quantity-${item.id}`}
+                      name="quantity"
+                      type="number"
+                      min="0.000001"
+                      step="any"
+                      required
+                      defaultValue={item.quantity}
+                    />
+                  </label>
+                  <label className="field" htmlFor={`shopping-list-unit-${item.id}`}>
+                    <span>Unidad</span>
+                    <select id={`shopping-list-unit-${item.id}`} name="unit" required defaultValue={item.unit}>
+                      <option value="ud">ud</option>
+                      <option value="g">g</option>
+                      <option value="kg">kg</option>
+                      <option value="ml">ml</option>
+                      <option value="l">l</option>
+                    </select>
+                  </label>
+                  <button className="button" type="submit">Guardar cambios</button>
+                </form>
+              </details>
             </li>
           ))}
         </ul>
