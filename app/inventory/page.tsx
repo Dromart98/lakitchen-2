@@ -65,12 +65,50 @@ const expirationFormatter = new Intl.DateTimeFormat("es-ES", {
   day: "numeric",
   month: "long",
   year: "numeric",
+  timeZone: "UTC",
 });
 
-function formatExpirationDate(expiresAt: string | null) {
+const millisecondsPerDay = 24 * 60 * 60 * 1000;
+
+function toUtcDateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getUtcDateKeyTimestamp(dateKey: string) {
+  return Date.parse(`${dateKey}T00:00:00.000Z`);
+}
+
+function getExpirationDayDifference(expiresAt: string, todayKey: string) {
+  const expirationKey = toUtcDateKey(new Date(`${expiresAt}T00:00:00.000Z`));
+
+  return Math.round((getUtcDateKeyTimestamp(expirationKey) - getUtcDateKeyTimestamp(todayKey)) / millisecondsPerDay);
+}
+
+function formatExpirationDate(expiresAt: string | null, todayKey: string) {
   if (!expiresAt) return "Sin fecha de caducidad";
 
-  return expirationFormatter.format(new Date(`${expiresAt}T00:00:00`));
+  const dayDifference = getExpirationDayDifference(expiresAt, todayKey);
+
+  if (dayDifference < 0) return "Caducado";
+  if (dayDifference === 0) return "Caduca hoy";
+  if (dayDifference === 1) return "Caduca en 1 día";
+  if (dayDifference <= 7) return `Caduca en ${dayDifference} días`;
+
+  return expirationFormatter.format(new Date(`${expiresAt}T00:00:00.000Z`));
+}
+
+function getExpirationAlertItems(items: InventoryItemRow[], todayKey: string) {
+  return items
+    .filter((item) => {
+      if (!item.expires_at) return false;
+
+      const dayDifference = getExpirationDayDifference(item.expires_at, todayKey);
+
+      return dayDifference <= 7;
+    })
+    .sort((firstItem, secondItem) => {
+      return getUtcDateKeyTimestamp(firstItem.expires_at ?? "") - getUtcDateKeyTimestamp(secondItem.expires_at ?? "");
+    });
 }
 
 function groupInventoryItems(items: InventoryItemRow[]): InventoryGroup[] {
@@ -102,6 +140,8 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
 
   const items = error ? [] : data ?? [];
   const groupedItems = groupInventoryItems(items);
+  const todayKey = toUtcDateKey(new Date());
+  const expirationAlertItems = getExpirationAlertItems(items, todayKey);
   const resolvedSearchParams = await searchParams;
   const inventoryErrorMessage = resolvedSearchParams?.inventoryError
     ? inventoryErrorMessages[resolvedSearchParams.inventoryError]
@@ -173,80 +213,101 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
           <p className="muted">Todavía no has añadido productos a la despensa, nevera o congelador.</p>
         </section>
       ) : (
-        <section className="grid cards">
-          {groupedItems.map((group) => (
-            <div className="card" key={group.location}>
-              <h2>{group.label}</h2>
-              {group.items.length ? (
-                <ul>
-                  {group.items.map((item) => (
-                    <li key={item.id}>
-                      <strong>{item.name}</strong>
-                      <br />
-                      {item.quantity} {item.unit}
-                      <br />
-                      <span className="muted">{formatExpirationDate(item.expires_at)}</span>
-                      <form action={deleteInventoryItemAction} className="meal-log-form">
-                        <input name="id" type="hidden" value={item.id} />
-                        <button className="button" type="submit">Eliminar</button>
-                      </form>
-                      <details>
-                        <summary>Descontar cantidad</summary>
-                        <form action={consumeInventoryItemAction} className="meal-log-form">
+        <>
+          {expirationAlertItems.length ? (
+            <section className="card">
+              <h2>Revisa estos productos</h2>
+              <ul>
+                {expirationAlertItems.map((item) => (
+                  <li key={item.id}>
+                    <strong>{item.name}</strong>
+                    <br />
+                    {item.quantity} {item.unit}
+                    <br />
+                    <span className="muted">{locationLabels[item.location]}</span>
+                    <br />
+                    <span className="muted">{formatExpirationDate(item.expires_at, todayKey)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <section className="grid cards">
+            {groupedItems.map((group) => (
+              <div className="card" key={group.location}>
+                <h2>{group.label}</h2>
+                {group.items.length ? (
+                  <ul>
+                    {group.items.map((item) => (
+                      <li key={item.id}>
+                        <strong>{item.name}</strong>
+                        <br />
+                        {item.quantity} {item.unit}
+                        <br />
+                        <span className="muted">{formatExpirationDate(item.expires_at, todayKey)}</span>
+                        <form action={deleteInventoryItemAction} className="meal-log-form">
                           <input name="id" type="hidden" value={item.id} />
-                          <label className="field" htmlFor={`inventory-consumed-quantity-${item.id}`}>
-                            <span>Cantidad consumida</span>
-                            <input id={`inventory-consumed-quantity-${item.id}`} name="consumed_quantity" type="number" min="0.000001" step="any" required />
-                          </label>
-                          <button className="button" type="submit">Confirmar consumo</button>
+                          <button className="button" type="submit">Eliminar</button>
                         </form>
-                      </details>
-                      <details>
-                        <summary>Editar</summary>
-                        <form action={updateInventoryItemAction} className="meal-log-form">
-                          <input name="id" type="hidden" value={item.id} />
-                          <label className="field" htmlFor={`inventory-name-${item.id}`}>
-                            <span>Nombre</span>
-                            <input id={`inventory-name-${item.id}`} name="name" type="text" maxLength={120} required defaultValue={item.name} />
-                          </label>
-                          <label className="field" htmlFor={`inventory-location-${item.id}`}>
-                            <span>Ubicación</span>
-                            <select id={`inventory-location-${item.id}`} name="location" required defaultValue={item.location}>
-                              <option value="pantry">Despensa</option>
-                              <option value="fridge">Nevera</option>
-                              <option value="freezer">Congelador</option>
-                            </select>
-                          </label>
-                          <label className="field" htmlFor={`inventory-quantity-${item.id}`}>
-                            <span>Cantidad</span>
-                            <input id={`inventory-quantity-${item.id}`} name="quantity" type="number" min="0.000001" step="any" required defaultValue={item.quantity} />
-                          </label>
-                          <label className="field" htmlFor={`inventory-unit-${item.id}`}>
-                            <span>Unidad</span>
-                            <select id={`inventory-unit-${item.id}`} name="unit" required defaultValue={item.unit}>
-                              <option value="ud">ud</option>
-                              <option value="g">g</option>
-                              <option value="kg">kg</option>
-                              <option value="ml">ml</option>
-                              <option value="l">l</option>
-                            </select>
-                          </label>
-                          <label className="field" htmlFor={`inventory-expires-at-${item.id}`}>
-                            <span>Caducidad (opcional)</span>
-                            <input id={`inventory-expires-at-${item.id}`} name="expires_at" type="date" defaultValue={item.expires_at ?? ""} />
-                          </label>
-                          <button className="button" type="submit">Guardar cambios</button>
-                        </form>
-                      </details>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="muted">No hay productos en esta ubicación.</p>
-              )}
-            </div>
-          ))}
-        </section>
+                        <details>
+                          <summary>Descontar cantidad</summary>
+                          <form action={consumeInventoryItemAction} className="meal-log-form">
+                            <input name="id" type="hidden" value={item.id} />
+                            <label className="field" htmlFor={`inventory-consumed-quantity-${item.id}`}>
+                              <span>Cantidad consumida</span>
+                              <input id={`inventory-consumed-quantity-${item.id}`} name="consumed_quantity" type="number" min="0.000001" step="any" required />
+                            </label>
+                            <button className="button" type="submit">Confirmar consumo</button>
+                          </form>
+                        </details>
+                        <details>
+                          <summary>Editar</summary>
+                          <form action={updateInventoryItemAction} className="meal-log-form">
+                            <input name="id" type="hidden" value={item.id} />
+                            <label className="field" htmlFor={`inventory-name-${item.id}`}>
+                              <span>Nombre</span>
+                              <input id={`inventory-name-${item.id}`} name="name" type="text" maxLength={120} required defaultValue={item.name} />
+                            </label>
+                            <label className="field" htmlFor={`inventory-location-${item.id}`}>
+                              <span>Ubicación</span>
+                              <select id={`inventory-location-${item.id}`} name="location" required defaultValue={item.location}>
+                                <option value="pantry">Despensa</option>
+                                <option value="fridge">Nevera</option>
+                                <option value="freezer">Congelador</option>
+                              </select>
+                            </label>
+                            <label className="field" htmlFor={`inventory-quantity-${item.id}`}>
+                              <span>Cantidad</span>
+                              <input id={`inventory-quantity-${item.id}`} name="quantity" type="number" min="0.000001" step="any" required defaultValue={item.quantity} />
+                            </label>
+                            <label className="field" htmlFor={`inventory-unit-${item.id}`}>
+                              <span>Unidad</span>
+                              <select id={`inventory-unit-${item.id}`} name="unit" required defaultValue={item.unit}>
+                                <option value="ud">ud</option>
+                                <option value="g">g</option>
+                                <option value="kg">kg</option>
+                                <option value="ml">ml</option>
+                                <option value="l">l</option>
+                              </select>
+                            </label>
+                            <label className="field" htmlFor={`inventory-expires-at-${item.id}`}>
+                              <span>Caducidad (opcional)</span>
+                              <input id={`inventory-expires-at-${item.id}`} name="expires_at" type="date" defaultValue={item.expires_at ?? ""} />
+                            </label>
+                            <button className="button" type="submit">Guardar cambios</button>
+                          </form>
+                        </details>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted">No hay productos en esta ubicación.</p>
+                )}
+              </div>
+            ))}
+          </section>
+        </>
       )}
     </main>
   );
