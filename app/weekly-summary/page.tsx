@@ -33,7 +33,7 @@ function getMealCountLabel(count: number): string {
 }
 
 function getDaysWithMealsLabel(count: number): string {
-  return `${count} de 7 ${count === 1 ? "día con registros" : "días con registros"}`;
+  return `${count} de 7 días con registros`;
 }
 
 function formatDayName(value: string): string {
