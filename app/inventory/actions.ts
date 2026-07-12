@@ -103,6 +103,45 @@ export async function updateInventoryItemAction(formData: FormData) {
   redirect(`${INVENTORY_PATH}?inventorySuccess=item-updated`);
 }
 
+export async function consumeInventoryItemAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "").trim();
+  const consumedQuantity = Number(formData.get("consumed_quantity"));
+
+  if (!isUuid(id)) redirect(`${INVENTORY_PATH}?inventoryError=consume-not-found`);
+  if (!Number.isFinite(consumedQuantity) || consumedQuantity <= 0) {
+    redirect(`${INVENTORY_PATH}?inventoryError=invalid-quantity`);
+  }
+
+  const supabase = await createClient();
+  await requireAuthenticatedUser(supabase, "inventory item consumption");
+
+  const { data, error } = await (supabase as any).rpc("consume_inventory_item", {
+    p_item_id: id,
+    p_quantity: consumedQuantity,
+  }) as { data: number | string | null; error: { code?: string; message: string } | null };
+
+  if (error) {
+    console.warn("Supabase could not consume the inventory item:", error.message);
+
+    if (error.code === "22003") {
+      redirect(`${INVENTORY_PATH}?inventoryError=consume-too-much`);
+    }
+
+    if (error.code === "P0002") {
+      redirect(`${INVENTORY_PATH}?inventoryError=consume-not-found`);
+    }
+
+    redirect(`${INVENTORY_PATH}?inventoryError=consume-failed`);
+  }
+
+  const remainingQuantity = Number(data);
+
+  revalidatePath(INVENTORY_PATH);
+  redirect(
+    `${INVENTORY_PATH}?inventorySuccess=${remainingQuantity === 0 ? "item-consumed-completely" : "item-consumed"}`,
+  );
+}
+
 export async function deleteInventoryItemAction(formData: FormData) {
   const id = String(formData.get("id") ?? "").trim();
 

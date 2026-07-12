@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 
-import { addInventoryItemAction, deleteInventoryItemAction, updateInventoryItemAction } from "./actions";
+import { addInventoryItemAction, consumeInventoryItemAction, deleteInventoryItemAction, updateInventoryItemAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,12 @@ type InventoryGroup = {
   location: InventoryLocation;
   label: string;
   items: InventoryItemRow[];
+};
+
+type ExpirationStatus = {
+  label: string;
+  daysUntilExpiration: number | null;
+  shouldAlert: boolean;
 };
 
 type InventoryPageSearchParams = {
@@ -47,6 +53,9 @@ const inventoryErrorMessages: Record<string, string> = {
   "update-not-found": "Este producto ya no está disponible.",
   "update-failed": "No se pudo actualizar el producto. Inténtalo de nuevo.",
   "delete-not-found": "Este producto ya no está disponible.",
+  "consume-not-found": "Este producto ya no está disponible.",
+  "consume-too-much": "La cantidad indicada supera el stock disponible.",
+  "consume-failed": "No se pudo actualizar el inventario. Inténtalo de nuevo.",
   "delete-failed": "No se pudo eliminar el producto. Inténtalo de nuevo.",
 };
 
@@ -54,6 +63,8 @@ const inventorySuccessMessages: Record<string, string> = {
   "item-created": "Producto añadido al inventario correctamente.",
   "item-updated": "Producto actualizado correctamente.",
   "item-deleted": "Producto eliminado correctamente.",
+  "item-consumed": "Cantidad descontada correctamente.",
+  "item-consumed-completely": "Producto consumido por completo y eliminado del inventario.",
 };
 
 const expirationFormatter = new Intl.DateTimeFormat("es-ES", {
@@ -62,10 +73,38 @@ const expirationFormatter = new Intl.DateTimeFormat("es-ES", {
   year: "numeric",
 });
 
-function formatExpirationDate(expiresAt: string | null) {
-  if (!expiresAt) return "Sin fecha de caducidad";
+const millisecondsPerDay = 24 * 60 * 60 * 1000;
 
-  return expirationFormatter.format(new Date(`${expiresAt}T00:00:00`));
+function getDateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getExpirationStatus(expiresAt: string | null, todayKey: string): ExpirationStatus {
+  if (!expiresAt) {
+    return { label: "Sin fecha de caducidad", daysUntilExpiration: null, shouldAlert: false };
+  }
+
+  const expirationTime = Date.parse(`${expiresAt}T00:00:00.000Z`);
+  const todayTime = Date.parse(`${todayKey}T00:00:00.000Z`);
+  const daysUntilExpiration = Math.round((expirationTime - todayTime) / millisecondsPerDay);
+
+  if (daysUntilExpiration < 0) {
+    return { label: "Caducado", daysUntilExpiration, shouldAlert: true };
+  }
+
+  if (daysUntilExpiration === 0) {
+    return { label: "Caduca hoy", daysUntilExpiration, shouldAlert: true };
+  }
+
+  if (daysUntilExpiration <= 7) {
+    return { label: `Caduca en ${daysUntilExpiration} días`, daysUntilExpiration, shouldAlert: true };
+  }
+
+  return {
+    label: expirationFormatter.format(new Date(`${expiresAt}T00:00:00`)),
+    daysUntilExpiration,
+    shouldAlert: false,
+  };
 }
 
 function groupInventoryItems(items: InventoryItemRow[]): InventoryGroup[] {
@@ -96,7 +135,16 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
   }
 
   const items = error ? [] : data ?? [];
+  const todayKey = getDateKey(new Date());
   const groupedItems = groupInventoryItems(items);
+  const expirationAlerts = items
+    .filter((item) => getExpirationStatus(item.expires_at, todayKey).shouldAlert)
+    .sort((firstItem, secondItem) => {
+      const firstStatus = getExpirationStatus(firstItem.expires_at, todayKey);
+      const secondStatus = getExpirationStatus(secondItem.expires_at, todayKey);
+
+      return (firstStatus.daysUntilExpiration ?? 0) - (secondStatus.daysUntilExpiration ?? 0);
+    });
   const resolvedSearchParams = await searchParams;
   const inventoryErrorMessage = resolvedSearchParams?.inventoryError
     ? inventoryErrorMessages[resolvedSearchParams.inventoryError]
@@ -168,11 +216,28 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
           <p className="muted">Todavía no has añadido productos a la despensa, nevera o congelador.</p>
         </section>
       ) : (
-        <section className="grid cards">
-          {groupedItems.map((group) => (
-            <div className="card" key={group.location}>
-              <h2>{group.label}</h2>
-              {group.items.length ? (
+        <>
+          {expirationAlerts.length ? (
+            <section className="card">
+              <h2>Revisa estos productos</h2>
+              <ul>
+                {expirationAlerts.map((item) => (
+                  <li key={`expiration-alert-${item.id}`}>
+                    <strong>{item.name}</strong>
+                    <br />
+                    {item.quantity} {item.unit} · {locationLabels[item.location]}
+                    <br />
+                    <span className="muted">{getExpirationStatus(item.expires_at, todayKey).label}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          <section className="grid cards">
+            {groupedItems.map((group) => (
+              <div className="card" key={group.location}>
+                <h2>{group.label}</h2>
+                {group.items.length ? (
                 <ul>
                   {group.items.map((item) => (
                     <li key={item.id}>
@@ -180,11 +245,22 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                       <br />
                       {item.quantity} {item.unit}
                       <br />
-                      <span className="muted">{formatExpirationDate(item.expires_at)}</span>
+                      <span className="muted">{getExpirationStatus(item.expires_at, todayKey).label}</span>
                       <form action={deleteInventoryItemAction} className="meal-log-form">
                         <input name="id" type="hidden" value={item.id} />
                         <button className="button" type="submit">Eliminar</button>
                       </form>
+                      <details>
+                        <summary>Descontar cantidad</summary>
+                        <form action={consumeInventoryItemAction} className="meal-log-form">
+                          <input name="id" type="hidden" value={item.id} />
+                          <label className="field" htmlFor={`inventory-consumed-quantity-${item.id}`}>
+                            <span>Cantidad consumida</span>
+                            <input id={`inventory-consumed-quantity-${item.id}`} name="consumed_quantity" type="number" min="0.000001" step="any" required />
+                          </label>
+                          <button className="button" type="submit">Confirmar consumo</button>
+                        </form>
+                      </details>
                       <details>
                         <summary>Editar</summary>
                         <form action={updateInventoryItemAction} className="meal-log-form">
@@ -225,12 +301,13 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                     </li>
                   ))}
                 </ul>
-              ) : (
-                <p className="muted">No hay productos en esta ubicación.</p>
-              )}
-            </div>
-          ))}
-        </section>
+                ) : (
+                  <p className="muted">No hay productos en esta ubicación.</p>
+                )}
+              </div>
+            ))}
+          </section>
+        </>
       )}
     </main>
   );
