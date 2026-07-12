@@ -132,6 +132,9 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
         <Link className="button nav-button" href="/meal-history">
           Historial de comidas
         </Link>
+        <Link className="button nav-button" href="/weekly-summary">
+          Resumen semanal
+        </Link>
       </div>
 
       {error ? (

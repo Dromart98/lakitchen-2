@@ -83,6 +83,7 @@ export default async function MealHistoryPage({ searchParams }: { searchParams?:
         </form>
         <div className="dashboard-actions" style={{ marginTop: 16 }}>
           <Link className="button nav-button" href={`/meal-history?date=${previousDate}`}>Día anterior</Link>
+          <Link className="button nav-button" href={`/weekly-summary?week=${selectedDate}`}>Resumen semanal</Link>
           {selectedDate >= today ? (
             <span className="button nav-button" aria-disabled="true">Día siguiente</span>
           ) : (
