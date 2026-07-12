@@ -5,7 +5,7 @@ import { MacroProgress } from "@/components/nutrition/MacroProgress";
 import { inventory } from "@/lib/demo-data";
 import { getExpiringItems } from "@/modules/inventory/inventory.rules";
 import { remainingMacros, sumMacros } from "@/modules/meals/meal-summary";
-import { addMealLogAction } from "./actions";
+import { addMealLogAction, deleteMealLogAction } from "./actions";
 import type { MacroTotals } from "@/modules/nutrition/nutrition.types";
 import { generateRecipe } from "@/modules/recipes/recipe-generator.service";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
@@ -40,23 +40,26 @@ function getProfileGoal(profile: NutritionProfileTargetsRow | null): MacroTotals
   return { calories, proteinG, carbsG, fatG };
 }
 
-const emptyConsumedToday: MacroTotals = {
-  calories: 0,
-  proteinG: 0,
-  carbsG: 0,
-  fatG: 0,
-};
 
 export const dynamic = "force-dynamic";
 
 function getMealErrorMessage(code: string | undefined) {
   if (code === "meal-name-required") return "Escribe un nombre para la comida.";
+  if (code === "meal-name-too-long") return "El nombre de la comida no puede superar los 120 caracteres.";
   if (code === "invalid-macros") return "Los macros deben ser números enteros de 0 o más.";
+  if (code === "meal-not-found") return "No se encontró la comida de hoy.";
   if (code === "save-failed") return "No se pudo guardar la comida. Inténtalo de nuevo.";
+  if (code === "delete-failed") return "No se pudo eliminar la comida. Inténtalo de nuevo.";
   return null;
 }
 
-export default async function DashboardPage({ searchParams }: { searchParams?: Promise<{ mealError?: string }> }) {
+function getMealSuccessMessage(code: string | undefined) {
+  if (code === "meal-created") return "Comida registrada correctamente.";
+  if (code === "meal-deleted") return "Comida eliminada correctamente.";
+  return null;
+}
+
+export default async function DashboardPage({ searchParams }: { searchParams?: Promise<{ mealError?: string; mealSuccess?: string }> }) {
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "dashboard");
 
@@ -91,8 +94,9 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   })));
   const resolvedSearchParams = await searchParams;
   const mealErrorMessage = getMealErrorMessage(resolvedSearchParams?.mealError);
+  const mealSuccessMessage = getMealSuccessMessage(resolvedSearchParams?.mealSuccess);
   const goal = getProfileGoal(profile ?? null);
-  const remaining = goal ? remainingMacros(goal, emptyConsumedToday) : null;
+  const remaining = goal ? remainingMacros(goal, consumedToday) : null;
   const expiring = getExpiringItems(inventory);
   const recipe = remaining ? generateRecipe({ items: inventory, mealType: "dinner", macroTarget: remaining }) : null;
 
@@ -121,13 +125,13 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
 
       {error ? (
         <p className="auth-message error" role="alert">
-          Supabase no pudo cargar tu perfil nutricional: {error.message}
+          No se pudo cargar tu perfil nutricional. Inténtalo de nuevo.
         </p>
       ) : null}
 
       {goal && remaining ? (
         <section className="grid cards">
-          <MacroProgress consumed={emptyConsumedToday} goal={goal} />
+          <MacroProgress consumed={consumedToday} goal={goal} />
           <div className="card">
             <h2>Restante</h2>
             <p>{remaining.calories} kcal</p>
@@ -154,6 +158,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
           <h2>Registro manual rápido</h2>
           <p className="muted">Añade una comida consumida hoy para sumar sus macros al dashboard.</p>
           {mealErrorMessage ? <p className="auth-message error" role="alert">{mealErrorMessage}</p> : null}
+          {mealSuccessMessage ? <p className="auth-message success">{mealSuccessMessage}</p> : null}
           <form action={addMealLogAction} className="meal-log-form">
             <label className="field" htmlFor="meal-name">
               <span>Nombre</span>
@@ -186,6 +191,10 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
               {mealsToday.map((meal) => (
                 <li key={meal.id}>
                   <strong>{meal.name}</strong> · {meal.calories} kcal · P {meal.protein_g}g · C {meal.carbs_g}g · G {meal.fat_g}g
+                  <form action={deleteMealLogAction} style={{ display: "inline", marginLeft: 8 }}>
+                    <input type="hidden" name="id" value={meal.id} />
+                    <button className="button" type="submit">Eliminar</button>
+                  </form>
                 </li>
               ))}
             </ul>

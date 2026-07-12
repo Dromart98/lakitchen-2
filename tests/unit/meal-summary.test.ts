@@ -7,18 +7,32 @@ describe("meal macro summary", () => {
     expect(sumMacros([])).toEqual({ calories: 0, proteinG: 0, carbsG: 0, fatG: 0 });
   });
 
-  it("sums meal logs and calculates remaining macros", () => {
+  it("sums several meal logs", () => {
+    expect(sumMacros([
+      { calories: 600, proteinG: 45, carbsG: 70, fatG: 12 },
+      { calories: 150, proteinG: 10, carbsG: 20, fatG: 4 },
+      { calories: 250, proteinG: 15, carbsG: 25, fatG: 10 },
+    ])).toEqual({ calories: 1000, proteinG: 70, carbsG: 115, fatG: 26 });
+  });
+
+  it("calculates remaining macros", () => {
     const consumed = sumMacros([
       { calories: 600, proteinG: 45, carbsG: 70, fatG: 12 },
       { calories: 150, proteinG: 10, carbsG: 20, fatG: 4 },
     ]);
 
-    expect(consumed).toEqual({ calories: 750, proteinG: 55, carbsG: 90, fatG: 16 });
     expect(remainingMacros({ calories: 2290, proteinG: 160, carbsG: 280, fatG: 64 }, consumed)).toEqual({
       calories: 1540,
       proteinG: 105,
       carbsG: 190,
       fatG: 48,
     });
+  });
+
+  it("returns zero and never negative remaining macros when consumption exceeds the goal", () => {
+    expect(remainingMacros(
+      { calories: 500, proteinG: 30, carbsG: 40, fatG: 15 },
+      { calories: 750, proteinG: 55, carbsG: 90, fatG: 16 },
+    )).toEqual({ calories: 0, proteinG: 0, carbsG: 0, fatG: 0 });
   });
 });
