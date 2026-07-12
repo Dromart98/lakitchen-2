@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 
-import { addInventoryItemAction, deleteInventoryItemAction } from "./actions";
+import { addInventoryItemAction, deleteInventoryItemAction, updateInventoryItemAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +15,7 @@ type InventoryItemRow = {
   location: InventoryLocation;
   quantity: number;
   unit: string;
+  expires_at: string | null;
   created_at: string;
 };
 
@@ -41,15 +42,31 @@ const inventoryErrorMessages: Record<string, string> = {
   "invalid-location": "Selecciona una ubicación válida.",
   "invalid-quantity": "La cantidad debe ser un número mayor que cero.",
   "invalid-unit": "Selecciona una unidad válida.",
+  "invalid-expires-at": "Introduce una fecha de caducidad válida.",
   "save-failed": "No se pudo guardar el producto. Inténtalo de nuevo.",
+  "update-not-found": "Este producto ya no está disponible.",
+  "update-failed": "No se pudo actualizar el producto. Inténtalo de nuevo.",
   "delete-not-found": "Este producto ya no está disponible.",
   "delete-failed": "No se pudo eliminar el producto. Inténtalo de nuevo.",
 };
 
 const inventorySuccessMessages: Record<string, string> = {
   "item-created": "Producto añadido al inventario correctamente.",
+  "item-updated": "Producto actualizado correctamente.",
   "item-deleted": "Producto eliminado correctamente.",
 };
+
+const expirationFormatter = new Intl.DateTimeFormat("es-ES", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
+function formatExpirationDate(expiresAt: string | null) {
+  if (!expiresAt) return "Sin fecha de caducidad";
+
+  return expirationFormatter.format(new Date(`${expiresAt}T00:00:00`));
+}
 
 function groupInventoryItems(items: InventoryItemRow[]): InventoryGroup[] {
   return (["pantry", "fridge", "freezer"] as const).map((location) => ({
@@ -65,7 +82,7 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
 
   const { data, error } = await (supabase as any)
     .from("inventory_items")
-    .select("id, name, location, quantity, unit, created_at")
+    .select("id, name, location, quantity, unit, expires_at, created_at")
     .eq("user_id", user.id)
     .order("location", { ascending: true })
     .order("name", { ascending: true })
@@ -132,7 +149,11 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
               <option value="l">l</option>
             </select>
           </label>
-          <button className="button" type="submit">Añadir al inventario</button>
+          <label className="field" htmlFor="inventory-expires-at">
+            <span>Caducidad (opcional)</span>
+            <input id="inventory-expires-at" name="expires_at" type="date" />
+          </label>
+          <button className="button" type="submit">Añadir producto</button>
         </form>
       </section>
 
@@ -140,6 +161,11 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
         <section className="card" role="alert">
           <h2>No se pudo cargar el inventario</h2>
           <p className="muted">No se pudo cargar el inventario. Inténtalo de nuevo.</p>
+        </section>
+      ) : items.length === 0 ? (
+        <section className="card">
+          <h2>Tu inventario está vacío</h2>
+          <p className="muted">Todavía no has añadido productos a la despensa, nevera o congelador.</p>
         </section>
       ) : (
         <section className="grid cards">
@@ -153,10 +179,49 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                       <strong>{item.name}</strong>
                       <br />
                       {item.quantity} {item.unit}
+                      <br />
+                      <span className="muted">{formatExpirationDate(item.expires_at)}</span>
                       <form action={deleteInventoryItemAction} className="meal-log-form">
                         <input name="id" type="hidden" value={item.id} />
                         <button className="button" type="submit">Eliminar</button>
                       </form>
+                      <details>
+                        <summary>Editar</summary>
+                        <form action={updateInventoryItemAction} className="meal-log-form">
+                          <input name="id" type="hidden" value={item.id} />
+                          <label className="field" htmlFor={`inventory-name-${item.id}`}>
+                            <span>Nombre</span>
+                            <input id={`inventory-name-${item.id}`} name="name" type="text" maxLength={120} required defaultValue={item.name} />
+                          </label>
+                          <label className="field" htmlFor={`inventory-location-${item.id}`}>
+                            <span>Ubicación</span>
+                            <select id={`inventory-location-${item.id}`} name="location" required defaultValue={item.location}>
+                              <option value="pantry">Despensa</option>
+                              <option value="fridge">Nevera</option>
+                              <option value="freezer">Congelador</option>
+                            </select>
+                          </label>
+                          <label className="field" htmlFor={`inventory-quantity-${item.id}`}>
+                            <span>Cantidad</span>
+                            <input id={`inventory-quantity-${item.id}`} name="quantity" type="number" min="0.000001" step="any" required defaultValue={item.quantity} />
+                          </label>
+                          <label className="field" htmlFor={`inventory-unit-${item.id}`}>
+                            <span>Unidad</span>
+                            <select id={`inventory-unit-${item.id}`} name="unit" required defaultValue={item.unit}>
+                              <option value="ud">ud</option>
+                              <option value="g">g</option>
+                              <option value="kg">kg</option>
+                              <option value="ml">ml</option>
+                              <option value="l">l</option>
+                            </select>
+                          </label>
+                          <label className="field" htmlFor={`inventory-expires-at-${item.id}`}>
+                            <span>Caducidad (opcional)</span>
+                            <input id={`inventory-expires-at-${item.id}`} name="expires_at" type="date" defaultValue={item.expires_at ?? ""} />
+                          </label>
+                          <button className="button" type="submit">Guardar cambios</button>
+                        </form>
+                      </details>
                     </li>
                   ))}
                 </ul>
