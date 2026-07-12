@@ -7,6 +7,7 @@ import {
   addShoppingListItemAction,
   deleteShoppingListItemAction,
   setShoppingListItemPurchasedAction,
+  transferShoppingListItemToInventoryAction,
   updateShoppingListItemAction,
 } from "./actions";
 
@@ -32,9 +33,13 @@ const shoppingListErrorMessages: Record<string, string> = {
   "invalid-quantity": "La cantidad debe ser un número mayor que cero.",
   "invalid-unit": "Selecciona una unidad válida.",
   "item-not-found": "Este producto ya no está disponible.",
+  "transfer-unavailable": "Este producto no está disponible para transferir.",
+  "invalid-expires-at": "Introduce una fecha de caducidad válida.",
+  "invalid-location": "Selecciona una ubicación válida.",
   "save-failed": "No se pudo guardar el producto. Inténtalo de nuevo.",
   "update-failed": "No se pudo actualizar el producto. Inténtalo de nuevo.",
   "delete-failed": "No se pudo eliminar el producto. Inténtalo de nuevo.",
+  "transfer-failed": "No se pudo añadir el producto al inventario. Inténtalo de nuevo.",
 };
 
 const shoppingListSuccessMessages: Record<string, string> = {
@@ -43,6 +48,7 @@ const shoppingListSuccessMessages: Record<string, string> = {
   "item-pending": "Producto devuelto a pendientes.",
   "item-deleted": "Producto eliminado correctamente.",
   "item-updated": "Producto actualizado correctamente.",
+  "item-transferred": "Producto añadido al inventario correctamente.",
 };
 
 function ShoppingListGroup({ items, title }: { items: ShoppingListItemRow[]; title: string }) {
@@ -67,6 +73,27 @@ function ShoppingListGroup({ items, title }: { items: ShoppingListItemRow[]; tit
                 <input name="id" type="hidden" value={item.id} />
                 <button className="button" type="submit">Eliminar</button>
               </form>
+              {item.is_purchased ? (
+                <details>
+                  <summary>Pasar al inventario</summary>
+                  <form action={transferShoppingListItemToInventoryAction} className="meal-log-form">
+                    <input name="id" type="hidden" value={item.id} />
+                    <label className="field" htmlFor={`shopping-list-transfer-location-${item.id}`}>
+                      <span>Ubicación</span>
+                      <select id={`shopping-list-transfer-location-${item.id}`} name="location" required defaultValue="pantry">
+                        <option value="pantry">Despensa</option>
+                        <option value="fridge">Nevera</option>
+                        <option value="freezer">Congelador</option>
+                      </select>
+                    </label>
+                    <label className="field" htmlFor={`shopping-list-transfer-expires-at-${item.id}`}>
+                      <span>Fecha de caducidad opcional</span>
+                      <input id={`shopping-list-transfer-expires-at-${item.id}`} name="expires_at" type="date" />
+                    </label>
+                    <button className="button" type="submit">Añadir al inventario</button>
+                  </form>
+                </details>
+              ) : null}
               <details>
                 <summary>Editar</summary>
                 <form action={updateShoppingListItemAction} className="meal-log-form">

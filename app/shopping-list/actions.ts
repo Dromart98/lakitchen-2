@@ -7,8 +7,10 @@ import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 
 type ShoppingListUnit = "ud" | "g" | "kg" | "ml" | "l";
+type InventoryLocation = "pantry" | "fridge" | "freezer";
 
 const shoppingListUnits = ["ud", "g", "kg", "ml", "l"] as const;
+const inventoryLocations = ["pantry", "fridge", "freezer"] as const;
 
 function isShoppingListUnit(value: string): value is ShoppingListUnit {
   return shoppingListUnits.includes(value as ShoppingListUnit);
@@ -16,6 +18,29 @@ function isShoppingListUnit(value: string): value is ShoppingListUnit {
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function isInventoryLocation(value: string): value is InventoryLocation {
+  return inventoryLocations.includes(value as InventoryLocation);
+}
+
+function getOptionalExpirationDate(formData: FormData) {
+  const rawValue = String(formData.get("expires_at") ?? "").trim();
+
+  if (!rawValue) {
+    return null;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
+    redirect("/shopping-list?shoppingListError=invalid-expires-at");
+  }
+
+  const date = new Date(`${rawValue}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== rawValue) {
+    redirect("/shopping-list?shoppingListError=invalid-expires-at");
+  }
+
+  return rawValue;
 }
 
 function getValidatedShoppingListFields(formData: FormData) {
@@ -134,6 +159,45 @@ export async function setShoppingListItemPurchasedAction(formData: FormData) {
 
   revalidatePath("/shopping-list");
   redirect(`/shopping-list?shoppingListSuccess=${isPurchased ? "item-purchased" : "item-pending"}`);
+}
+
+export async function transferShoppingListItemToInventoryAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "").trim();
+  const location = String(formData.get("location") ?? "");
+
+  if (!isUuid(id)) {
+    redirect("/shopping-list?shoppingListError=transfer-unavailable");
+  }
+
+  if (!isInventoryLocation(location)) {
+    redirect("/shopping-list?shoppingListError=invalid-location");
+  }
+
+  const expiresAt = getOptionalExpirationDate(formData);
+  const supabase = await createClient();
+  await requireAuthenticatedUser(supabase, "shopping list item inventory transfer");
+
+  const { data, error } = await (supabase as any).rpc("transfer_purchased_shopping_item_to_inventory", {
+    p_item_id: id,
+    p_location: location,
+    p_expires_at: expiresAt,
+  }) as {
+    data: string | null;
+    error: { message: string } | null;
+  };
+
+  if (error) {
+    console.warn("Supabase could not transfer the shopping list item to inventory:", error.message);
+    redirect("/shopping-list?shoppingListError=transfer-failed");
+  }
+
+  if (!data) {
+    redirect("/shopping-list?shoppingListError=transfer-unavailable");
+  }
+
+  revalidatePath("/shopping-list");
+  revalidatePath("/inventory");
+  redirect("/shopping-list?shoppingListSuccess=item-transferred");
 }
 
 export async function deleteShoppingListItemAction(formData: FormData) {
