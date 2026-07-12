@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { isMealType } from "@/modules/meals/meal-types";
 
 const DASHBOARD_PATH = "/dashboard";
 
@@ -37,6 +38,12 @@ export async function addMealLogAction(formData: FormData) {
     redirect(`${DASHBOARD_PATH}?mealError=meal-name-too-long`);
   }
 
+  const mealType = String(formData.get("meal_type") ?? "").trim();
+
+  if (!isMealType(mealType)) {
+    redirect(`${DASHBOARD_PATH}?mealError=invalid-meal-type`);
+  }
+
   const calories = readNonNegativeInteger(formData, "calories");
   const proteinG = readNonNegativeInteger(formData, "protein_g");
   const carbsG = readNonNegativeInteger(formData, "carbs_g");
@@ -49,6 +56,7 @@ export async function addMealLogAction(formData: FormData) {
   const { error } = await supabase.from("daily_meal_logs").insert({
     user_id: user.id,
     name,
+    meal_type: mealType,
     calories,
     protein_g: proteinG,
     carbs_g: carbsG,
