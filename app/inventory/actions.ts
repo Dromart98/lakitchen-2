@@ -6,6 +6,11 @@ import { redirect } from "next/navigation";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isInventoryCategory } from "@/modules/inventory/inventory-categories";
+import {
+  hasInventoryNutritionValues,
+  isInventoryNutritionBasis,
+  parseOptionalInventoryNutritionNumber,
+} from "@/modules/inventory/inventory-nutrition";
 
 type InventoryLocation = "pantry" | "fridge" | "freezer";
 type InventoryUnit = "ud" | "g" | "kg" | "ml" | "l";
@@ -39,6 +44,37 @@ function getOptionalExpirationDate(formData: FormData) {
   return rawValue;
 }
 
+function getOptionalNutritionNumber(formData: FormData, field: string, errorCode: string) {
+  const value = parseOptionalInventoryNutritionNumber(formData.get(field));
+
+  if (value !== null && (!Number.isFinite(value) || value < 0)) {
+    redirect(`${INVENTORY_PATH}?inventoryError=${errorCode}`);
+  }
+
+  return value;
+}
+
+function getOptionalNutritionFields(formData: FormData) {
+  const rawBasis = String(formData.get("nutrition_basis") ?? "").trim();
+  const calories = getOptionalNutritionNumber(formData, "calories", "invalid-calories");
+  const proteinG = getOptionalNutritionNumber(formData, "protein_g", "invalid-protein");
+  const carbsG = getOptionalNutritionNumber(formData, "carbs_g", "invalid-carbs");
+  const fatG = getOptionalNutritionNumber(formData, "fat_g", "invalid-fat");
+  const hasNutritionValues = hasInventoryNutritionValues([calories, proteinG, carbsG, fatG]);
+
+  if (!rawBasis) {
+    if (hasNutritionValues) redirect(`${INVENTORY_PATH}?inventoryError=missing-nutrition-basis`);
+
+    return { nutritionBasis: null, calories, proteinG, carbsG, fatG };
+  }
+
+  if (!isInventoryNutritionBasis(rawBasis)) {
+    redirect(`${INVENTORY_PATH}?inventoryError=invalid-nutrition-basis`);
+  }
+
+  return { nutritionBasis: rawBasis, calories, proteinG, carbsG, fatG };
+}
+
 function getValidatedInventoryFields(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const location = String(formData.get("location") ?? "");
@@ -53,11 +89,21 @@ function getValidatedInventoryFields(formData: FormData) {
   if (!isInventoryLocation(location)) redirect(`${INVENTORY_PATH}?inventoryError=invalid-location`);
   if (!isInventoryCategory(category)) redirect(`${INVENTORY_PATH}?inventoryError=invalid-category`);
 
-  return { name, quantity, unit, location, category, expiresAt: getOptionalExpirationDate(formData) };
+  const nutritionFields = getOptionalNutritionFields(formData);
+
+  return {
+    name,
+    quantity,
+    unit,
+    location,
+    category,
+    expiresAt: getOptionalExpirationDate(formData),
+    ...nutritionFields,
+  };
 }
 
 export async function addInventoryItemAction(formData: FormData) {
-  const { name, quantity, unit, location, category, expiresAt } = getValidatedInventoryFields(formData);
+  const { name, quantity, unit, location, category, expiresAt, nutritionBasis, calories, proteinG, carbsG, fatG } = getValidatedInventoryFields(formData);
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "inventory item creation");
 
@@ -68,6 +114,11 @@ export async function addInventoryItemAction(formData: FormData) {
     unit,
     location,
     category,
+    nutrition_basis: nutritionBasis,
+    calories,
+    protein_g: proteinG,
+    carbs_g: carbsG,
+    fat_g: fatG,
     expires_at: expiresAt,
   });
 
@@ -85,13 +136,25 @@ export async function updateInventoryItemAction(formData: FormData) {
 
   if (!isUuid(id)) redirect(`${INVENTORY_PATH}?inventoryError=update-not-found`);
 
-  const { name, quantity, unit, location, category, expiresAt } = getValidatedInventoryFields(formData);
+  const { name, quantity, unit, location, category, expiresAt, nutritionBasis, calories, proteinG, carbsG, fatG } = getValidatedInventoryFields(formData);
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "inventory item update");
 
   const { data, error } = await (supabase as any)
     .from("inventory_items")
-    .update({ name, quantity, unit, location, category, expires_at: expiresAt })
+    .update({
+      name,
+      quantity,
+      unit,
+      location,
+      category,
+      nutrition_basis: nutritionBasis,
+      calories,
+      protein_g: proteinG,
+      carbs_g: carbsG,
+      fat_g: fatG,
+      expires_at: expiresAt,
+    })
     .eq("id", id)
     .eq("user_id", user.id)
     .select("id") as { data: { id: string }[] | null; error: { message: string } | null };
