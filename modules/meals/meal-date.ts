@@ -25,6 +25,13 @@ export function isValidMealHistoryDate(value: string, today = getTodayUtcDate())
   return isRealUtcDate(value) && value <= today;
 }
 
+export function isPastMealHistoryDate(
+  value: string,
+  today = getTodayUtcDate(),
+): boolean {
+  return isRealUtcDate(today) && isValidMealHistoryDate(value, today) && value < today;
+}
+
 function shiftUtcDate(value: string, days: number): string {
   const [year, month, day] = value.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day + days));

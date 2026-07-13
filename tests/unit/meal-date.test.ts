@@ -4,6 +4,7 @@ import {
   formatSpanishUtcDate,
   getNextUtcDate,
   getPreviousUtcDate,
+  isPastMealHistoryDate,
   isRealUtcDate,
   isValidMealHistoryDate,
   resolveMealHistoryDate,
@@ -28,6 +29,24 @@ describe("meal history dates", () => {
 
   it("rejects a future date", () => {
     expect(isValidMealHistoryDate("2026-07-13", "2026-07-12")).toBe(false);
+  });
+
+  it("accepts only real dates before today for repeating meals", () => {
+    expect(isPastMealHistoryDate("2026-07-11", "2026-07-12")).toBe(true);
+    expect(isPastMealHistoryDate("2026-07-12", "2026-07-12")).toBe(false);
+    expect(isPastMealHistoryDate("2026-07-13", "2026-07-12")).toBe(false);
+    expect(isPastMealHistoryDate("2026-02-31", "2026-07-12")).toBe(false);
+    expect(isPastMealHistoryDate("12-07-2026", "2026-07-12")).toBe(false);
+  });
+
+  it("detects past meal history dates across month boundaries", () => {
+    expect(isPastMealHistoryDate("2026-02-28", "2026-03-01")).toBe(true);
+    expect(isPastMealHistoryDate("2026-03-01", "2026-03-01")).toBe(false);
+  });
+
+  it("detects past meal history dates across year boundaries", () => {
+    expect(isPastMealHistoryDate("2025-12-31", "2026-01-01")).toBe(true);
+    expect(isPastMealHistoryDate("2026-01-01", "2026-01-01")).toBe(false);
   });
 
   it("calculates the previous UTC day", () => {

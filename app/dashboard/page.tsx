@@ -61,6 +61,7 @@ function getMealSuccessMessage(code: string | undefined) {
   if (code === "meal-created") return "Comida registrada correctamente.";
   if (code === "meal-deleted") return "Comida eliminada correctamente.";
   if (code === "meal-updated") return "Comida actualizada correctamente.";
+  if (code === "meal-repeated") return "Comida repetida y añadida a hoy.";
   return null;
 }
 
