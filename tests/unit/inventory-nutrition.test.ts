@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  calculateAvailableInventoryNutrition,
+  formatInventoryNutritionTotalValue,
   getInventoryNutritionBasisLabel,
   hasInventoryNutritionValues,
   INVENTORY_NUTRITION_BASIS_LABELS,
@@ -63,5 +65,204 @@ describe("inventory nutrition number parsing", () => {
     expect(hasInventoryNutritionValues([null, null, null, null])).toBe(false);
     expect(hasInventoryNutritionValues([null, 0, null, null])).toBe(true);
     expect(hasInventoryNutritionValues([null, 12.5, null, null])).toBe(true);
+  });
+});
+
+describe("available inventory nutrition totals", () => {
+  it("uses factor 2.5 for 250 g with values per 100 g", () => {
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_100g",
+      quantity: 250,
+      unit: "g",
+      calories: 100,
+      protein_g: 10,
+      carbs_g: 4,
+      fat_g: 2,
+    })).toEqual({
+      calories: 250,
+      protein_g: 25,
+      carbs_g: 10,
+      fat_g: 5,
+    });
+  });
+
+  it("uses factor 15 for 1.5 kg with values per 100 g", () => {
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_100g",
+      quantity: 1.5,
+      unit: "kg",
+      calories: 100,
+      protein_g: 10,
+      carbs_g: 4,
+      fat_g: 2,
+    })).toEqual({
+      calories: 1500,
+      protein_g: 150,
+      carbs_g: 60,
+      fat_g: 30,
+    });
+  });
+
+  it("uses factor 3 for 3 units with values per unit", () => {
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_unit",
+      quantity: 3,
+      unit: "ud",
+      calories: 120,
+      protein_g: 8,
+      carbs_g: 20,
+      fat_g: 4,
+    })).toEqual({
+      calories: 360,
+      protein_g: 24,
+      carbs_g: 60,
+      fat_g: 12,
+    });
+  });
+
+  it("preserves null values when nutrition values are partial", () => {
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_100g",
+      quantity: 250,
+      unit: "g",
+      calories: 100,
+      protein_g: 10,
+      carbs_g: null,
+      fat_g: null,
+    })).toEqual({
+      calories: 250,
+      protein_g: 25,
+      carbs_g: null,
+      fat_g: null,
+    });
+  });
+
+  it("returns null for incompatible nutrition basis and units", () => {
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_100g",
+      quantity: 250,
+      unit: "ud",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_100g",
+      quantity: 250,
+      unit: "ml",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_100g",
+      quantity: 1,
+      unit: "l",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_unit",
+      quantity: 250,
+      unit: "g",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_unit",
+      quantity: 1.5,
+      unit: "kg",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_unit",
+      quantity: 250,
+      unit: "ml",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_unit",
+      quantity: 1,
+      unit: "l",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+  });
+
+  it("returns null for missing basis, invalid quantities, and products without nutrition values", () => {
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: null,
+      quantity: 250,
+      unit: "g",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_100g",
+      quantity: Number.NaN,
+      unit: "g",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_100g",
+      quantity: Infinity,
+      unit: "g",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_100g",
+      quantity: 0,
+      unit: "g",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_100g",
+      quantity: 250,
+      unit: "g",
+      calories: null,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+  });
+});
+
+describe("inventory nutrition total formatting", () => {
+  it("removes unnecessary decimals and keeps at most one decimal", () => {
+    expect(formatInventoryNutritionTotalValue(250)).toBe("250");
+    expect(formatInventoryNutritionTotalValue(22.04)).toBe("22");
+    expect(formatInventoryNutritionTotalValue(22.05)).toBe("22.1");
+    expect(formatInventoryNutritionTotalValue(22.56)).toBe("22.6");
+  });
+
+  it("never formats unsafe values", () => {
+    expect(formatInventoryNutritionTotalValue(null)).toBeNull();
+    expect(formatInventoryNutritionTotalValue(Number.NaN)).toBeNull();
+    expect(formatInventoryNutritionTotalValue(Infinity)).toBeNull();
   });
 });
