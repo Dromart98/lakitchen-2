@@ -1,16 +1,14 @@
 import Link from "next/link";
-import { RecipeSuggestion } from "@/components/dashboard/RecipeSuggestion";
 import { ExpiringList } from "@/components/inventory/ExpiringList";
 import { MacroProgress } from "@/components/nutrition/MacroProgress";
-import { inventory } from "@/lib/demo-data";
-import { getExpiringItems } from "@/modules/inventory/inventory.rules";
+import { getInventoryExpirationAlertItems } from "@/modules/inventory/inventory-expiration";
 import { remainingMacros, sumMacros } from "@/modules/meals/meal-summary";
 import { MEAL_TYPE_LABELS, MEAL_TYPES, normalizeMealType } from "@/modules/meals/meal-types";
 import { addMealLogAction, deleteMealLogAction } from "./actions";
 import type { MacroTotals } from "@/modules/nutrition/nutrition.types";
-import { generateRecipe } from "@/modules/recipes/recipe-generator.service";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import type { InventoryItemRecord } from "@/modules/inventory/inventory.types";
 
 type NutritionProfileTargetsRow = {
   target_calories: number | null;
@@ -28,6 +26,11 @@ type DailyMealLogRow = {
   fat_g: number;
   created_at: string;
   meal_type: string | null;
+};
+
+type InventoryItemsQueryResult = {
+  data: InventoryItemRecord[] | null;
+  error: { message: string } | null;
 };
 
 function getProfileGoal(profile: NutritionProfileTargetsRow | null): MacroTotals | null {
@@ -83,6 +86,13 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
     .eq("consumed_on", today)
     .order("created_at", { ascending: false }) as { data: DailyMealLogRow[] | null; error: { message: string } | null };
 
+  const { data: inventoryData, error: inventoryError } = await (supabase as any)
+    .from("inventory_items")
+    .select("id, name, location, quantity, unit, expires_at, created_at")
+    .eq("user_id", user.id)
+    .gt("quantity", 0)
+    .order("created_at", { ascending: true }) as InventoryItemsQueryResult;
+
   if (error) {
     console.warn("Supabase could not load the dashboard nutrition profile:", error.message);
   }
@@ -91,6 +101,11 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
     console.warn("Supabase could not load the dashboard meal logs:", mealLogsError.message);
   }
 
+  if (inventoryError) {
+    console.warn("Supabase could not load the dashboard inventory items:", inventoryError.message);
+  }
+
+  const inventoryItems = inventoryError ? [] : inventoryData ?? [];
   const mealsToday = mealLogsError ? [] : mealLogs ?? [];
   const groupedMeals = MEAL_TYPES.map((mealType) => ({
     mealType,
@@ -108,8 +123,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   const mealSuccessMessage = getMealSuccessMessage(resolvedSearchParams?.mealSuccess);
   const goal = getProfileGoal(profile ?? null);
   const remaining = goal ? remainingMacros(goal, consumedToday) : null;
-  const expiring = getExpiringItems(inventory);
-  const recipe = remaining ? generateRecipe({ items: inventory, mealType: "dinner", macroTarget: remaining }) : null;
+  const expiring = getInventoryExpirationAlertItems(inventoryItems, today);
 
   return (
     <main className="shell">
@@ -143,6 +157,12 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
       {error ? (
         <p className="auth-message error" role="alert">
           No se pudo cargar tu perfil nutricional. Inténtalo de nuevo.
+        </p>
+      ) : null}
+
+      {inventoryError ? (
+        <p className="auth-message error" role="alert">
+          No se pudo cargar tu inventario. Inténtalo de nuevo.
         </p>
       ) : null}
 
@@ -239,21 +259,19 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
       </section>
 
       <section className="grid cards" style={{ marginTop: 16 }}>
-        <ExpiringList items={expiring} />
-        {recipe ? (
-          <RecipeSuggestion recipe={recipe} />
-        ) : (
-          <div className="card">
-            <h2>Receta sugerida</h2>
-            <p className="muted">
-              Configura tu perfil nutricional para generar una sugerencia con tus macros restantes.
-            </p>
-          </div>
-        )}
+        <ExpiringList items={expiring} todayKey={today} />
+        <div className="card">
+          <h2>Recetas con tu inventario</h2>
+          <p className="muted">
+            {inventoryItems.length === 0
+              ? "Añade productos a tu inventario para preparar futuras sugerencias de recetas."
+              : "Tu inventario ya está conectado. Próximamente podrás generar recetas con los productos disponibles."}
+          </p>
+          <Link className="button nav-button" href="/inventory">
+            Gestionar inventario
+          </Link>
+        </div>
       </section>
-      <p className="muted" style={{ fontSize: 12, marginTop: 16 }}>
-        Build check: no-meal-error-banner-v1
-      </p>
     </main>
   );
 }
