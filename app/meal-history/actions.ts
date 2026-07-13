@@ -5,7 +5,11 @@ import { redirect } from "next/navigation";
 
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { isPastMealHistoryDate } from "@/modules/meals/meal-date";
+import {
+  getTodayUtcDate,
+  isPastMealHistoryDate,
+  isValidMealHistoryDate,
+} from "@/modules/meals/meal-date";
 import { normalizeMealType } from "@/modules/meals/meal-types";
 import { isMealLogId } from "@/modules/meals/meal-validation";
 
@@ -30,13 +34,24 @@ type RepeatMealLogRow = {
 export async function repeatMealLogTodayAction(formData: FormData) {
   const id = String(formData.get("id") ?? "").trim();
   const sourceDate = String(formData.get("source_date") ?? "").trim();
+  const today = getTodayUtcDate();
 
-  if (!isMealLogId(id)) {
-    redirectMealHistoryError(sourceDate, "repeat-not-found");
+  const safeReturnDate = isValidMealHistoryDate(sourceDate, today)
+    ? sourceDate
+    : today;
+
+  if (!isPastMealHistoryDate(sourceDate, today)) {
+    redirectMealHistoryError(
+      safeReturnDate,
+      "repeat-not-available",
+    );
   }
 
-  if (!isPastMealHistoryDate(sourceDate)) {
-    redirectMealHistoryError(sourceDate, "repeat-not-available");
+  if (!isMealLogId(id)) {
+    redirectMealHistoryError(
+      safeReturnDate,
+      "repeat-not-found",
+    );
   }
 
   const supabase = await createClient();
@@ -44,7 +59,6 @@ export async function repeatMealLogTodayAction(formData: FormData) {
     supabase,
     "repeat meal log today",
   );
-  const today = new Date().toISOString().slice(0, 10);
 
   const { data: sourceMeal, error: sourceMealError } = await (supabase as any)
     .from("daily_meal_logs")
