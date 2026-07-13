@@ -17,6 +17,12 @@ type InventoryAvailableNutritionInput = InventoryNutritionValues & {
   unit: string;
 };
 
+type InventoryConsumedNutritionInput = InventoryNutritionValues & {
+  nutrition_basis: InventoryNutritionBasis | null;
+  consumed_quantity: number;
+  unit: string;
+};
+
 export type InventoryAvailableNutritionTotals = InventoryNutritionValues;
 
 export const INVENTORY_NUTRITION_BASIS_LABELS: Record<InventoryNutritionBasis, string> = {
@@ -74,8 +80,12 @@ function multiplyOptionalNutritionValue(value: number | null, factor: number) {
   return value === null ? null : value * factor;
 }
 
-export function calculateAvailableInventoryNutrition(
-  input: InventoryAvailableNutritionInput,
+function calculateInventoryNutritionForQuantity(
+  input: InventoryNutritionValues & {
+    nutrition_basis: InventoryNutritionBasis | null;
+    quantity: number;
+    unit: string;
+  },
 ): InventoryAvailableNutritionTotals | null {
   const values = [input.calories, input.protein_g, input.carbs_g, input.fat_g];
 
@@ -91,6 +101,26 @@ export function calculateAvailableInventoryNutrition(
     carbs_g: multiplyOptionalNutritionValue(input.carbs_g, factor),
     fat_g: multiplyOptionalNutritionValue(input.fat_g, factor),
   };
+}
+
+export function calculateAvailableInventoryNutrition(
+  input: InventoryAvailableNutritionInput,
+): InventoryAvailableNutritionTotals | null {
+  return calculateInventoryNutritionForQuantity(input);
+}
+
+export function calculateConsumedInventoryNutrition(
+  input: InventoryConsumedNutritionInput,
+): InventoryAvailableNutritionTotals | null {
+  return calculateInventoryNutritionForQuantity({
+    nutrition_basis: input.nutrition_basis,
+    quantity: input.consumed_quantity,
+    unit: input.unit,
+    calories: input.calories,
+    protein_g: input.protein_g,
+    carbs_g: input.carbs_g,
+    fat_g: input.fat_g,
+  });
 }
 
 export function formatInventoryNutritionTotalValue(value: number | null): string | null {

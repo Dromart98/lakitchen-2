@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateAvailableInventoryNutrition,
+  calculateConsumedInventoryNutrition,
   formatInventoryNutritionTotalValue,
   getInventoryNutritionBasisLabel,
   hasInventoryNutritionValues,
@@ -243,6 +244,136 @@ describe("available inventory nutrition totals", () => {
     expect(calculateAvailableInventoryNutrition({
       nutrition_basis: "per_100g",
       quantity: 250,
+      unit: "g",
+      calories: null,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+  });
+});
+
+describe("consumed inventory nutrition preview totals", () => {
+  it("uses factor 2.5 for consuming 250 g with values per 100 g", () => {
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100g",
+      consumed_quantity: 250,
+      unit: "g",
+      calories: 100,
+      protein_g: 10,
+      carbs_g: 4,
+      fat_g: 2,
+    })).toEqual({
+      calories: 250,
+      protein_g: 25,
+      carbs_g: 10,
+      fat_g: 5,
+    });
+  });
+
+  it("uses factor 2.5 for consuming 0.25 kg with values per 100 g", () => {
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100g",
+      consumed_quantity: 0.25,
+      unit: "kg",
+      calories: 100,
+      protein_g: 10,
+      carbs_g: 4,
+      fat_g: 2,
+    })).toEqual({
+      calories: 250,
+      protein_g: 25,
+      carbs_g: 10,
+      fat_g: 5,
+    });
+  });
+
+  it("uses factor 3 for consuming 3 units with values per unit", () => {
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_unit",
+      consumed_quantity: 3,
+      unit: "ud",
+      calories: 120,
+      protein_g: 8,
+      carbs_g: 20,
+      fat_g: 4,
+    })).toEqual({
+      calories: 360,
+      protein_g: 24,
+      carbs_g: 60,
+      fat_g: 12,
+    });
+  });
+
+  it("preserves null values when consumed nutrition values are partial", () => {
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100g",
+      consumed_quantity: 250,
+      unit: "g",
+      calories: 100,
+      protein_g: 10,
+      carbs_g: null,
+      fat_g: null,
+    })).toEqual({
+      calories: 250,
+      protein_g: 25,
+      carbs_g: null,
+      fat_g: null,
+    });
+  });
+
+  it("returns null for incompatible consumed quantity units", () => {
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100g",
+      consumed_quantity: 250,
+      unit: "ud",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_unit",
+      consumed_quantity: 250,
+      unit: "g",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+  });
+
+  it("returns null for zero, negative, non-finite, and nutritionless consumed quantities", () => {
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100g",
+      consumed_quantity: 0,
+      unit: "g",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100g",
+      consumed_quantity: -1,
+      unit: "g",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100g",
+      consumed_quantity: Number.NaN,
+      unit: "g",
+      calories: 100,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+    })).toBeNull();
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100g",
+      consumed_quantity: 250,
       unit: "g",
       calories: null,
       protein_g: null,
