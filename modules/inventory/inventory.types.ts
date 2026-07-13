@@ -1,3 +1,4 @@
+import type { InventoryCategory } from "@/modules/inventory/inventory-categories";
 import type { MacroTotals } from "@/modules/nutrition/nutrition.types";
 export type InventoryLocation = "pantry" | "fridge" | "freezer";
 export type InventoryStatus = "available" | "low" | "consumed" | "discarded";
@@ -7,6 +8,7 @@ export type InventoryItemRecord = {
   id: string;
   name: string;
   location: InventoryLocation;
+  category: InventoryCategory | null;
   quantity: number;
   unit: string;
   expires_at: string | null;

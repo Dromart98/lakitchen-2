@@ -12,6 +12,7 @@ function item(id: string, expires_at: string | null): InventoryItemRecord {
     id,
     name: `Producto ${id}`,
     location: "pantry",
+    category: null,
     quantity: 1,
     unit: "ud",
     expires_at,

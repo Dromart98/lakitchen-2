@@ -1,6 +1,11 @@
 import Link from "next/link";
 
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
+import {
+  getInventoryCategoryLabel,
+  INVENTORY_CATEGORIES,
+  INVENTORY_CATEGORY_LABELS,
+} from "@/modules/inventory/inventory-categories";
 import { createClient } from "@/lib/supabase/server";
 import {
   formatInventoryExpirationLabel,
@@ -50,6 +55,7 @@ const inventoryErrorMessages: Record<string, string> = {
   "name-required": "El nombre del producto es obligatorio.",
   "name-too-long": "El nombre no puede superar los 120 caracteres.",
   "invalid-location": "Selecciona una ubicación válida.",
+  "invalid-category": "Selecciona una categoría nutricional válida.",
   "invalid-quantity": "La cantidad debe ser un número mayor que cero.",
   "invalid-unit": "Selecciona una unidad válida.",
   "invalid-expires-at": "Introduce una fecha de caducidad válida.",
@@ -106,7 +112,7 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
 
   const { data, error } = await (supabase as any)
     .from("inventory_items")
-    .select("id, name, location, quantity, unit, expires_at, created_at")
+    .select("id, name, location, category, quantity, unit, expires_at, created_at")
     .eq("user_id", user.id)
     .order("location", { ascending: true })
     .order("name", { ascending: true })
@@ -169,6 +175,17 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
               <option value="pantry">Despensa</option>
               <option value="fridge">Nevera</option>
               <option value="freezer">Congelador</option>
+            </select>
+          </label>
+          <label className="field" htmlFor="inventory-category">
+            <span>Categoría nutricional</span>
+            <select id="inventory-category" name="category" required defaultValue="">
+              <option value="" disabled>Selecciona una categoría</option>
+              {INVENTORY_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {INVENTORY_CATEGORY_LABELS[category]}
+                </option>
+              ))}
             </select>
           </label>
           <label className="field" htmlFor="inventory-quantity">
@@ -277,6 +294,8 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                         <br />
                         {item.quantity} {item.unit}
                         <br />
+                        <span className="muted">Categoría: {getInventoryCategoryLabel(item.category)}</span>
+                        <br />
                         <span className="muted">{formatInventoryExpirationLabel(item.expires_at, todayKey)}</span>
                         <form action={deleteInventoryItemAction} className="meal-log-form">
                           <input name="id" type="hidden" value={item.id} />
@@ -307,6 +326,17 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                                 <option value="pantry">Despensa</option>
                                 <option value="fridge">Nevera</option>
                                 <option value="freezer">Congelador</option>
+                              </select>
+                            </label>
+                            <label className="field" htmlFor={`inventory-category-${item.id}`}>
+                              <span>Categoría nutricional</span>
+                              <select id={`inventory-category-${item.id}`} name="category" required defaultValue={item.category ?? ""}>
+                                <option value="" disabled>Selecciona una categoría</option>
+                                {INVENTORY_CATEGORIES.map((category) => (
+                                  <option key={category} value={category}>
+                                    {INVENTORY_CATEGORY_LABELS[category]}
+                                  </option>
+                                ))}
                               </select>
                             </label>
                             <label className="field" htmlFor={`inventory-quantity-${item.id}`}>

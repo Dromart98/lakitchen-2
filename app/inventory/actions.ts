@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { isInventoryCategory } from "@/modules/inventory/inventory-categories";
 
 type InventoryLocation = "pantry" | "fridge" | "freezer";
 type InventoryUnit = "ud" | "g" | "kg" | "ml" | "l";
@@ -43,18 +44,20 @@ function getValidatedInventoryFields(formData: FormData) {
   const location = String(formData.get("location") ?? "");
   const quantity = Number(formData.get("quantity"));
   const unit = String(formData.get("unit") ?? "");
+  const category = String(formData.get("category") ?? "").trim();
 
   if (!name) redirect(`${INVENTORY_PATH}?inventoryError=name-required`);
   if (name.length > 120) redirect(`${INVENTORY_PATH}?inventoryError=name-too-long`);
   if (!Number.isFinite(quantity) || quantity <= 0) redirect(`${INVENTORY_PATH}?inventoryError=invalid-quantity`);
   if (!isInventoryUnit(unit)) redirect(`${INVENTORY_PATH}?inventoryError=invalid-unit`);
   if (!isInventoryLocation(location)) redirect(`${INVENTORY_PATH}?inventoryError=invalid-location`);
+  if (!isInventoryCategory(category)) redirect(`${INVENTORY_PATH}?inventoryError=invalid-category`);
 
-  return { name, quantity, unit, location, expiresAt: getOptionalExpirationDate(formData) };
+  return { name, quantity, unit, location, category, expiresAt: getOptionalExpirationDate(formData) };
 }
 
 export async function addInventoryItemAction(formData: FormData) {
-  const { name, quantity, unit, location, expiresAt } = getValidatedInventoryFields(formData);
+  const { name, quantity, unit, location, category, expiresAt } = getValidatedInventoryFields(formData);
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "inventory item creation");
 
@@ -64,6 +67,7 @@ export async function addInventoryItemAction(formData: FormData) {
     quantity,
     unit,
     location,
+    category,
     expires_at: expiresAt,
   });
 
@@ -81,13 +85,13 @@ export async function updateInventoryItemAction(formData: FormData) {
 
   if (!isUuid(id)) redirect(`${INVENTORY_PATH}?inventoryError=update-not-found`);
 
-  const { name, quantity, unit, location, expiresAt } = getValidatedInventoryFields(formData);
+  const { name, quantity, unit, location, category, expiresAt } = getValidatedInventoryFields(formData);
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "inventory item update");
 
   const { data, error } = await (supabase as any)
     .from("inventory_items")
-    .update({ name, quantity, unit, location, expires_at: expiresAt })
+    .update({ name, quantity, unit, location, category, expires_at: expiresAt })
     .eq("id", id)
     .eq("user_id", user.id)
     .select("id") as { data: { id: string }[] | null; error: { message: string } | null };
