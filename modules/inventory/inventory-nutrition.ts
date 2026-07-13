@@ -52,6 +52,17 @@ export function hasInventoryNutritionValues(values: Array<number | null>): boole
   return values.some((value) => value !== null);
 }
 
+export function hasCompleteInventoryNutritionValues(values: {
+  calories: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+}): boolean {
+  return [values.calories, values.protein_g, values.carbs_g, values.fat_g].every(
+    (value) => value !== null && Number.isFinite(value) && value >= 0,
+  );
+}
+
 function isInventoryNutritionUnit(value: string): value is InventoryNutritionUnit {
   return value === "ud" || value === "g" || value === "kg" || value === "ml" || value === "l";
 }

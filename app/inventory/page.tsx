@@ -80,6 +80,13 @@ const inventoryErrorMessages: Record<string, string> = {
   "consume-not-found": "Este producto ya no está disponible.",
   "consume-too-much": "La cantidad indicada supera el stock disponible.",
   "consume-failed": "No se pudo actualizar el inventario. Inténtalo de nuevo.",
+  "consume-log-not-found": "Este producto ya no está disponible.",
+  "consume-log-invalid-quantity": "La cantidad debe ser un número mayor que cero.",
+  "consume-log-too-much": "La cantidad indicada supera el stock disponible.",
+  "consume-log-incomplete-nutrition": "Completa las calorías y todos los macros para registrar este consumo como comida.",
+  "consume-log-incompatible-unit": "No se puede registrar este consumo como comida con la unidad actual.",
+  "consume-log-invalid-meal-type": "Selecciona un tipo de comida válido.",
+  "consume-log-failed": "No se pudo registrar la comida. Inténtalo de nuevo.",
   "delete-failed": "No se pudo eliminar el producto. Inténtalo de nuevo.",
 };
 
@@ -89,6 +96,8 @@ const inventorySuccessMessages: Record<string, string> = {
   "item-deleted": "Producto eliminado correctamente.",
   "item-consumed": "Cantidad descontada correctamente.",
   "item-consumed-completely": "Producto consumido por completo y eliminado del inventario.",
+  "item-consumed-logged": "Producto consumido y comida registrada correctamente.",
+  "item-consumed-logged-completely": "Producto consumido y comida registrada correctamente.",
 };
 
 function groupInventoryItems(items: InventoryItemRecord[]): InventoryGroup[] {
