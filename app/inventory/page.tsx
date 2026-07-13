@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { InventoryConsumeForm } from "@/components/inventory/InventoryConsumeForm";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import {
   getInventoryCategoryLabel,
@@ -22,7 +23,7 @@ import {
 } from "@/modules/inventory/inventory-expiration";
 import type { InventoryItemRecord, InventoryLocation } from "@/modules/inventory/inventory.types";
 
-import { addInventoryItemAction, consumeInventoryItemAction, deleteInventoryItemAction, updateInventoryItemAction } from "./actions";
+import { addInventoryItemAction, deleteInventoryItemAction, updateInventoryItemAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -415,14 +416,16 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                         </form>
                         <details>
                           <summary>Descontar cantidad</summary>
-                          <form action={consumeInventoryItemAction} className="meal-log-form">
-                            <input name="id" type="hidden" value={item.id} />
-                            <label className="field" htmlFor={`inventory-consumed-quantity-${item.id}`}>
-                              <span>Cantidad consumida</span>
-                              <input id={`inventory-consumed-quantity-${item.id}`} name="consumed_quantity" type="number" min="0.000001" step="any" required />
-                            </label>
-                            <button className="button" type="submit">Confirmar consumo</button>
-                          </form>
+                          <InventoryConsumeForm
+                            id={item.id}
+                            quantity={item.quantity}
+                            unit={item.unit}
+                            nutrition_basis={item.nutrition_basis}
+                            calories={item.calories}
+                            protein_g={item.protein_g}
+                            carbs_g={item.carbs_g}
+                            fat_g={item.fat_g}
+                          />
                         </details>
                         <details>
                           <summary>Editar</summary>
