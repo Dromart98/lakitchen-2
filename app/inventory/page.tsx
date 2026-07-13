@@ -8,6 +8,11 @@ import {
 } from "@/modules/inventory/inventory-categories";
 import { createClient } from "@/lib/supabase/server";
 import {
+  getInventoryNutritionBasisLabel,
+  INVENTORY_NUTRITION_BASIS_LABELS,
+  NUTRITION_BASES,
+} from "@/modules/inventory/inventory-nutrition";
+import {
   formatInventoryExpirationLabel,
   getCurrentInventoryExpirationDateKey,
   getInventoryExpirationAlertItems,
@@ -59,6 +64,12 @@ const inventoryErrorMessages: Record<string, string> = {
   "invalid-quantity": "La cantidad debe ser un número mayor que cero.",
   "invalid-unit": "Selecciona una unidad válida.",
   "invalid-expires-at": "Introduce una fecha de caducidad válida.",
+  "invalid-nutrition-basis": "Selecciona una base nutricional válida.",
+  "missing-nutrition-basis": "Selecciona si los valores nutricionales son por 100 g o por unidad.",
+  "invalid-calories": "Introduce calorías válidas, sin valores negativos.",
+  "invalid-protein": "Introduce proteínas válidas, sin valores negativos.",
+  "invalid-carbs": "Introduce carbohidratos válidos, sin valores negativos.",
+  "invalid-fat": "Introduce grasas válidas, sin valores negativos.",
   "save-failed": "No se pudo guardar el producto. Inténtalo de nuevo.",
   "update-not-found": "Este producto ya no está disponible.",
   "update-failed": "No se pudo actualizar el producto. Inténtalo de nuevo.",
@@ -93,6 +104,19 @@ function isExpirationFilter(value: string | undefined): value is InventoryExpira
   return expirationFilters.some((filter) => filter.value === value);
 }
 
+function formatOptionalNutritionValue(value: number | null, suffix: string) {
+  return value === null ? null : `${value} ${suffix}`;
+}
+
+function getInventoryNutritionParts(item: InventoryItemRecord) {
+  return [
+    formatOptionalNutritionValue(item.calories, "kcal"),
+    formatOptionalNutritionValue(item.protein_g, "g proteína"),
+    formatOptionalNutritionValue(item.carbs_g, "g carbohidratos"),
+    formatOptionalNutritionValue(item.fat_g, "g grasas"),
+  ].filter((part): part is string => Boolean(part));
+}
+
 function matchesExpirationFilter(item: InventoryItemRecord, expirationFilter: InventoryExpirationFilter, todayKey: string) {
   if (expirationFilter === "all") return true;
   if (expirationFilter === "no-date") return !item.expires_at;
@@ -112,7 +136,7 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
 
   const { data, error } = await (supabase as any)
     .from("inventory_items")
-    .select("id, name, location, category, quantity, unit, expires_at, created_at")
+    .select("id, name, location, category, nutrition_basis, calories, protein_g, carbs_g, fat_g, quantity, unit, expires_at, created_at")
     .eq("user_id", user.id)
     .order("location", { ascending: true })
     .order("name", { ascending: true })
@@ -206,6 +230,36 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
             <span>Caducidad (opcional)</span>
             <input id="inventory-expires-at" name="expires_at" type="date" />
           </label>
+          <fieldset className="meal-log-form">
+            <legend>Información nutricional opcional</legend>
+            <label className="field" htmlFor="inventory-nutrition-basis">
+              <span>Valores por</span>
+              <select id="inventory-nutrition-basis" name="nutrition_basis" defaultValue="">
+                <option value="">Sin información nutricional</option>
+                {NUTRITION_BASES.map((basis) => (
+                  <option key={basis} value={basis}>
+                    {INVENTORY_NUTRITION_BASIS_LABELS[basis]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field" htmlFor="inventory-calories">
+              <span>Calorías</span>
+              <input id="inventory-calories" name="calories" type="number" min="0" step="any" inputMode="decimal" placeholder="245" />
+            </label>
+            <label className="field" htmlFor="inventory-protein-g">
+              <span>Proteínas (g)</span>
+              <input id="inventory-protein-g" name="protein_g" type="number" min="0" step="any" inputMode="decimal" placeholder="22" />
+            </label>
+            <label className="field" htmlFor="inventory-carbs-g">
+              <span>Carbohidratos (g)</span>
+              <input id="inventory-carbs-g" name="carbs_g" type="number" min="0" step="any" inputMode="decimal" placeholder="4" />
+            </label>
+            <label className="field" htmlFor="inventory-fat-g">
+              <span>Grasas (g)</span>
+              <input id="inventory-fat-g" name="fat_g" type="number" min="0" step="any" inputMode="decimal" placeholder="15" />
+            </label>
+          </fieldset>
           <button className="button" type="submit">Añadir producto</button>
         </form>
       </section>
@@ -297,6 +351,16 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                         <span className="muted">Categoría: {getInventoryCategoryLabel(item.category)}</span>
                         <br />
                         <span className="muted">{formatInventoryExpirationLabel(item.expires_at, todayKey)}</span>
+                        {getInventoryNutritionParts(item).length ? (
+                          <>
+                            <br />
+                            <span className="muted">
+                              Información nutricional · {getInventoryNutritionBasisLabel(item.nutrition_basis)}
+                            </span>
+                            <br />
+                            <span className="muted">{getInventoryNutritionParts(item).join(" · ")}</span>
+                          </>
+                        ) : null}
                         <form action={deleteInventoryItemAction} className="meal-log-form">
                           <input name="id" type="hidden" value={item.id} />
                           <button className="button" type="submit">Eliminar</button>
@@ -357,6 +421,36 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                               <span>Caducidad (opcional)</span>
                               <input id={`inventory-expires-at-${item.id}`} name="expires_at" type="date" defaultValue={item.expires_at ?? ""} />
                             </label>
+                            <fieldset className="meal-log-form">
+                              <legend>Información nutricional opcional</legend>
+                              <label className="field" htmlFor={`inventory-nutrition-basis-${item.id}`}>
+                                <span>Valores por</span>
+                                <select id={`inventory-nutrition-basis-${item.id}`} name="nutrition_basis" defaultValue={item.nutrition_basis ?? ""}>
+                                  <option value="">Sin información nutricional</option>
+                                  {NUTRITION_BASES.map((basis) => (
+                                    <option key={basis} value={basis}>
+                                      {INVENTORY_NUTRITION_BASIS_LABELS[basis]}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label className="field" htmlFor={`inventory-calories-${item.id}`}>
+                                <span>Calorías</span>
+                                <input id={`inventory-calories-${item.id}`} name="calories" type="number" min="0" step="any" inputMode="decimal" defaultValue={item.calories ?? ""} />
+                              </label>
+                              <label className="field" htmlFor={`inventory-protein-g-${item.id}`}>
+                                <span>Proteínas (g)</span>
+                                <input id={`inventory-protein-g-${item.id}`} name="protein_g" type="number" min="0" step="any" inputMode="decimal" defaultValue={item.protein_g ?? ""} />
+                              </label>
+                              <label className="field" htmlFor={`inventory-carbs-g-${item.id}`}>
+                                <span>Carbohidratos (g)</span>
+                                <input id={`inventory-carbs-g-${item.id}`} name="carbs_g" type="number" min="0" step="any" inputMode="decimal" defaultValue={item.carbs_g ?? ""} />
+                              </label>
+                              <label className="field" htmlFor={`inventory-fat-g-${item.id}`}>
+                                <span>Grasas (g)</span>
+                                <input id={`inventory-fat-g-${item.id}`} name="fat_g" type="number" min="0" step="any" inputMode="decimal" defaultValue={item.fat_g ?? ""} />
+                              </label>
+                            </fieldset>
                             <button className="button" type="submit">Guardar cambios</button>
                           </form>
                         </details>
