@@ -2,27 +2,22 @@ import Link from "next/link";
 
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import {
+  formatInventoryExpirationLabel,
+  getCurrentInventoryExpirationDateKey,
+  getInventoryExpirationAlertItems,
+  getInventoryExpirationDayDifference,
+} from "@/modules/inventory/inventory-expiration";
+import type { InventoryItemRecord, InventoryLocation } from "@/modules/inventory/inventory.types";
 
 import { addInventoryItemAction, consumeInventoryItemAction, deleteInventoryItemAction, updateInventoryItemAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-type InventoryLocation = "pantry" | "fridge" | "freezer";
-
-type InventoryItemRow = {
-  id: string;
-  name: string;
-  location: InventoryLocation;
-  quantity: number;
-  unit: string;
-  expires_at: string | null;
-  created_at: string;
-};
-
 type InventoryGroup = {
   location: InventoryLocation;
   label: string;
-  items: InventoryItemRow[];
+  items: InventoryItemRecord[];
 };
 
 type InventoryExpirationFilter = "all" | "expired" | "today" | "next-7-days" | "no-date";
@@ -76,57 +71,7 @@ const inventorySuccessMessages: Record<string, string> = {
   "item-consumed-completely": "Producto consumido por completo y eliminado del inventario.",
 };
 
-const expirationFormatter = new Intl.DateTimeFormat("es-ES", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
-const millisecondsPerDay = 24 * 60 * 60 * 1000;
-
-function toUtcDateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
-
-function getUtcDateKeyTimestamp(dateKey: string) {
-  return Date.parse(`${dateKey}T00:00:00.000Z`);
-}
-
-function getExpirationDayDifference(expiresAt: string, todayKey: string) {
-  const expirationKey = toUtcDateKey(new Date(`${expiresAt}T00:00:00.000Z`));
-
-  return Math.round((getUtcDateKeyTimestamp(expirationKey) - getUtcDateKeyTimestamp(todayKey)) / millisecondsPerDay);
-}
-
-function formatExpirationDate(expiresAt: string | null, todayKey: string) {
-  if (!expiresAt) return "Sin fecha de caducidad";
-
-  const dayDifference = getExpirationDayDifference(expiresAt, todayKey);
-
-  if (dayDifference < 0) return "Caducado";
-  if (dayDifference === 0) return "Caduca hoy";
-  if (dayDifference === 1) return "Caduca en 1 día";
-  if (dayDifference <= 7) return `Caduca en ${dayDifference} días`;
-
-  return expirationFormatter.format(new Date(`${expiresAt}T00:00:00.000Z`));
-}
-
-function getExpirationAlertItems(items: InventoryItemRow[], todayKey: string) {
-  return items
-    .filter((item) => {
-      if (!item.expires_at) return false;
-
-      const dayDifference = getExpirationDayDifference(item.expires_at, todayKey);
-
-      return dayDifference <= 7;
-    })
-    .sort((firstItem, secondItem) => {
-      return getUtcDateKeyTimestamp(firstItem.expires_at ?? "") - getUtcDateKeyTimestamp(secondItem.expires_at ?? "");
-    });
-}
-
-function groupInventoryItems(items: InventoryItemRow[]): InventoryGroup[] {
+function groupInventoryItems(items: InventoryItemRecord[]): InventoryGroup[] {
   return inventoryLocations.map((location) => ({
     location,
     label: locationLabels[location],
@@ -142,12 +87,12 @@ function isExpirationFilter(value: string | undefined): value is InventoryExpira
   return expirationFilters.some((filter) => filter.value === value);
 }
 
-function matchesExpirationFilter(item: InventoryItemRow, expirationFilter: InventoryExpirationFilter, todayKey: string) {
+function matchesExpirationFilter(item: InventoryItemRecord, expirationFilter: InventoryExpirationFilter, todayKey: string) {
   if (expirationFilter === "all") return true;
   if (expirationFilter === "no-date") return !item.expires_at;
   if (!item.expires_at) return false;
 
-  const dayDifference = getExpirationDayDifference(item.expires_at, todayKey);
+  const dayDifference = getInventoryExpirationDayDifference(item.expires_at, todayKey);
 
   if (expirationFilter === "expired") return dayDifference < 0;
   if (expirationFilter === "today") return dayDifference === 0;
@@ -166,7 +111,7 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
     .order("location", { ascending: true })
     .order("name", { ascending: true })
     .order("created_at", { ascending: true }) as {
-      data: InventoryItemRow[] | null;
+      data: InventoryItemRecord[] | null;
       error: { message: string } | null;
     };
 
@@ -175,8 +120,8 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
   }
 
   const items = error ? [] : data ?? [];
-  const todayKey = toUtcDateKey(new Date());
-  const expirationAlertItems = getExpirationAlertItems(items, todayKey);
+  const todayKey = getCurrentInventoryExpirationDateKey(new Date());
+  const expirationAlertItems = getInventoryExpirationAlertItems(items, todayKey);
   const resolvedSearchParams = await searchParams;
   const query = resolvedSearchParams?.query?.trim() ?? "";
   const selectedLocation: InventoryLocation | "all" = isInventoryLocation(resolvedSearchParams?.location) ? resolvedSearchParams.location : "all";
@@ -307,7 +252,7 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                     <br />
                     <span className="muted">{locationLabels[item.location]}</span>
                     <br />
-                    <span className="muted">{formatExpirationDate(item.expires_at, todayKey)}</span>
+                    <span className="muted">{formatInventoryExpirationLabel(item.expires_at, todayKey)}</span>
                   </li>
                 ))}
               </ul>
@@ -332,7 +277,7 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                         <br />
                         {item.quantity} {item.unit}
                         <br />
-                        <span className="muted">{formatExpirationDate(item.expires_at, todayKey)}</span>
+                        <span className="muted">{formatInventoryExpirationLabel(item.expires_at, todayKey)}</span>
                         <form action={deleteInventoryItemAction} className="meal-log-form">
                           <input name="id" type="hidden" value={item.id} />
                           <button className="button" type="submit">Eliminar</button>
