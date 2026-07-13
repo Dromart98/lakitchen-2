@@ -88,7 +88,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
 
   const { data: inventoryData, error: inventoryError } = await (supabase as any)
     .from("inventory_items")
-    .select("id, name, location, quantity, unit, expires_at, created_at")
+    .select("id, name, location, category, quantity, unit, expires_at, created_at")
     .eq("user_id", user.id)
     .gt("quantity", 0)
     .order("created_at", { ascending: true }) as InventoryItemsQueryResult;
