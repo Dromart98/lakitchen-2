@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { consumeMealBuilderAndLogMealAction } from "@/app/meal-builder/actions";
-
 import {
   calculateMealBuilderLineNutrition,
   calculateMealBuilderTotals,
@@ -12,10 +11,17 @@ import {
   formatMealBuilderNutritionValue,
   isMealBuilderInventoryItemEligible,
   type MealBuilderInventoryItem,
+  type RepeatedMealBuilderDraftLine,
+  type RepeatedMealBuilderUnavailableItem,
 } from "@/modules/meals/meal-builder";
-import { MEAL_TYPE_LABELS, MEAL_TYPES, isMealType } from "@/modules/meals/meal-types";
+import { MEAL_TYPE_LABELS, MEAL_TYPES, isMealType, type MealType } from "@/modules/meals/meal-types";
 
 const MAX_MEAL_BUILDER_ROWS = 10;
+
+const UNAVAILABLE_REASON_LABELS: Record<RepeatedMealBuilderUnavailableItem["reason"], string> = {
+  missing: "Ya no está en tu inventario.",
+  incompatible: "El producto existe, pero necesita información nutricional válida.",
+};
 
 type BuilderRow = {
   id: string;
@@ -25,6 +31,10 @@ type BuilderRow = {
 
 type InventoryMealBuilderProps = {
   items: MealBuilderInventoryItem[];
+  initialMealName?: string;
+  initialMealType?: MealType | "";
+  initialRows?: RepeatedMealBuilderDraftLine[];
+  unavailableItems?: RepeatedMealBuilderUnavailableItem[];
 };
 
 function createRow(index: number): BuilderRow {
@@ -33,6 +43,24 @@ function createRow(index: number): BuilderRow {
     itemId: "",
     quantity: "",
   };
+}
+
+function createInitialRows(initialRows: RepeatedMealBuilderDraftLine[] | undefined): BuilderRow[] {
+  const seenItemIds = new Set<string>();
+  const rows: BuilderRow[] = [];
+
+  for (const row of initialRows ?? []) {
+    if (!row.itemId || seenItemIds.has(row.itemId) || rows.length >= MAX_MEAL_BUILDER_ROWS) continue;
+
+    seenItemIds.add(row.itemId);
+    rows.push({
+      id: `meal-builder-initial-row-${rows.length}-${row.itemId}`,
+      itemId: row.itemId,
+      quantity: row.quantity,
+    });
+  }
+
+  return rows.length ? rows : [createRow(0)];
 }
 
 function parseQuantity(value: string): number | null {
@@ -51,11 +79,36 @@ function formatStock(value: number): string {
   return formatMealBuilderNutritionValue(value) ?? String(value);
 }
 
-export function InventoryMealBuilder({ items }: InventoryMealBuilderProps) {
+function UnavailableItemsCard({ items }: { items: RepeatedMealBuilderUnavailableItem[] }) {
+  if (!items.length) return null;
+
+  return (
+    <section className="card" style={{ marginTop: 16 }}>
+      <h2>Productos que debes revisar</h2>
+      <ul>
+        {items.map((item) => (
+          <li key={`${item.sourceInventoryItemId}-${item.reason}`}>
+            <strong>{item.productName}</strong> — {formatStock(item.consumedQuantity)} {item.unit}
+            <br />
+            <span className="muted">{UNAVAILABLE_REASON_LABELS[item.reason]}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export function InventoryMealBuilder({
+  items,
+  initialMealName = "",
+  initialMealType = "",
+  initialRows,
+  unavailableItems = [],
+}: InventoryMealBuilderProps) {
   const eligibleItems = useMemo(() => items.filter(isMealBuilderInventoryItemEligible), [items]);
-  const [rows, setRows] = useState<BuilderRow[]>(() => [createRow(0)]);
-  const [mealName, setMealName] = useState("");
-  const [mealType, setMealType] = useState("");
+  const [rows, setRows] = useState<BuilderRow[]>(() => createInitialRows(initialRows));
+  const [mealName, setMealName] = useState(initialMealName);
+  const [mealType, setMealType] = useState<MealType | "">(initialMealType);
 
   const selectedItemIds = useMemo(
     () => new Set(rows.map((row) => row.itemId).filter(Boolean)),
@@ -106,15 +159,20 @@ export function InventoryMealBuilder({ items }: InventoryMealBuilderProps) {
 
   if (!eligibleItems.length) {
     return (
-      <section className="card">
-        <p className="muted">Añade información nutricional completa a tus productos para poder componer una comida.</p>
-        <Link className="button nav-button" href="/inventory">Volver al inventario</Link>
-      </section>
+      <>
+        <UnavailableItemsCard items={unavailableItems} />
+        <section className="card">
+          <p className="muted">Añade información nutricional completa a tus productos para poder componer una comida.</p>
+          <Link className="button nav-button" href="/inventory">Volver al inventario</Link>
+        </section>
+      </>
     );
   }
 
   return (
     <>
+      <UnavailableItemsCard items={unavailableItems} />
+
       <section className="grid cards">
         {rows.map((row, index) => {
           const item = eligibleItems.find((candidate) => candidate.id === row.itemId) ?? null;
@@ -228,7 +286,7 @@ export function InventoryMealBuilder({ items }: InventoryMealBuilderProps) {
               name="meal_type"
               required
               value={mealType}
-              onChange={(event) => setMealType(event.target.value)}
+              onChange={(event) => setMealType(event.target.value as MealType | "")}
             >
               <option value="">Selecciona un tipo</option>
               {MEAL_TYPES.map((type) => (

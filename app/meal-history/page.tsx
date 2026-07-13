@@ -177,6 +177,11 @@ export default async function MealHistoryPage({ searchParams }: { searchParams?:
                               </button>
                             </form>
                           ) : null}
+                          {mealItemsByMealId.get(meal.id)?.length ? (
+                            <Link className="button nav-button" href={`/meal-builder?repeatMeal=${meal.id}`}>
+                              Repetir en el compositor
+                            </Link>
+                          ) : null}
                         </div>
                         {mealItemsByMealId.get(meal.id)?.length ? (
                           <div style={{ marginTop: 8, marginLeft: 12 }}>
