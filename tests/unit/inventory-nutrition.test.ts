@@ -143,6 +143,55 @@ describe("available inventory nutrition totals", () => {
     });
   });
 
+  it("uses factor 2.5 for 250 ml with values per 100 ml", () => {
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_100ml",
+      quantity: 250,
+      unit: "ml",
+      calories: 40,
+      protein_g: 1,
+      carbs_g: 8,
+      fat_g: 0.5,
+    })).toEqual({
+      calories: 100,
+      protein_g: 2.5,
+      carbs_g: 20,
+      fat_g: 1.25,
+    });
+  });
+
+  it("uses factor 5 for 0.5 l and factor 15 for 1.5 l with values per 100 ml", () => {
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_100ml",
+      quantity: 0.5,
+      unit: "l",
+      calories: 40,
+      protein_g: 1,
+      carbs_g: 8,
+      fat_g: 0.5,
+    })).toEqual({
+      calories: 200,
+      protein_g: 5,
+      carbs_g: 40,
+      fat_g: 2.5,
+    });
+
+    expect(calculateAvailableInventoryNutrition({
+      nutrition_basis: "per_100ml",
+      quantity: 1.5,
+      unit: "l",
+      calories: 40,
+      protein_g: 1,
+      carbs_g: 8,
+      fat_g: 0.5,
+    })).toEqual({
+      calories: 600,
+      protein_g: 15,
+      carbs_g: 120,
+      fat_g: 7.5,
+    });
+  });
+
   it("uses factor 3 for 3 units with values per unit", () => {
     expect(calculateAvailableInventoryNutrition({
       nutrition_basis: "per_unit",
@@ -241,6 +290,17 @@ describe("available inventory nutrition totals", () => {
       carbs_g: null,
       fat_g: null,
     })).toBeNull();
+    for (const unit of ["g", "kg", "ud", "cup"] as const) {
+      expect(calculateAvailableInventoryNutrition({
+        nutrition_basis: "per_100ml",
+        quantity: 250,
+        unit,
+        calories: 100,
+        protein_g: null,
+        carbs_g: null,
+        fat_g: null,
+      })).toBeNull();
+    }
   });
 
   it("returns null for missing basis, invalid quantities, and products without nutrition values", () => {
@@ -327,6 +387,55 @@ describe("consumed inventory nutrition preview totals", () => {
     });
   });
 
+  it("uses factor 2.5 for consuming 250 ml with values per 100 ml", () => {
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100ml",
+      consumed_quantity: 250,
+      unit: "ml",
+      calories: 40,
+      protein_g: 1,
+      carbs_g: 8,
+      fat_g: 0.5,
+    })).toEqual({
+      calories: 100,
+      protein_g: 2.5,
+      carbs_g: 20,
+      fat_g: 1.25,
+    });
+  });
+
+  it("uses factor 5 for consuming 0.5 l and factor 15 for consuming 1.5 l with values per 100 ml", () => {
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100ml",
+      consumed_quantity: 0.5,
+      unit: "l",
+      calories: 40,
+      protein_g: 1,
+      carbs_g: 8,
+      fat_g: 0.5,
+    })).toEqual({
+      calories: 200,
+      protein_g: 5,
+      carbs_g: 40,
+      fat_g: 2.5,
+    });
+
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100ml",
+      consumed_quantity: 1.5,
+      unit: "l",
+      calories: 40,
+      protein_g: 1,
+      carbs_g: 8,
+      fat_g: 0.5,
+    })).toEqual({
+      calories: 600,
+      protein_g: 15,
+      carbs_g: 120,
+      fat_g: 7.5,
+    });
+  });
+
   it("uses factor 3 for consuming 3 units with values per unit", () => {
     expect(calculateConsumedInventoryNutrition({
       nutrition_basis: "per_unit",
@@ -380,6 +489,17 @@ describe("consumed inventory nutrition preview totals", () => {
       carbs_g: null,
       fat_g: null,
     })).toBeNull();
+    for (const unit of ["g", "kg", "ud", "cup"] as const) {
+      expect(calculateConsumedInventoryNutrition({
+        nutrition_basis: "per_100ml",
+        consumed_quantity: 250,
+        unit,
+        calories: 100,
+        protein_g: null,
+        carbs_g: null,
+        fat_g: null,
+      })).toBeNull();
+    }
   });
 
   it("returns null for zero, negative, non-finite, and nutritionless consumed quantities", () => {

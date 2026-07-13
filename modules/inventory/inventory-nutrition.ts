@@ -1,4 +1,4 @@
-export const NUTRITION_BASES = ["per_100g", "per_unit"] as const;
+export const NUTRITION_BASES = ["per_100g", "per_unit", "per_100ml"] as const;
 
 export type InventoryNutritionBasis = (typeof NUTRITION_BASES)[number];
 
@@ -28,6 +28,7 @@ export type InventoryAvailableNutritionTotals = InventoryNutritionValues;
 export const INVENTORY_NUTRITION_BASIS_LABELS: Record<InventoryNutritionBasis, string> = {
   per_100g: "Por 100 g",
   per_unit: "Por unidad",
+  per_100ml: "Por 100 ml",
 };
 
 export function isInventoryNutritionBasis(value: unknown): value is InventoryNutritionBasis {
@@ -79,6 +80,12 @@ function getAvailableNutritionFactor(
   if (nutritionBasis === "per_100g") {
     if (unit === "g") return quantity / 100;
     if (unit === "kg") return quantity * 10;
+    return null;
+  }
+
+  if (nutritionBasis === "per_100ml") {
+    if (unit === "ml") return quantity / 100;
+    if (unit === "l") return quantity * 10;
     return null;
   }
 
