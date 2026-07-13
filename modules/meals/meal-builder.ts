@@ -91,6 +91,33 @@ export function calculateMealBuilderTotals(lines: MealBuilderLine[]): MealBuilde
   return totals;
 }
 
+export type MealBuilderConsumptionPayloadLine = {
+  item_id: string;
+  consumed_quantity: number;
+};
+
+export function createMealBuilderConsumptionPayload(
+  lines: MealBuilderLine[],
+): MealBuilderConsumptionPayloadLine[] | null {
+  if (!lines.length || lines.length > 10) return null;
+  if (!calculateMealBuilderTotals(lines)) return null;
+
+  const seenItemIds = new Set<string>();
+  const payload: MealBuilderConsumptionPayloadLine[] = [];
+
+  for (const line of lines) {
+    if (seenItemIds.has(line.id)) return null;
+    seenItemIds.add(line.id);
+
+    payload.push({
+      item_id: line.id,
+      consumed_quantity: line.consumed_quantity,
+    });
+  }
+
+  return payload;
+}
+
 export function formatMealBuilderNutritionValue(value: number): string | null {
   if (!Number.isFinite(value)) return null;
 
