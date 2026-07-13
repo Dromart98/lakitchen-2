@@ -5,6 +5,7 @@ import {
   calculateConsumedInventoryNutrition,
   formatInventoryNutritionTotalValue,
   getInventoryNutritionBasisLabel,
+  hasCompleteInventoryNutritionValues,
   hasInventoryNutritionValues,
   INVENTORY_NUTRITION_BASIS_LABELS,
   isInventoryNutritionBasis,
@@ -66,6 +67,44 @@ describe("inventory nutrition number parsing", () => {
     expect(hasInventoryNutritionValues([null, null, null, null])).toBe(false);
     expect(hasInventoryNutritionValues([null, 0, null, null])).toBe(true);
     expect(hasInventoryNutritionValues([null, 12.5, null, null])).toBe(true);
+  });
+});
+
+describe("complete inventory nutrition values", () => {
+  it("accepts complete finite non-negative nutrition values", () => {
+    expect(hasCompleteInventoryNutritionValues({
+      calories: 0,
+      protein_g: 10,
+      carbs_g: 20,
+      fat_g: 5,
+    })).toBe(true);
+  });
+
+  it("rejects missing, negative, and non-finite nutrition values", () => {
+    expect(hasCompleteInventoryNutritionValues({
+      calories: null,
+      protein_g: 10,
+      carbs_g: 20,
+      fat_g: 5,
+    })).toBe(false);
+    expect(hasCompleteInventoryNutritionValues({
+      calories: 100,
+      protein_g: -1,
+      carbs_g: 20,
+      fat_g: 5,
+    })).toBe(false);
+    expect(hasCompleteInventoryNutritionValues({
+      calories: 100,
+      protein_g: 10,
+      carbs_g: Number.NaN,
+      fat_g: 5,
+    })).toBe(false);
+    expect(hasCompleteInventoryNutritionValues({
+      calories: 100,
+      protein_g: 10,
+      carbs_g: 20,
+      fat_g: Infinity,
+    })).toBe(false);
   });
 });
 
