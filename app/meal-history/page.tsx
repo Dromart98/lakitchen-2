@@ -11,10 +11,17 @@ import {
   isPastMealHistoryDate,
   resolveMealHistoryDate,
 } from "@/modules/meals/meal-date";
+import { formatMealLogItemNutritionValue, sortMealLogItems, type MealLogItemRecord } from "@/modules/meals/meal-log-items";
 import { sumMacros } from "@/modules/meals/meal-summary";
 import { MEAL_TYPE_LABELS, MEAL_TYPES, normalizeMealType } from "@/modules/meals/meal-types";
 
 export const dynamic = "force-dynamic";
+
+type MealLogItemRow = MealLogItemRecord & {
+  id: string;
+  meal_log_id: string;
+  created_at: string;
+};
 
 type DailyMealLogRow = {
   id: string;
@@ -64,6 +71,30 @@ export default async function MealHistoryPage({ searchParams }: { searchParams?:
   }
 
   const meals = mealLogsError ? [] : mealLogs ?? [];
+  const mealIds = meals.map((meal) => meal.id);
+  let mealItemsByMealId = new Map<string, MealLogItemRow[]>();
+  let mealItemsError = false;
+
+  if (mealIds.length > 0) {
+    const { data: mealItems, error } = await (supabase as any)
+      .from("daily_meal_log_items")
+      .select("id, meal_log_id, source_inventory_item_id, product_name, consumed_quantity, unit, nutrition_basis, calories, protein_g, carbs_g, fat_g, created_at")
+      .in("meal_log_id", mealIds)
+      .order("product_name", { ascending: true })
+      .order("source_inventory_item_id", { ascending: true }) as { data: MealLogItemRow[] | null; error: { message: string } | null };
+
+    if (error) {
+      console.warn("Supabase could not load the meal history item snapshots:", error.message);
+      mealItemsError = true;
+    } else {
+      mealItemsByMealId = (mealItems ?? []).reduce((itemsByMealId, item) => {
+        const existingItems = itemsByMealId.get(item.meal_log_id) ?? [];
+        existingItems.push(item);
+        itemsByMealId.set(item.meal_log_id, existingItems);
+        return itemsByMealId;
+      }, new Map<string, MealLogItemRow[]>());
+    }
+  }
   const totals = sumMacros(meals.map((meal) => ({
     calories: meal.calories,
     proteinG: meal.protein_g,
@@ -117,6 +148,7 @@ export default async function MealHistoryPage({ searchParams }: { searchParams?:
               <p>{totals.calories} kcal</p>
               <p className="muted">P {totals.proteinG}g · C {totals.carbsG}g · G {totals.fatG}g</p>
               <p className="muted">{getMealCountLabel(meals.length)}</p>
+              {mealItemsError ? <p className="auth-message error" role="alert">No se pudo cargar el desglose de ingredientes.</p> : null}
             </div>
           </section>
 
@@ -145,7 +177,30 @@ export default async function MealHistoryPage({ searchParams }: { searchParams?:
                               </button>
                             </form>
                           ) : null}
+                          {mealItemsByMealId.get(meal.id)?.length ? (
+                            <Link className="button nav-button" href={`/meal-builder?repeatMeal=${meal.id}`}>
+                              Repetir en el compositor
+                            </Link>
+                          ) : null}
                         </div>
+                        {mealItemsByMealId.get(meal.id)?.length ? (
+                          <div style={{ marginTop: 8, marginLeft: 12 }}>
+                            <p className="muted" style={{ margin: "0 0 4px" }}><strong>Ingredientes utilizados</strong></p>
+                            <ul style={{ margin: 0, paddingLeft: 16 }}>
+                              {sortMealLogItems(mealItemsByMealId.get(meal.id) ?? []).map((item) => (
+                                <li key={item.id} className="muted" style={{ marginTop: 4 }}>
+                                  <span>
+                                    <strong>{item.product_name}</strong> — {formatMealLogItemNutritionValue(item.consumed_quantity)} {item.unit}
+                                  </span>
+                                  <br />
+                                  <span>
+                                    {formatMealLogItemNutritionValue(item.calories)} kcal · P {formatMealLogItemNutritionValue(item.protein_g)} g · C {formatMealLogItemNutritionValue(item.carbs_g)} g · G {formatMealLogItemNutritionValue(item.fat_g)} g
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
                       </li>
                     ))}
                   </ul>

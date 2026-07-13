@@ -126,3 +126,144 @@ describe("meal builder totals", () => {
     });
   });
 });
+
+describe("repeated meal builder drafts", () => {
+  const meal = { name: "Bowl de pasta", meal_type: "lunch" };
+  const currentPasta = { ...pasta, id: "pasta", consumed_quantity: undefined } as never as typeof pasta;
+  const currentJuice = { ...juice, id: "juice", consumed_quantity: undefined } as never as typeof juice;
+
+  it("creates available lines for a meal with two current products", async () => {
+    const { createRepeatedMealBuilderDraft } = await import("@/modules/meals/meal-builder");
+    const draft = createRepeatedMealBuilderDraft(meal, [snapshot("pasta", "Pasta", 250, "g"), snapshot("juice", "Zumo", 200, "ml")], [currentPasta, currentJuice]);
+
+    expect(draft.availableLines).toEqual([
+      { itemId: "pasta", quantity: "250" },
+      { itemId: "juice", quantity: "200" },
+    ]);
+    expect(draft.unavailableItems).toEqual([]);
+  });
+
+  it("marks deleted inventory products as missing", async () => {
+    const { createRepeatedMealBuilderDraft } = await import("@/modules/meals/meal-builder");
+    const draft = createRepeatedMealBuilderDraft(meal, [snapshot("missing", "Yogur", 1, "ud")], [currentPasta]);
+
+    expect(draft.availableLines).toEqual([]);
+    expect(draft.unavailableItems).toEqual([
+      { sourceInventoryItemId: "missing", productName: "Yogur", consumedQuantity: 1, unit: "ud", reason: "missing" },
+    ]);
+  });
+
+  it("marks current products with incomplete nutrition as incompatible", async () => {
+    const { createRepeatedMealBuilderDraft } = await import("@/modules/meals/meal-builder");
+    const draft = createRepeatedMealBuilderDraft(meal, [snapshot("pasta", "Pasta", 250, "g")], [{ ...currentPasta, calories: null }]);
+
+    expect(draft.availableLines).toEqual([]);
+    expect(draft.unavailableItems[0]?.reason).toBe("incompatible");
+  });
+
+  it("marks current products with incompatible units as incompatible", async () => {
+    const { createRepeatedMealBuilderDraft } = await import("@/modules/meals/meal-builder");
+    const draft = createRepeatedMealBuilderDraft(meal, [snapshot("juice", "Zumo", 250, "ml")], [{ ...currentJuice, unit: "g" }]);
+
+    expect(draft.availableLines).toEqual([]);
+    expect(draft.unavailableItems[0]?.reason).toBe("incompatible");
+  });
+
+  it("keeps the historical quantity when current stock is lower", async () => {
+    const { createRepeatedMealBuilderDraft } = await import("@/modules/meals/meal-builder");
+    const draft = createRepeatedMealBuilderDraft(meal, [snapshot("pasta", "Pasta", 250, "g")], [{ ...currentPasta, quantity: 100 }]);
+
+    expect(draft.availableLines).toEqual([{ itemId: "pasta", quantity: "250" }]);
+  });
+
+  it("preloads the historical meal name", async () => {
+    const { createRepeatedMealBuilderDraft } = await import("@/modules/meals/meal-builder");
+    const draft = createRepeatedMealBuilderDraft(meal, [], []);
+
+    expect(draft.mealName).toBe("Bowl de pasta");
+  });
+
+  it("preloads a valid historical meal type", async () => {
+    const { createRepeatedMealBuilderDraft } = await import("@/modules/meals/meal-builder");
+    const draft = createRepeatedMealBuilderDraft(meal, [], []);
+
+    expect(draft.mealType).toBe("lunch");
+  });
+
+  it("leaves invalid historical meal types unselected", async () => {
+    const { createRepeatedMealBuilderDraft } = await import("@/modules/meals/meal-builder");
+    const draft = createRepeatedMealBuilderDraft({ ...meal, meal_type: "brunch" }, [], []);
+
+    expect(draft.mealType).toBe("");
+  });
+
+  it("deduplicates duplicated snapshots", async () => {
+    const { createRepeatedMealBuilderDraft } = await import("@/modules/meals/meal-builder");
+    const draft = createRepeatedMealBuilderDraft(meal, [snapshot("pasta", "Pasta", 250, "g"), snapshot("pasta", "Pasta", 100, "g")], [currentPasta]);
+
+    expect(draft.availableLines).toEqual([{ itemId: "pasta", quantity: "250" }]);
+  });
+
+  it("limits available lines to ten snapshots", async () => {
+    const { createRepeatedMealBuilderDraft } = await import("@/modules/meals/meal-builder");
+    const snapshots = Array.from({ length: 11 }, (_, index) => snapshot(`item-${index}`, `Producto ${index}`, 1, "ud"));
+    const inventory = snapshots.map((entry) => ({
+      id: entry.source_inventory_item_id,
+      name: entry.product_name,
+      quantity: 2,
+      unit: "ud",
+      nutrition_basis: "per_unit" as const,
+      calories: 1,
+      protein_g: 1,
+      carbs_g: 1,
+      fat_g: 1,
+    }));
+    const draft = createRepeatedMealBuilderDraft(meal, snapshots, inventory);
+
+    expect(draft.availableLines).toHaveLength(10);
+  });
+
+  it("handles an empty snapshot list", async () => {
+    const { createRepeatedMealBuilderDraft } = await import("@/modules/meals/meal-builder");
+    const draft = createRepeatedMealBuilderDraft(meal, [], [currentPasta]);
+
+    expect(draft.availableLines).toEqual([]);
+    expect(draft.unavailableItems).toEqual([]);
+  });
+
+  it("uses current inventory data instead of historical nutrition compatibility", async () => {
+    const { createRepeatedMealBuilderDraft } = await import("@/modules/meals/meal-builder");
+    const draft = createRepeatedMealBuilderDraft(meal, [{ ...snapshot("pasta", "Pasta", 250, "kg"), unit: "kg" }], [currentPasta]);
+
+    expect(draft.availableLines).toEqual([{ itemId: "pasta", quantity: "250" }]);
+  });
+
+  it("does not copy historical macros into draft lines", async () => {
+    const { createRepeatedMealBuilderDraft } = await import("@/modules/meals/meal-builder");
+    const draft = createRepeatedMealBuilderDraft(meal, [snapshot("pasta", "Pasta", 250, "g")], [currentPasta]);
+
+    expect(draft.availableLines[0]).toEqual({ itemId: "pasta", quantity: "250" });
+    expect(draft.availableLines[0]).not.toHaveProperty("calories");
+    expect(draft.availableLines[0]).not.toHaveProperty("protein_g");
+  });
+
+  it("sorts unavailable items stably", async () => {
+    const { createRepeatedMealBuilderDraft } = await import("@/modules/meals/meal-builder");
+    const draft = createRepeatedMealBuilderDraft(meal, [
+      snapshot("b", "Yogur", 1, "ud"),
+      snapshot("c", "Arroz", 1, "g"),
+      snapshot("a", "Yogur", 1, "ud"),
+    ], []);
+
+    expect(draft.unavailableItems.map((item) => item.sourceInventoryItemId)).toEqual(["c", "a", "b"]);
+  });
+});
+
+function snapshot(sourceInventoryItemId: string, productName: string, consumedQuantity: number, unit: string) {
+  return {
+    source_inventory_item_id: sourceInventoryItemId,
+    product_name: productName,
+    consumed_quantity: consumedQuantity,
+    unit,
+  };
+}
