@@ -1,7 +1,19 @@
 import Link from "next/link";
 
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
+import {
+  getInventoryCategoryLabel,
+  INVENTORY_CATEGORIES,
+  INVENTORY_CATEGORY_LABELS,
+} from "@/modules/inventory/inventory-categories";
 import { createClient } from "@/lib/supabase/server";
+import {
+  calculateAvailableInventoryNutrition,
+  formatInventoryNutritionTotalValue,
+  getInventoryNutritionBasisLabel,
+  INVENTORY_NUTRITION_BASIS_LABELS,
+  NUTRITION_BASES,
+} from "@/modules/inventory/inventory-nutrition";
 import {
   formatInventoryExpirationLabel,
   getCurrentInventoryExpirationDateKey,
@@ -50,9 +62,16 @@ const inventoryErrorMessages: Record<string, string> = {
   "name-required": "El nombre del producto es obligatorio.",
   "name-too-long": "El nombre no puede superar los 120 caracteres.",
   "invalid-location": "Selecciona una ubicación válida.",
+  "invalid-category": "Selecciona una categoría nutricional válida.",
   "invalid-quantity": "La cantidad debe ser un número mayor que cero.",
   "invalid-unit": "Selecciona una unidad válida.",
   "invalid-expires-at": "Introduce una fecha de caducidad válida.",
+  "invalid-nutrition-basis": "Selecciona una base nutricional válida.",
+  "missing-nutrition-basis": "Selecciona si los valores nutricionales son por 100 g o por unidad.",
+  "invalid-calories": "Introduce calorías válidas, sin valores negativos.",
+  "invalid-protein": "Introduce proteínas válidas, sin valores negativos.",
+  "invalid-carbs": "Introduce carbohidratos válidos, sin valores negativos.",
+  "invalid-fat": "Introduce grasas válidas, sin valores negativos.",
   "save-failed": "No se pudo guardar el producto. Inténtalo de nuevo.",
   "update-not-found": "Este producto ya no está disponible.",
   "update-failed": "No se pudo actualizar el producto. Inténtalo de nuevo.",
@@ -87,6 +106,46 @@ function isExpirationFilter(value: string | undefined): value is InventoryExpira
   return expirationFilters.some((filter) => filter.value === value);
 }
 
+function formatOptionalNutritionValue(value: number | null, suffix: string) {
+  return value === null ? null : `${value} ${suffix}`;
+}
+
+function getInventoryNutritionParts(item: InventoryItemRecord) {
+  return [
+    formatOptionalNutritionValue(item.calories, "kcal"),
+    formatOptionalNutritionValue(item.protein_g, "g proteína"),
+    formatOptionalNutritionValue(item.carbs_g, "g carbohidratos"),
+    formatOptionalNutritionValue(item.fat_g, "g grasas"),
+  ].filter((part): part is string => Boolean(part));
+}
+
+function formatOptionalNutritionTotalValue(value: number | null, suffix: string) {
+  const formattedValue = formatInventoryNutritionTotalValue(value);
+
+  return formattedValue === null ? null : `${formattedValue} ${suffix}`;
+}
+
+function getAvailableInventoryNutritionParts(item: InventoryItemRecord) {
+  const totals = calculateAvailableInventoryNutrition({
+    nutrition_basis: item.nutrition_basis,
+    quantity: item.quantity,
+    unit: item.unit,
+    calories: item.calories,
+    protein_g: item.protein_g,
+    carbs_g: item.carbs_g,
+    fat_g: item.fat_g,
+  });
+
+  if (!totals) return [];
+
+  return [
+    formatOptionalNutritionTotalValue(totals.calories, "kcal"),
+    formatOptionalNutritionTotalValue(totals.protein_g, "g proteína"),
+    formatOptionalNutritionTotalValue(totals.carbs_g, "g carbohidratos"),
+    formatOptionalNutritionTotalValue(totals.fat_g, "g grasas"),
+  ].filter((part): part is string => Boolean(part));
+}
+
 function matchesExpirationFilter(item: InventoryItemRecord, expirationFilter: InventoryExpirationFilter, todayKey: string) {
   if (expirationFilter === "all") return true;
   if (expirationFilter === "no-date") return !item.expires_at;
@@ -106,7 +165,7 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
 
   const { data, error } = await (supabase as any)
     .from("inventory_items")
-    .select("id, name, location, quantity, unit, expires_at, created_at")
+    .select("id, name, location, category, nutrition_basis, calories, protein_g, carbs_g, fat_g, quantity, unit, expires_at, created_at")
     .eq("user_id", user.id)
     .order("location", { ascending: true })
     .order("name", { ascending: true })
@@ -171,6 +230,17 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
               <option value="freezer">Congelador</option>
             </select>
           </label>
+          <label className="field" htmlFor="inventory-category">
+            <span>Categoría nutricional</span>
+            <select id="inventory-category" name="category" required defaultValue="">
+              <option value="" disabled>Selecciona una categoría</option>
+              {INVENTORY_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {INVENTORY_CATEGORY_LABELS[category]}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="field" htmlFor="inventory-quantity">
             <span>Cantidad</span>
             <input id="inventory-quantity" name="quantity" type="number" min="0.000001" step="any" required placeholder="1" />
@@ -189,6 +259,36 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
             <span>Caducidad (opcional)</span>
             <input id="inventory-expires-at" name="expires_at" type="date" />
           </label>
+          <fieldset className="meal-log-form">
+            <legend>Información nutricional opcional</legend>
+            <label className="field" htmlFor="inventory-nutrition-basis">
+              <span>Valores por</span>
+              <select id="inventory-nutrition-basis" name="nutrition_basis" defaultValue="">
+                <option value="">Sin información nutricional</option>
+                {NUTRITION_BASES.map((basis) => (
+                  <option key={basis} value={basis}>
+                    {INVENTORY_NUTRITION_BASIS_LABELS[basis]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field" htmlFor="inventory-calories">
+              <span>Calorías</span>
+              <input id="inventory-calories" name="calories" type="number" min="0" step="any" inputMode="decimal" placeholder="245" />
+            </label>
+            <label className="field" htmlFor="inventory-protein-g">
+              <span>Proteínas (g)</span>
+              <input id="inventory-protein-g" name="protein_g" type="number" min="0" step="any" inputMode="decimal" placeholder="22" />
+            </label>
+            <label className="field" htmlFor="inventory-carbs-g">
+              <span>Carbohidratos (g)</span>
+              <input id="inventory-carbs-g" name="carbs_g" type="number" min="0" step="any" inputMode="decimal" placeholder="4" />
+            </label>
+            <label className="field" htmlFor="inventory-fat-g">
+              <span>Grasas (g)</span>
+              <input id="inventory-fat-g" name="fat_g" type="number" min="0" step="any" inputMode="decimal" placeholder="15" />
+            </label>
+          </fieldset>
           <button className="button" type="submit">Añadir producto</button>
         </form>
       </section>
@@ -271,13 +371,44 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                 <h2>{group.label}</h2>
                 {group.items.length ? (
                   <ul>
-                    {group.items.map((item) => (
+                    {group.items.map((item) => {
+                      const nutritionParts = getInventoryNutritionParts(item);
+                      const availableNutritionParts = getAvailableInventoryNutritionParts(item);
+                      const showUnavailableAvailableNutritionMessage = nutritionParts.length > 0 && availableNutritionParts.length === 0;
+
+                      return (
                       <li key={item.id}>
                         <strong>{item.name}</strong>
                         <br />
                         {item.quantity} {item.unit}
                         <br />
+                        <span className="muted">Categoría: {getInventoryCategoryLabel(item.category)}</span>
+                        <br />
                         <span className="muted">{formatInventoryExpirationLabel(item.expires_at, todayKey)}</span>
+                        {nutritionParts.length ? (
+                          <>
+                            <br />
+                            <span className="muted">
+                              Información nutricional · {getInventoryNutritionBasisLabel(item.nutrition_basis)}
+                            </span>
+                            <br />
+                            <span className="muted">{nutritionParts.join(" · ")}</span>
+                            {availableNutritionParts.length ? (
+                              <>
+                                <br />
+                                <span className="muted">Total disponible</span>
+                                <br />
+                                <span className="muted">{availableNutritionParts.join(" · ")}</span>
+                              </>
+                            ) : null}
+                            {showUnavailableAvailableNutritionMessage ? (
+                              <>
+                                <br />
+                                <span className="muted">El total nutricional no puede calcularse con la unidad actual.</span>
+                              </>
+                            ) : null}
+                          </>
+                        ) : null}
                         <form action={deleteInventoryItemAction} className="meal-log-form">
                           <input name="id" type="hidden" value={item.id} />
                           <button className="button" type="submit">Eliminar</button>
@@ -309,6 +440,17 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                                 <option value="freezer">Congelador</option>
                               </select>
                             </label>
+                            <label className="field" htmlFor={`inventory-category-${item.id}`}>
+                              <span>Categoría nutricional</span>
+                              <select id={`inventory-category-${item.id}`} name="category" required defaultValue={item.category ?? ""}>
+                                <option value="" disabled>Selecciona una categoría</option>
+                                {INVENTORY_CATEGORIES.map((category) => (
+                                  <option key={category} value={category}>
+                                    {INVENTORY_CATEGORY_LABELS[category]}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
                             <label className="field" htmlFor={`inventory-quantity-${item.id}`}>
                               <span>Cantidad</span>
                               <input id={`inventory-quantity-${item.id}`} name="quantity" type="number" min="0.000001" step="any" required defaultValue={item.quantity} />
@@ -327,11 +469,42 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                               <span>Caducidad (opcional)</span>
                               <input id={`inventory-expires-at-${item.id}`} name="expires_at" type="date" defaultValue={item.expires_at ?? ""} />
                             </label>
+                            <fieldset className="meal-log-form">
+                              <legend>Información nutricional opcional</legend>
+                              <label className="field" htmlFor={`inventory-nutrition-basis-${item.id}`}>
+                                <span>Valores por</span>
+                                <select id={`inventory-nutrition-basis-${item.id}`} name="nutrition_basis" defaultValue={item.nutrition_basis ?? ""}>
+                                  <option value="">Sin información nutricional</option>
+                                  {NUTRITION_BASES.map((basis) => (
+                                    <option key={basis} value={basis}>
+                                      {INVENTORY_NUTRITION_BASIS_LABELS[basis]}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label className="field" htmlFor={`inventory-calories-${item.id}`}>
+                                <span>Calorías</span>
+                                <input id={`inventory-calories-${item.id}`} name="calories" type="number" min="0" step="any" inputMode="decimal" defaultValue={item.calories ?? ""} />
+                              </label>
+                              <label className="field" htmlFor={`inventory-protein-g-${item.id}`}>
+                                <span>Proteínas (g)</span>
+                                <input id={`inventory-protein-g-${item.id}`} name="protein_g" type="number" min="0" step="any" inputMode="decimal" defaultValue={item.protein_g ?? ""} />
+                              </label>
+                              <label className="field" htmlFor={`inventory-carbs-g-${item.id}`}>
+                                <span>Carbohidratos (g)</span>
+                                <input id={`inventory-carbs-g-${item.id}`} name="carbs_g" type="number" min="0" step="any" inputMode="decimal" defaultValue={item.carbs_g ?? ""} />
+                              </label>
+                              <label className="field" htmlFor={`inventory-fat-g-${item.id}`}>
+                                <span>Grasas (g)</span>
+                                <input id={`inventory-fat-g-${item.id}`} name="fat_g" type="number" min="0" step="any" inputMode="decimal" defaultValue={item.fat_g ?? ""} />
+                              </label>
+                            </fieldset>
                             <button className="button" type="submit">Guardar cambios</button>
                           </form>
                         </details>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                 ) : (
                   <p className="muted">No hay productos en esta ubicación.</p>
