@@ -3,13 +3,17 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { consumeMealBuilderAndLogMealAction } from "@/app/meal-builder/actions";
+
 import {
   calculateMealBuilderLineNutrition,
   calculateMealBuilderTotals,
+  createMealBuilderConsumptionPayload,
   formatMealBuilderNutritionValue,
   isMealBuilderInventoryItemEligible,
   type MealBuilderInventoryItem,
 } from "@/modules/meals/meal-builder";
+import { MEAL_TYPE_LABELS, MEAL_TYPES, isMealType } from "@/modules/meals/meal-types";
 
 const MAX_MEAL_BUILDER_ROWS = 10;
 
@@ -50,6 +54,8 @@ function formatStock(value: number): string {
 export function InventoryMealBuilder({ items }: InventoryMealBuilderProps) {
   const eligibleItems = useMemo(() => items.filter(isMealBuilderInventoryItemEligible), [items]);
   const [rows, setRows] = useState<BuilderRow[]>(() => [createRow(0)]);
+  const [mealName, setMealName] = useState("");
+  const [mealType, setMealType] = useState("");
 
   const selectedItemIds = useMemo(
     () => new Set(rows.map((row) => row.itemId).filter(Boolean)),
@@ -72,6 +78,11 @@ export function InventoryMealBuilder({ items }: InventoryMealBuilderProps) {
   }, [eligibleItems, rows]);
 
   const total = useMemo(() => (selectedLines ? calculateMealBuilderTotals(selectedLines) : null), [selectedLines]);
+  const consumptionPayload = useMemo(
+    () => (selectedLines ? createMealBuilderConsumptionPayload(selectedLines) : null),
+    [selectedLines],
+  );
+  const canSubmitMeal = Boolean(mealName.trim() && isMealType(mealType) && total && consumptionPayload);
 
   function updateRow(rowId: string, values: Partial<BuilderRow>) {
     setRows((currentRows) => currentRows.map((row) => (row.id === rowId ? { ...row, ...values } : row)));
@@ -192,6 +203,53 @@ export function InventoryMealBuilder({ items }: InventoryMealBuilderProps) {
           <p><strong>Grasas:</strong> {formatNutrition(total.fat_g)} g</p>
         </section>
       ) : null}
+
+      <section className="card" style={{ marginTop: 16 }}>
+        <h2>Registrar comida</h2>
+        <form action={consumeMealBuilderAndLogMealAction} className="meal-log-form">
+          <label className="field" htmlFor="meal-builder-meal-name">
+            <span>Nombre de la comida</span>
+            <input
+              id="meal-builder-meal-name"
+              maxLength={120}
+              name="meal_name"
+              required
+              type="text"
+              value={mealName}
+              onChange={(event) => setMealName(event.target.value)}
+              placeholder="Ej. Bowl de pollo"
+            />
+          </label>
+
+          <label className="field" htmlFor="meal-builder-meal-type">
+            <span>Tipo de comida</span>
+            <select
+              id="meal-builder-meal-type"
+              name="meal_type"
+              required
+              value={mealType}
+              onChange={(event) => setMealType(event.target.value)}
+            >
+              <option value="">Selecciona un tipo</option>
+              {MEAL_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {MEAL_TYPE_LABELS[type]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <input name="lines" type="hidden" value={JSON.stringify(consumptionPayload ?? [])} />
+
+          <p className="muted">
+            Al confirmar, se descontarán todos estos productos del inventario y se registrará una única comida.
+          </p>
+
+          <button className="button" disabled={!canSubmitMeal} type="submit">
+            Consumir inventario y registrar comida
+          </button>
+        </form>
+      </section>
     </>
   );
 }
