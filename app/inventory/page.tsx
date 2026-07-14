@@ -8,6 +8,7 @@ import {
   INVENTORY_CATEGORIES,
   INVENTORY_CATEGORY_LABELS,
 } from "@/modules/inventory/inventory-categories";
+import { INVENTORY_ADD_FORM_FIELD_IDS } from "@/modules/inventory/inventory-form-fields";
 import { createClient } from "@/lib/supabase/server";
 import {
   calculateAvailableInventoryNutrition,
@@ -234,21 +235,21 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
         {inventorySuccessMessage ? <p className="auth-message success" role="status">{inventorySuccessMessage}</p> : null}
         <form action={addInventoryItemAction} className="meal-log-form">
           <BarcodeCatalogControls lookupAction={lookupBarcodeProductAction} />
-          <label className="field" htmlFor="inventory-name">
+          <label className="field" htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.name}>
             <span>Nombre</span>
-            <input id="inventory-name" name="name" type="text" maxLength={120} required placeholder="Arroz integral" />
+            <input id={INVENTORY_ADD_FORM_FIELD_IDS.name} name="name" type="text" maxLength={120} required placeholder="Arroz integral" />
           </label>
-          <label className="field" htmlFor="inventory-location">
+          <label className="field" htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.location}>
             <span>Ubicación</span>
-            <select id="inventory-location" name="location" required defaultValue="pantry">
+            <select id={INVENTORY_ADD_FORM_FIELD_IDS.location} name="location" required defaultValue="pantry">
               <option value="pantry">Despensa</option>
               <option value="fridge">Nevera</option>
               <option value="freezer">Congelador</option>
             </select>
           </label>
-          <label className="field" htmlFor="inventory-category">
+          <label className="field" htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.category}>
             <span>Categoría nutricional</span>
-            <select id="inventory-category" name="category" required defaultValue="">
+            <select id={INVENTORY_ADD_FORM_FIELD_IDS.category} name="category" required defaultValue="">
               <option value="" disabled>Selecciona una categoría</option>
               {INVENTORY_CATEGORIES.map((category) => (
                 <option key={category} value={category}>
@@ -257,13 +258,13 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
               ))}
             </select>
           </label>
-          <label className="field" htmlFor="inventory-quantity">
+          <label className="field" htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.quantity}>
             <span>Cantidad</span>
-            <input id="inventory-quantity" name="quantity" type="number" min="0.000001" step="any" required placeholder="1" />
+            <input id={INVENTORY_ADD_FORM_FIELD_IDS.quantity} name="quantity" type="number" min="0.000001" step="any" required placeholder="1" />
           </label>
-          <label className="field" htmlFor="inventory-unit">
+          <label className="field" htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.unit}>
             <span>Unidad</span>
-            <select id="inventory-unit" name="unit" required defaultValue="ud">
+            <select id={INVENTORY_ADD_FORM_FIELD_IDS.unit} name="unit" required defaultValue="ud">
               <option value="ud">ud</option>
               <option value="g">g</option>
               <option value="kg">kg</option>
@@ -271,15 +272,15 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
               <option value="l">l</option>
             </select>
           </label>
-          <label className="field" htmlFor="inventory-expires-at">
+          <label className="field" htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.expiresAt}>
             <span>Caducidad (opcional)</span>
-            <input id="inventory-expires-at" name="expires_at" type="date" />
+            <input id={INVENTORY_ADD_FORM_FIELD_IDS.expiresAt} name="expires_at" type="date" />
           </label>
           <fieldset className="meal-log-form">
             <legend>Información nutricional opcional</legend>
-            <label className="field" htmlFor="inventory-nutrition-basis">
+            <label className="field" htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.nutritionBasis}>
               <span>Valores por</span>
-              <select id="inventory-nutrition-basis" name="nutrition_basis" defaultValue="">
+              <select id={INVENTORY_ADD_FORM_FIELD_IDS.nutritionBasis} name="nutrition_basis" defaultValue="">
                 <option value="">Sin información nutricional</option>
                 {NUTRITION_BASES.map((basis) => (
                   <option key={basis} value={basis}>
@@ -288,21 +289,21 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                 ))}
               </select>
             </label>
-            <label className="field" htmlFor="inventory-calories">
+            <label className="field" htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.calories}>
               <span>Calorías</span>
-              <input id="inventory-calories" name="calories" type="number" min="0" step="any" inputMode="decimal" placeholder="245" />
+              <input id={INVENTORY_ADD_FORM_FIELD_IDS.calories} name="calories" type="number" min="0" step="any" inputMode="decimal" placeholder="245" />
             </label>
-            <label className="field" htmlFor="inventory-protein-g">
+            <label className="field" htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.proteinG}>
               <span>Proteínas (g)</span>
-              <input id="inventory-protein-g" name="protein_g" type="number" min="0" step="any" inputMode="decimal" placeholder="22" />
+              <input id={INVENTORY_ADD_FORM_FIELD_IDS.proteinG} name="protein_g" type="number" min="0" step="any" inputMode="decimal" placeholder="22" />
             </label>
-            <label className="field" htmlFor="inventory-carbs-g">
+            <label className="field" htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.carbsG}>
               <span>Carbohidratos (g)</span>
-              <input id="inventory-carbs-g" name="carbs_g" type="number" min="0" step="any" inputMode="decimal" placeholder="4" />
+              <input id={INVENTORY_ADD_FORM_FIELD_IDS.carbsG} name="carbs_g" type="number" min="0" step="any" inputMode="decimal" placeholder="4" />
             </label>
-            <label className="field" htmlFor="inventory-fat-g">
+            <label className="field" htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.fatG}>
               <span>Grasas (g)</span>
-              <input id="inventory-fat-g" name="fat_g" type="number" min="0" step="any" inputMode="decimal" placeholder="15" />
+              <input id={INVENTORY_ADD_FORM_FIELD_IDS.fatG} name="fat_g" type="number" min="0" step="any" inputMode="decimal" placeholder="15" />
             </label>
           </fieldset>
           <button className="button" type="submit">Añadir producto</button>

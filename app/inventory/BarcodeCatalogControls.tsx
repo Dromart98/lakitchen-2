@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { getRestoredBarcodeAutofillValue, normalizeBarcodeInput } from "@/modules/barcodes/barcode";
+import { INVENTORY_ADD_FORM_FIELD_IDS, INVENTORY_BARCODE_AUTOFILL_FIELD_IDS } from "@/modules/inventory/inventory-form-fields";
 import type { lookupBarcodeProductAction } from "./actions";
 
 type BarcodeLookupAction = typeof lookupBarcodeProductAction;
@@ -47,18 +48,7 @@ type ExternalLookupResult =
   | { status: "invalid" | "error"; message: string };
 
 const unsupportedScannerMessage = "Tu navegador no permite escanear directamente. Introduce el código manualmente.";
-const autofillFieldIds = [
-  "inventory-name",
-  "inventory-quantity",
-  "inventory-unit",
-  "inventory-location",
-  "inventory-category",
-  "inventory-nutrition-basis",
-  "inventory-calories",
-  "inventory-protein",
-  "inventory-carbs",
-  "inventory-fat",
-] as const;
+const autofillFieldIds = INVENTORY_BARCODE_AUTOFILL_FIELD_IDS;
 
 function getInputElement(id: string): HTMLInputElement | HTMLSelectElement | null {
   return document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
@@ -87,16 +77,16 @@ function getAutofillValues(product: ExternalBarcodeProduct): Record<(typeof auto
     .some((value) => value !== null && value !== undefined);
 
   return {
-    "inventory-name": product.name,
-    "inventory-quantity": String(product.default_quantity),
-    "inventory-unit": product.default_unit,
-    "inventory-location": product.default_location ?? "",
-    "inventory-category": product.category ?? "",
-    "inventory-nutrition-basis": hasNutrition ? product.nutrition_basis ?? "per_100g" : "",
-    "inventory-calories": product.calories === null || product.calories === undefined ? "" : String(product.calories),
-    "inventory-protein": product.protein_g === null || product.protein_g === undefined ? "" : String(product.protein_g),
-    "inventory-carbs": product.carbs_g === null || product.carbs_g === undefined ? "" : String(product.carbs_g),
-    "inventory-fat": product.fat_g === null || product.fat_g === undefined ? "" : String(product.fat_g),
+    [INVENTORY_ADD_FORM_FIELD_IDS.name]: product.name,
+    [INVENTORY_ADD_FORM_FIELD_IDS.quantity]: String(product.default_quantity),
+    [INVENTORY_ADD_FORM_FIELD_IDS.unit]: product.default_unit,
+    [INVENTORY_ADD_FORM_FIELD_IDS.location]: product.default_location ?? "",
+    [INVENTORY_ADD_FORM_FIELD_IDS.category]: product.category ?? "",
+    [INVENTORY_ADD_FORM_FIELD_IDS.nutritionBasis]: hasNutrition ? product.nutrition_basis ?? "per_100g" : "",
+    [INVENTORY_ADD_FORM_FIELD_IDS.calories]: product.calories === null || product.calories === undefined ? "" : String(product.calories),
+    [INVENTORY_ADD_FORM_FIELD_IDS.proteinG]: product.protein_g === null || product.protein_g === undefined ? "" : String(product.protein_g),
+    [INVENTORY_ADD_FORM_FIELD_IDS.carbsG]: product.carbs_g === null || product.carbs_g === undefined ? "" : String(product.carbs_g),
+    [INVENTORY_ADD_FORM_FIELD_IDS.fatG]: product.fat_g === null || product.fat_g === undefined ? "" : String(product.fat_g),
   };
 }
 
@@ -160,7 +150,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
   function updateBarcode(nextBarcode: string) {
     clearPreviousAutofill();
     setBarcode(nextBarcode);
-    setInputValue("inventory-barcode", nextBarcode);
+    setInputValue(INVENTORY_ADD_FORM_FIELD_IDS.barcode, nextBarcode);
   }
 
   function applyBarcode(rawValue: string) {
@@ -234,7 +224,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
   function searchBarcode() {
     const normalized = normalizeBarcodeInput(barcode);
     setBarcode(normalized);
-    setInputValue("inventory-barcode", normalized);
+    setInputValue(INVENTORY_ADD_FORM_FIELD_IDS.barcode, normalized);
     setMessage("Buscando primero en tu catálogo personal...");
 
     startTransition(async () => {
@@ -275,10 +265,10 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
 
   return (
     <div className="meal-log-form" aria-live="polite">
-      <label className="field" htmlFor="inventory-barcode">
+      <label className="field" htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.barcode}>
         <span>Código de barras</span>
         <input
-          id="inventory-barcode"
+          id={INVENTORY_ADD_FORM_FIELD_IDS.barcode}
           name="barcode"
           type="text"
           inputMode="numeric"
