@@ -121,6 +121,47 @@ function containsFoodStatePhrase(normalizedName: string, phrase: string) {
   return new RegExp(`(^|[^a-z0-9])${phrase.replace(/ /g, "\\s+")}([^a-z0-9]|$)`, "u").test(normalizedName);
 }
 
+function normalizePrimaryInventoryProductName(name: string) {
+  const normalizedName = normalizeForFoodStateDetection(name);
+  const presentationPrefixes = [
+    "loncha de",
+    "lonchas de",
+    "cuna de",
+    "paquete de",
+    "pack de",
+    "bandeja de",
+    "pieza de",
+    "porcion de",
+    "bloque de",
+    "tarrina de",
+    "bolsa de",
+    "sobre de",
+  ];
+
+  for (const prefix of presentationPrefixes) {
+    if (normalizedName === prefix) return normalizedName;
+    if (normalizedName.startsWith(`${prefix} `)) return normalizedName.slice(prefix.length + 1).trim();
+  }
+
+  return normalizedName;
+}
+
+function isPrimaryHamFamilyName(normalizedPrimaryName: string) {
+  return normalizedPrimaryName === "jamon"
+    || normalizedPrimaryName.startsWith("jamon ")
+    || normalizedPrimaryName === "paleta"
+    || normalizedPrimaryName.startsWith("paleta ");
+}
+
+function isPrimaryCheeseFamilyName(normalizedPrimaryName: string) {
+  return normalizedPrimaryName === "queso"
+    || normalizedPrimaryName.startsWith("queso ")
+    || normalizedPrimaryName === "mozzarella"
+    || normalizedPrimaryName.startsWith("mozzarella ")
+    || normalizedPrimaryName === "cheddar"
+    || normalizedPrimaryName.startsWith("cheddar ");
+}
+
 export function detectExplicitInventoryFoodState(
   name: string,
 ): "raw" | "cooked" | "processed" | null {
@@ -148,7 +189,9 @@ function findFirstVariant(normalizedName: string, variants: ReadonlyArray<readon
 export function detectInventoryHamVariant(
   name: string,
 ): { variant: string; source: "explicit" | "default" } | null {
-  const normalizedName = normalizeForFoodStateDetection(name);
+  const normalizedName = normalizePrimaryInventoryProductName(name);
+  if (!isPrimaryHamFamilyName(normalizedName)) return null;
+
   const explicitVariant = findFirstVariant(normalizedName, [
     ["jamon gran reserva", "Jamón gran reserva"],
     ["jamon de bellota", "Jamón de bellota"],
@@ -174,7 +217,9 @@ export function detectInventoryHamVariant(
 export function detectInventoryCheeseVariant(
   name: string,
 ): { variant: string; source: "explicit" | "default" } | null {
-  const normalizedName = normalizeForFoodStateDetection(name);
+  const normalizedName = normalizePrimaryInventoryProductName(name);
+  if (!isPrimaryCheeseFamilyName(normalizedName)) return null;
+
   const explicitVariant = findFirstVariant(normalizedName, [
     ["queso semicurado", "Queso semicurado"],
     ["queso fresco", "Queso fresco"],
@@ -201,7 +246,7 @@ export function detectInventoryCheeseVariant(
 
 function detectDefaultRawInventoryFood(name: string) {
   const normalizedName = normalizeForFoodStateDetection(name);
-  const excluded = ["leche", "yogur", "pan", "salsa", "mayonesa", "pizza", "tortilla", "croquetas", "ensalada", "comida casera", "plato preparado", "atun", "pasta fresca"];
+  const excluded = ["leche", "yogur", "pan", "salsa", "mayonesa", "pizza", "tortilla", "croquetas", "ensalada", "comida casera", "plato preparado", "atun", "pasta fresca", "pasta con", "pasta de"];
   if (excluded.some((phrase) => containsFoodStatePhrase(normalizedName, phrase))) return null;
 
   const rawFoods = ["pechuga de pollo", "pollo", "pechuga de pavo", "pavo", "ternera", "carne picada", "cerdo", "solomillo", "merluza", "salmon", "tilapia", "bacalao", "pescado", "gambas", "langostinos", "pasta", "macarrones", "espaguetis", "arroz", "quinoa", "cuscus", "avena", "lentejas", "garbanzos", "alubias", "brocoli", "espinacas", "calabacin", "zanahoria", "pimiento", "cebolla", "papas", "patatas", "huevos"];
@@ -280,7 +325,10 @@ export function calibrateInventoryNutritionAiConfidence(
   if (normalizedNameIntroducesPreparation(input.name, output.normalized_food_name)) return "medium";
   if (textMentionsUnprovidedMaterialAssumption(input.name, output.assumptions)) return "medium";
   if (assumptionsIntroduceMismatchedFoodState(input.name, output.assumptions)) return "medium";
-  if (isExcessivelyGenericFoodName(input.name)) return "medium";
+  const isExplicitProcessedVariant = expectation?.source === "explicit"
+    && expectation.state === "processed"
+    && expectation.normalizedHint !== null;
+  if (!isExplicitProcessedVariant && isExcessivelyGenericFoodName(input.name)) return "medium";
 
   return "high";
 }

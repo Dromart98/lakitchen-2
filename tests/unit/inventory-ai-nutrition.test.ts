@@ -61,6 +61,10 @@ describe("food state expectations", () => {
     ["Jamón de bellota", { state: "processed", source: "explicit", normalizedHint: "Jamón de bellota" }],
     ["Jamón cocido", { state: "processed", source: "explicit", normalizedHint: "Jamón cocido" }],
     ["Jamón York", { state: "processed", source: "explicit", normalizedHint: "Jamón cocido tipo York" }],
+    ["Jamón bajo en sal", { state: "processed", source: "default", normalizedHint: "Jamón curado tipo serrano genérico" }],
+    ["Jamón serrano bajo en sal", { state: "processed", source: "explicit", normalizedHint: "Jamón serrano" }],
+    ["Lonchas de jamón serrano", { state: "processed", source: "explicit", normalizedHint: "Jamón serrano" }],
+    ["Paquete de jamón cocido", { state: "processed", source: "explicit", normalizedHint: "Jamón cocido" }],
     ["Paleta ibérica", { state: "processed", source: "explicit", normalizedHint: "Paleta ibérica" }],
   ] as const)("detects ham expectation for %s", (name, expected) => {
     expect(getInventoryNutritionFoodStateExpectation(name)).toEqual(expected);
@@ -73,10 +77,17 @@ describe("food state expectations", () => {
     ["Queso tierno", { state: "processed", source: "explicit", normalizedHint: "Queso tierno" }],
     ["Queso semicurado", { state: "processed", source: "explicit", normalizedHint: "Queso semicurado" }],
     ["Queso curado", { state: "processed", source: "explicit", normalizedHint: "Queso curado" }],
+    ["Cuña de queso curado", { state: "processed", source: "explicit", normalizedHint: "Queso curado" }],
+    ["Lonchas de queso semicurado", { state: "processed", source: "explicit", normalizedHint: "Queso semicurado" }],
     ["Queso ahumado", { state: "processed", source: "explicit", normalizedHint: "Queso ahumado" }],
     ["Queso azul", { state: "processed", source: "explicit", normalizedHint: "Queso azul" }],
     ["Queso de cabra", { state: "processed", source: "explicit", normalizedHint: "Queso de cabra" }],
     ["Queso de oveja", { state: "processed", source: "explicit", normalizedHint: "Queso de oveja" }],
+    ["Mozzarella", { state: "processed", source: "explicit", normalizedHint: "Mozzarella" }],
+    ["Mozzarella rallada", { state: "processed", source: "explicit", normalizedHint: "Mozzarella" }],
+    ["Paquete de mozzarella", { state: "processed", source: "explicit", normalizedHint: "Mozzarella" }],
+    ["Cheddar", { state: "processed", source: "explicit", normalizedHint: "Cheddar" }],
+    ["Cheddar en lonchas", { state: "processed", source: "explicit", normalizedHint: "Cheddar" }],
   ] as const)("detects cheese expectation for %s", (name, expected) => {
     expect(getInventoryNutritionFoodStateExpectation(name)).toEqual(expected);
     expect(detectInventoryCheeseVariant(name)).toEqual({ variant: expected.normalizedHint, source: expected.source });
@@ -97,7 +108,39 @@ describe("food state expectations", () => {
     expect(getInventoryNutritionFoodStateExpectation(name)?.state).toBe(state);
   });
 
-  it.each(["Atún", "Pasta fresca", "Leche", "Yogur", "Pan", "Salsa", "Pizza"])("does not infer a default state for %s", (name) => {
+
+  it.each(["Pizza de jamón", "Bocadillo de jamón", "Croquetas de jamón", "Tortilla con jamón", "Pasta con jamón", "Ensalada con jamón"])("does not detect ham as the primary product for %s", (name) => {
+    expect(detectInventoryHamVariant(name)).toBeNull();
+  });
+
+  it.each(["Pizza de queso", "Salsa de queso", "Pasta con queso", "Tortilla con queso", "Ensalada con queso", "Bocadillo de queso", "Croquetas de queso", "Hamburguesa con cheddar", "Pizza de mozzarella"])("does not detect cheese as the primary product for %s", (name) => {
+    expect(detectInventoryCheeseVariant(name)).toBeNull();
+  });
+
+  it.each([
+    "Atún",
+    "Pasta fresca",
+    "Leche",
+    "Yogur",
+    "Pan",
+    "Salsa",
+    "Pizza",
+    "Pizza de jamón",
+    "Bocadillo de jamón",
+    "Croquetas de jamón",
+    "Tortilla con jamón",
+    "Pasta con jamón",
+    "Ensalada con jamón",
+    "Pizza de queso",
+    "Salsa de queso",
+    "Pasta con queso",
+    "Tortilla con queso",
+    "Ensalada con queso",
+    "Bocadillo de queso",
+    "Croquetas de queso",
+    "Hamburguesa con cheddar",
+    "Pizza de mozzarella",
+  ])("does not infer a default state for %s", (name) => {
     expect(getInventoryNutritionFoodStateExpectation(name)).toBeNull();
   });
 });
@@ -361,6 +404,8 @@ describe("calibrateInventoryNutritionAiConfidence", () => {
   it.each([
     ["Jamón serrano", "Jamón serrano"],
     ["Jamón cocido", "Jamón cocido"],
+    ["Mozzarella", "Mozzarella"],
+    ["Cheddar", "Cheddar"],
     ["Queso curado", "Queso curado"],
     ["Queso semicurado", "Queso semicurado"],
   ] as const)("keeps explicit variant %s high confidence", (name, normalizedName) => {
