@@ -13,7 +13,7 @@ import {
   parseOptionalInventoryNutritionNumber,
 } from "@/modules/inventory/inventory-nutrition";
 import { isMealType } from "@/modules/meals/meal-types";
-import { createInventoryNutritionOpenAiClient, estimateInventoryNutritionWithOpenAi } from "@/lib/openai/inventory-nutrition";
+import { estimateInventoryNutritionWithOpenAi } from "@/lib/openai/inventory-nutrition";
 import { parseInventoryNutritionAiInput, type InventoryNutritionAiEstimate, type InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
 
 type InventoryLocation = "pantry" | "fridge" | "freezer";
@@ -59,7 +59,7 @@ export async function estimateInventoryNutritionAction(input: InventoryNutrition
   if (!apiKey) return inventoryNutritionAiError("not-configured");
 
   const result = await estimateInventoryNutritionWithOpenAi(validatedInput, {
-    client: await createInventoryNutritionOpenAiClient(apiKey),
+    apiKey,
     model: process.env.OPENAI_INVENTORY_NUTRITION_MODEL || undefined,
   });
 

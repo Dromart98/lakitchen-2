@@ -1,31 +1,20 @@
 import {
   buildInventoryNutritionAiInputText,
+  INVENTORY_NUTRITION_AI_JSON_SCHEMA,
   INVENTORY_NUTRITION_AI_MAX_OUTPUT_TOKENS,
   INVENTORY_NUTRITION_AI_MODEL_DEFAULT,
   INVENTORY_NUTRITION_AI_TIMEOUT_MS,
-  InventoryNutritionAiOutputSchema,
   validateInventoryNutritionAiOutput,
   type InventoryNutritionAiEstimate,
   type InventoryNutritionAiInput,
 } from "@/modules/inventory/inventory-ai-nutrition";
 
+const OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
+
 export type InventoryNutritionProviderResult =
   | { status: "success"; estimate: InventoryNutritionAiEstimate }
   | { status: "needs-clarification"; message: string }
   | { status: "error"; code: "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response" };
-
-type ParsedResponsesClient = {
-  responses: {
-    parse: (body: {
-      model: string;
-      input: Array<{ role: "system" | "user"; content: string }>;
-      text: { format: unknown };
-      store: false;
-      max_output_tokens: number;
-      reasoning?: { effort: "low" };
-    }, options?: { timeout?: number; maxRetries?: number }) => Promise<{ output_parsed?: unknown }>;
-  };
-};
 
 export const INVENTORY_NUTRITION_AI_SYSTEM_PROMPT = `Estima valores nutricionales típicos de un alimento o producto.
 Los valores deben corresponder a la base nutricional, no al total comprado.
@@ -41,60 +30,126 @@ Escribe assumptions y clarification en español.
 No afirmes que la estimación procede de una etiqueta, base de datos o fuente verificada.
 No incluyas explicaciones fuera del esquema estructurado.`;
 
-export async function createInventoryNutritionOpenAiClient(apiKey: string): Promise<ParsedResponsesClient> {
-  // @ts-expect-error The official SDK is installed in package.json; this dynamic import keeps tests mockable.
-  const openAiModule = await import("openai");
-  const OpenAI = openAiModule.default;
-  return new OpenAI({ apiKey, timeout: INVENTORY_NUTRITION_AI_TIMEOUT_MS, maxRetries: 1 });
+type OpenAiResponseObject = {
+  status?: unknown;
+  error?: unknown;
+  output?: unknown;
+  output_text?: unknown;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
-type InventoryNutritionProviderErrorCode = "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response";
+function getNonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
 
-function getSafeOpenAiErrorCode(error: unknown): InventoryNutritionProviderErrorCode {
-  if (typeof error === "object" && error !== null) {
-    const maybeStatus = "status" in error ? Number((error as { status?: unknown }).status) : null;
-    const maybeCode = "code" in error ? String((error as { code?: unknown }).code) : "";
-    const maybeName = "name" in error ? String((error as { name?: unknown }).name) : "";
+export function extractInventoryNutritionAiOutputText(responseBody: unknown):
+  | { status: "success"; text: string }
+  | { status: "provider-error" }
+  | { status: "invalid-ai-response" } {
+  if (!isRecord(responseBody)) return { status: "invalid-ai-response" };
 
-    if (maybeStatus === 429) return "rate-limited";
-    if (maybeCode === "ETIMEDOUT" || maybeCode === "AbortError" || maybeName === "TimeoutError" || maybeStatus === 408) return "timeout";
+  const root = responseBody as OpenAiResponseObject;
+  if (root.error !== undefined) return { status: "provider-error" };
+  if (root.status === "incomplete") return { status: "invalid-ai-response" };
+  if (root.status !== "completed") return { status: "invalid-ai-response" };
+
+  const rootOutputText = getNonEmptyString(root.output_text);
+  if (rootOutputText) return { status: "success", text: rootOutputText };
+
+  if (!Array.isArray(root.output)) return { status: "invalid-ai-response" };
+
+  for (const outputItem of root.output) {
+    if (!isRecord(outputItem) || outputItem.type !== "message" || !Array.isArray(outputItem.content)) continue;
+
+    for (const contentItem of outputItem.content) {
+      if (!isRecord(contentItem)) continue;
+      if (contentItem.type === "refusal") return { status: "invalid-ai-response" };
+      if (contentItem.type === "output_text") {
+        const text = getNonEmptyString(contentItem.text);
+        if (text) return { status: "success", text };
+      }
+    }
   }
 
-  return "provider-error";
+  return { status: "invalid-ai-response" };
 }
 
-async function getInventoryNutritionAiZodTextFormat() {
-  // @ts-expect-error The official SDK helper is provided by the openai package.
-  const helperModule = await import("openai/helpers/zod");
-  return helperModule.zodTextFormat(InventoryNutritionAiOutputSchema, "inventory_nutrition_estimate");
+function parseInventoryNutritionAiResponse(
+  input: InventoryNutritionAiInput,
+  responseBody: unknown,
+): InventoryNutritionProviderResult {
+  const extracted = extractInventoryNutritionAiOutputText(responseBody);
+
+  if (extracted.status === "provider-error") return { status: "error", code: "provider-error" };
+  if (extracted.status === "invalid-ai-response") return { status: "error", code: "invalid-ai-response" };
+
+  try {
+    const parsedJson = JSON.parse(extracted.text) as unknown;
+    const validated = validateInventoryNutritionAiOutput(input, parsedJson);
+    if (validated.status === "invalid") return { status: "error", code: "invalid-ai-response" };
+    return validated;
+  } catch {
+    return { status: "error", code: "invalid-ai-response" };
+  }
+}
+
+function isAbortError(error: unknown) {
+  return isRecord(error) && error.name === "AbortError";
 }
 
 export async function estimateInventoryNutritionWithOpenAi(
   input: InventoryNutritionAiInput,
   options: {
-    client: ParsedResponsesClient;
+    apiKey: string;
     model?: string;
+    fetchImpl?: typeof fetch;
   },
 ): Promise<InventoryNutritionProviderResult> {
-  try {
-    const response = await options.client.responses.parse({
-      model: options.model ?? INVENTORY_NUTRITION_AI_MODEL_DEFAULT,
-      input: [
-        { role: "system", content: INVENTORY_NUTRITION_AI_SYSTEM_PROMPT },
-        { role: "user", content: buildInventoryNutritionAiInputText(input) },
-      ],
-      text: {
-        format: await getInventoryNutritionAiZodTextFormat(),
-      },
-      store: false,
-      max_output_tokens: INVENTORY_NUTRITION_AI_MAX_OUTPUT_TOKENS,
-      reasoning: { effort: "low" },
-    }, { timeout: INVENTORY_NUTRITION_AI_TIMEOUT_MS, maxRetries: 0 });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), INVENTORY_NUTRITION_AI_TIMEOUT_MS);
+  const fetchImpl = options.fetchImpl ?? fetch;
 
-    const validated = validateInventoryNutritionAiOutput(input, response.output_parsed);
-    if (validated.status === "invalid") return { status: "error", code: "invalid-ai-response" };
-    return validated;
+  try {
+    const response = await fetchImpl(OPENAI_RESPONSES_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${options.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: options.model ?? INVENTORY_NUTRITION_AI_MODEL_DEFAULT,
+        input: [
+          { role: "system", content: INVENTORY_NUTRITION_AI_SYSTEM_PROMPT },
+          { role: "user", content: buildInventoryNutritionAiInputText(input) },
+        ],
+        text: {
+          format: {
+            type: "json_schema",
+            name: "inventory_nutrition_estimate",
+            strict: true,
+            schema: INVENTORY_NUTRITION_AI_JSON_SCHEMA,
+          },
+        },
+        store: false,
+        max_output_tokens: INVENTORY_NUTRITION_AI_MAX_OUTPUT_TOKENS,
+        reasoning: { effort: "none" },
+      }),
+      signal: controller.signal,
+    });
+
+    if (response.status === 408) return { status: "error", code: "timeout" };
+    if (response.status === 429) return { status: "error", code: "rate-limited" };
+    if (!response.ok) return { status: "error", code: "provider-error" };
+
+    const responseBody = await response.json() as unknown;
+    return parseInventoryNutritionAiResponse(input, responseBody);
   } catch (error) {
-    return { status: "error", code: getSafeOpenAiErrorCode(error) };
+    if (isAbortError(error)) return { status: "error", code: "timeout" };
+    return { status: "error", code: "provider-error" };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

@@ -9,6 +9,39 @@ export const INVENTORY_NUTRITION_AI_MAX_OUTPUT_TOKENS = 300;
 export const INVENTORY_NUTRITION_AI_PER_UNIT_MAX = 100_000;
 
 const inventoryUnits = ["ud", "g", "kg", "ml", "l"] as const;
+
+export const INVENTORY_NUTRITION_AI_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    status: { type: "string", enum: ["estimated", "needs_clarification"] },
+    nutrition_basis: {
+      anyOf: [
+        { type: "string", enum: ["per_100g", "per_100ml", "per_unit"] },
+        { type: "null" },
+      ],
+    },
+    calories: { anyOf: [{ type: "number" }, { type: "null" }] },
+    protein_g: { anyOf: [{ type: "number" }, { type: "null" }] },
+    carbs_g: { anyOf: [{ type: "number" }, { type: "null" }] },
+    fat_g: { anyOf: [{ type: "number" }, { type: "null" }] },
+    confidence: { type: "string", enum: ["low", "medium", "high"] },
+    assumptions: { type: "string" },
+    clarification: { anyOf: [{ type: "string" }, { type: "null" }] },
+  },
+  required: [
+    "status",
+    "nutrition_basis",
+    "calories",
+    "protein_g",
+    "carbs_g",
+    "fat_g",
+    "confidence",
+    "assumptions",
+    "clarification",
+  ],
+  additionalProperties: false,
+} as const;
+
 const inventoryCategories = [...INVENTORY_CATEGORIES] as const;
 
 export type InventoryNutritionAiInput = {
@@ -110,6 +143,7 @@ export function validateInventoryNutritionAiOutput(
 
   if (!isCompatibleInventoryNutritionAiBasis(input.unit, output.nutrition_basis)) return { status: "invalid" };
   if (output.clarification !== null) return { status: "invalid" };
+  if (!output.assumptions.trim()) return { status: "invalid" };
 
   const hasCompleteValues = hasFiniteNonNegativeNumber(output.calories)
     && hasFiniteNonNegativeNumber(output.protein_g)

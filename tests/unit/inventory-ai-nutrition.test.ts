@@ -67,6 +67,7 @@ describe("validateInventoryNutritionAiOutput", () => {
     { ...validOutput, nutrition_basis: "per_unit" },
     { status: "estimated", nutrition_basis: "per_100g" },
     { ...validOutput, calories: "120" },
+    { ...validOutput, assumptions: "" },
   ])("rejects invalid output %#", (output) => {
     expect(validateInventoryNutritionAiOutput(validInput, output).status).toBe("invalid");
   });
@@ -107,39 +108,146 @@ describe("overwrite confirmation", () => {
   });
 });
 
-describe("OpenAI provider behavior", () => {
-  async function loadProvider() {
-    vi.resetModules();
-    vi.doMock("openai/helpers/zod", () => ({ zodTextFormat: () => ({ type: "json_schema" }) }));
-    vi.doMock("openai", () => ({ default: class OpenAI {} }));
-    return import("@/lib/openai/inventory-nutrition");
+
+describe("OpenAI fetch provider behavior", () => {
+  const successfulResponseBody = {
+    status: "completed",
+    output: [
+      {
+        type: "message",
+        content: [{ type: "output_text", text: JSON.stringify(validOutput) }],
+      },
+    ],
+  };
+
+  function createJsonResponse(body: unknown, init?: ResponseInit) {
+    return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" }, ...init });
   }
 
-  it("handles a valid response", async () => {
-    const { estimateInventoryNutritionWithOpenAi } = await loadProvider();
-    const client = { responses: { parse: async () => ({ output_parsed: validOutput }) } };
-    await expect(estimateInventoryNutritionWithOpenAi(validInput, { client })).resolves.toMatchObject({ status: "success" });
+  function createFetch(response: Response) {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      calls.push({ url: String(input), init: init ?? {} });
+      return response;
+    };
+
+    return { fetchImpl, calls };
+  }
+
+  it("sends the expected Responses API request without logging secrets", async () => {
+    const { estimateInventoryNutritionWithOpenAi } = await import("@/lib/openai/inventory-nutrition");
+    const { fetchImpl, calls } = createFetch(createJsonResponse(successfulResponseBody));
+
+    await expect(estimateInventoryNutritionWithOpenAi(validInput, { apiKey: "test-key", fetchImpl })).resolves.toMatchObject({ status: "success" });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("https://api.openai.com/v1/responses");
+    expect(calls[0].init.method).toBe("POST");
+    expect(calls[0].init.headers).toMatchObject({ "Content-Type": "application/json" });
+    expect((calls[0].init.headers as Record<string, string>).Authorization).toBeTruthy();
+    expect(calls[0].init.signal).toBeInstanceOf(AbortSignal);
+
+    const body = JSON.parse(String(calls[0].init.body)) as {
+      model: string;
+      store: boolean;
+      max_output_tokens: number;
+      reasoning: { effort: string };
+      text: { format: { type: string; strict: boolean; schema: { required: string[] } } };
+    };
+
+    expect(body.model).toBe("gpt-5.6-luna");
+    expect(body.store).toBe(false);
+    expect(body.max_output_tokens).toBe(300);
+    expect(body.reasoning.effort).toBe("none");
+    expect(body.text.format.type).toBe("json_schema");
+    expect(body.text.format.strict).toBe(true);
+    expect(body.text.format.schema.required).toEqual([
+      "status",
+      "nutrition_basis",
+      "calories",
+      "protein_g",
+      "carbs_g",
+      "fat_g",
+      "confidence",
+      "assumptions",
+      "clarification",
+    ]);
+  });
+
+  it("uses a configurable model", async () => {
+    const { estimateInventoryNutritionWithOpenAi } = await import("@/lib/openai/inventory-nutrition");
+    const { fetchImpl, calls } = createFetch(createJsonResponse(successfulResponseBody));
+
+    await estimateInventoryNutritionWithOpenAi(validInput, { apiKey: "test-key", model: "custom-model", fetchImpl });
+
+    expect(JSON.parse(String(calls[0].init.body))).toMatchObject({ model: "custom-model" });
+  });
+
+  it("handles a valid root output_text fallback", async () => {
+    const { estimateInventoryNutritionWithOpenAi } = await import("@/lib/openai/inventory-nutrition");
+    const { fetchImpl } = createFetch(createJsonResponse({ status: "completed", output_text: JSON.stringify(validOutput) }));
+
+    await expect(estimateInventoryNutritionWithOpenAi(validInput, { apiKey: "test-key", fetchImpl })).resolves.toMatchObject({ status: "success" });
   });
 
   it("handles needs_clarification", async () => {
-    const { estimateInventoryNutritionWithOpenAi } = await loadProvider();
-    const client = { responses: { parse: async () => ({ output_parsed: { status: "needs_clarification", nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null, confidence: "low", assumptions: "", clarification: "Necesito más detalle." } }) } };
-    await expect(estimateInventoryNutritionWithOpenAi(validInput, { client })).resolves.toEqual({ status: "needs-clarification", message: "Necesito más detalle." });
+    const { estimateInventoryNutritionWithOpenAi } = await import("@/lib/openai/inventory-nutrition");
+    const output = { status: "needs_clarification", nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null, confidence: "low", assumptions: "", clarification: "Necesito más detalle." };
+    const { fetchImpl } = createFetch(createJsonResponse({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(output) }] }] }));
+
+    await expect(estimateInventoryNutritionWithOpenAi(validInput, { apiKey: "test-key", fetchImpl })).resolves.toEqual({ status: "needs-clarification", message: "Necesito más detalle." });
   });
 
   it.each([
-    [{ name: "TimeoutError" }, "timeout"],
-    [{ status: 429 }, "rate-limited"],
-    [{ status: 500 }, "provider-error"],
-  ])("maps provider errors %#", async (error, code) => {
-    const { estimateInventoryNutritionWithOpenAi } = await loadProvider();
-    const client = { responses: { parse: async () => { throw error; } } };
-    await expect(estimateInventoryNutritionWithOpenAi(validInput, { client })).resolves.toEqual({ status: "error", code });
+    [{ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: "{" }] }] }, "invalid-ai-response"],
+    [{ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({ ...validOutput, calories: 5000 }) }] }] }, "invalid-ai-response"],
+    [{ status: "incomplete", output: [] }, "invalid-ai-response"],
+    [{ status: "completed", error: { message: "provider failed" } }, "provider-error"],
+    [{ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: "" }] }] }, "invalid-ai-response"],
+    [{ status: "completed", output: [{ type: "message", content: [{ type: "refusal", refusal: "No" }] }] }, "invalid-ai-response"],
+  ])("maps malformed provider body %#", async (body, code) => {
+    const { estimateInventoryNutritionWithOpenAi } = await import("@/lib/openai/inventory-nutrition");
+    const { fetchImpl } = createFetch(createJsonResponse(body));
+
+    await expect(estimateInventoryNutritionWithOpenAi(validInput, { apiKey: "test-key", fetchImpl })).resolves.toEqual({ status: "error", code });
   });
 
-  it("returns invalid-ai-response for invalid structured data", async () => {
-    const { estimateInventoryNutritionWithOpenAi } = await loadProvider();
-    const client = { responses: { parse: async () => ({ output_parsed: { ...validOutput, calories: 5000 } }) } };
-    await expect(estimateInventoryNutritionWithOpenAi(validInput, { client })).resolves.toEqual({ status: "error", code: "invalid-ai-response" });
+  it.each([
+    [408, "timeout"],
+    [429, "rate-limited"],
+    [400, "provider-error"],
+    [401, "provider-error"],
+    [403, "provider-error"],
+    [500, "provider-error"],
+  ])("maps HTTP %s", async (status, code) => {
+    const { estimateInventoryNutritionWithOpenAi } = await import("@/lib/openai/inventory-nutrition");
+    const { fetchImpl } = createFetch(createJsonResponse({ error: "hidden" }, { status }));
+
+    await expect(estimateInventoryNutritionWithOpenAi(validInput, { apiKey: "test-key", fetchImpl })).resolves.toEqual({ status: "error", code });
+  });
+
+  it("maps AbortError to timeout", async () => {
+    const { estimateInventoryNutritionWithOpenAi } = await import("@/lib/openai/inventory-nutrition");
+    const fetchImpl: typeof fetch = async () => { throw new DOMException("Aborted", "AbortError"); };
+
+    await expect(estimateInventoryNutritionWithOpenAi(validInput, { apiKey: "test-key", fetchImpl })).resolves.toEqual({ status: "error", code: "timeout" });
+  });
+
+  it("maps network errors to provider-error", async () => {
+    const { estimateInventoryNutritionWithOpenAi } = await import("@/lib/openai/inventory-nutrition");
+    const fetchImpl: typeof fetch = async () => { throw new Error("network down"); };
+
+    await expect(estimateInventoryNutritionWithOpenAi(validInput, { apiKey: "test-key", fetchImpl })).resolves.toEqual({ status: "error", code: "provider-error" });
+  });
+
+  it("cleans up the timeout timer", async () => {
+    const { estimateInventoryNutritionWithOpenAi } = await import("@/lib/openai/inventory-nutrition");
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+    const { fetchImpl } = createFetch(createJsonResponse(successfulResponseBody));
+
+    await estimateInventoryNutritionWithOpenAi(validInput, { apiKey: "test-key", fetchImpl });
+
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    clearTimeoutSpy.mockRestore();
   });
 });
