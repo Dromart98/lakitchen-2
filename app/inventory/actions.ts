@@ -13,6 +13,8 @@ import {
   parseOptionalInventoryNutritionNumber,
 } from "@/modules/inventory/inventory-nutrition";
 import { isMealType } from "@/modules/meals/meal-types";
+import { createInventoryNutritionOpenAiClient, estimateInventoryNutritionWithOpenAi } from "@/lib/openai/inventory-nutrition";
+import { parseInventoryNutritionAiInput, type InventoryNutritionAiEstimate, type InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
 
 type InventoryLocation = "pantry" | "fridge" | "freezer";
 type InventoryUnit = "ud" | "g" | "kg" | "ml" | "l";
@@ -20,6 +22,54 @@ type InventoryUnit = "ud" | "g" | "kg" | "ml" | "l";
 const INVENTORY_PATH = "/inventory";
 const inventoryLocations = ["pantry", "fridge", "freezer"] as const;
 const inventoryUnits = ["ud", "g", "kg", "ml", "l"] as const;
+
+
+export type InventoryNutritionAiActionResult =
+  | { status: "success"; estimate: InventoryNutritionAiEstimate }
+  | { status: "needs-clarification"; message: string }
+  | {
+      status: "error";
+      code: "invalid-input" | "not-configured" | "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response";
+      message: string;
+    };
+
+type InventoryNutritionAiErrorCode = "invalid-input" | "not-configured" | "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response";
+
+const inventoryNutritionAiErrorMessages: Record<InventoryNutritionAiErrorCode, string> = {
+  "invalid-input": "Completa un nombre y una unidad válidos antes de calcular.",
+  "not-configured": "La estimación con IA no está configurada todavía.",
+  timeout: "La estimación está tardando demasiado. Inténtalo de nuevo.",
+  "rate-limited": "Hay demasiadas solicitudes en este momento. Inténtalo de nuevo en unos minutos.",
+  "provider-error": "No se pudieron estimar los macros. Inténtalo de nuevo.",
+  "invalid-ai-response": "No se pudo obtener una estimación nutricional válida.",
+};
+
+function inventoryNutritionAiError(code: keyof typeof inventoryNutritionAiErrorMessages): InventoryNutritionAiActionResult {
+  return { status: "error", code, message: inventoryNutritionAiErrorMessages[code] };
+}
+
+export async function estimateInventoryNutritionAction(input: InventoryNutritionAiInput): Promise<InventoryNutritionAiActionResult> {
+  const validatedInput = parseInventoryNutritionAiInput(input);
+  if (!validatedInput) return inventoryNutritionAiError("invalid-input");
+
+  const supabase = await createClient();
+  await requireAuthenticatedUser(supabase, "inventory nutrition AI estimate");
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return inventoryNutritionAiError("not-configured");
+
+  const result = await estimateInventoryNutritionWithOpenAi(validatedInput, {
+    client: await createInventoryNutritionOpenAiClient(apiKey),
+    model: process.env.OPENAI_INVENTORY_NUTRITION_MODEL || undefined,
+  });
+
+  if (result.status === "error") {
+    console.warn("inventory_nutrition_ai_estimate_failed", { code: result.code });
+    return inventoryNutritionAiError(result.code);
+  }
+
+  return result;
+}
 
 function isInventoryLocation(value: string): value is InventoryLocation {
   return inventoryLocations.includes(value as InventoryLocation);
