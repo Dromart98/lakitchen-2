@@ -113,6 +113,29 @@ describe("buildRecipeConsumptionLines", () => {
     expect(buildRecipeConsumptionLines([], [item()])).toEqual({ ok: false, code: "empty" });
   });
 
+
+  it("rejects a quantity converted to zero by underflow", () => {
+    expect(buildRecipeConsumptionLines([allocation({ usedQuantity: Number.MIN_VALUE, usedUnit: "g" })], [item({ unit: "kg" })])).toEqual({ ok: false, code: "invalid-quantity" });
+  });
+
+  it("rejects a grouped sum that overflows to Infinity", () => {
+    expect(buildRecipeConsumptionLines([
+      allocation({ usedQuantity: Number.MAX_VALUE, usedUnit: "g" }),
+      allocation({ usedQuantity: Number.MAX_VALUE, usedUnit: "g" }),
+    ], [item({ unit: "g" })])).toEqual({ ok: false, code: "invalid-quantity" });
+  });
+
+  it("keeps normal conversion working after numeric hardening", () => {
+    expect(buildRecipeConsumptionLines([allocation({ usedQuantity: 500, usedUnit: "ml" })], [item({ unit: "l" })])).toEqual({ ok: true, lines: [{ item_id: ids[0], consumed_quantity: 0.5 }] });
+  });
+
+  it("keeps normal grouping working after numeric hardening", () => {
+    expect(buildRecipeConsumptionLines([
+      allocation({ usedQuantity: 125, usedUnit: "g" }),
+      allocation({ usedQuantity: 375, usedUnit: "g" }),
+    ], [item({ unit: "kg" })])).toEqual({ ok: true, lines: [{ item_id: ids[0], consumed_quantity: 0.5 }] });
+  });
+
   it("does not mutate inputs", () => {
     const allocations = [allocation({ usedQuantity: 250 })];
     const inventory = [item({ unit: "kg" })];

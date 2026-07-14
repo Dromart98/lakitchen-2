@@ -23,12 +23,16 @@ export type RecipeConsumptionResult =
     };
 
 const MAX_UNIQUE_ITEMS = 10;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type BaseUnit = RecipeIngredientAllocation["usedUnit"];
 
 function isValidItemId(value: string): boolean {
   return UUID_PATTERN.test(value);
+}
+
+function isPositiveFiniteQuantity(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
 }
 
 function convertBaseQuantityToInventoryUnit(quantity: number, baseUnit: BaseUnit, inventoryUnit: string): number | null {
@@ -68,14 +72,18 @@ export function buildRecipeConsumptionLines(
     const item = inventoryById.get(itemId);
     if (!item) return { ok: false, code: "missing-item" };
 
-    if (!Number.isFinite(allocation.usedQuantity) || allocation.usedQuantity <= 0) {
+    if (!isPositiveFiniteQuantity(allocation.usedQuantity)) {
       return { ok: false, code: "invalid-quantity" };
     }
 
     const convertedQuantity = convertBaseQuantityToInventoryUnit(allocation.usedQuantity, allocation.usedUnit, item.unit);
     if (convertedQuantity === null) return { ok: false, code: "incompatible-unit" };
+    if (!isPositiveFiniteQuantity(convertedQuantity)) return { ok: false, code: "invalid-quantity" };
 
-    quantitiesByItemId.set(itemId, (quantitiesByItemId.get(itemId) ?? 0) + convertedQuantity);
+    const summedQuantity = (quantitiesByItemId.get(itemId) ?? 0) + convertedQuantity;
+    if (!isPositiveFiniteQuantity(summedQuantity)) return { ok: false, code: "invalid-quantity" };
+
+    quantitiesByItemId.set(itemId, summedQuantity);
 
     if (quantitiesByItemId.size > MAX_UNIQUE_ITEMS) return { ok: false, code: "too-many-items" };
   }

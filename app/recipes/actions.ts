@@ -18,7 +18,7 @@ import {
 import { estimateRecipeNutrition } from "@/modules/recipes/recipe-nutrition";
 
 const RECIPES_PATH = "/recipes";
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type RecipeTemplateConsumptionRow = Omit<RecipeTemplate, "instructions" | "recipe_ingredients"> & {
   recipe_ingredients: RecipeIngredient[] | null;
