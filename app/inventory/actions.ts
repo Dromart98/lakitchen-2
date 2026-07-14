@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
+import { validateBarcodeInput } from "@/modules/barcodes/barcode";
 import { createClient } from "@/lib/supabase/server";
 import { isInventoryCategory } from "@/modules/inventory/inventory-categories";
 import {
@@ -26,6 +27,45 @@ function isInventoryLocation(value: string): value is InventoryLocation {
 
 function isInventoryUnit(value: string): value is InventoryUnit {
   return inventoryUnits.includes(value as InventoryUnit);
+}
+
+
+type BarcodeProductLookupResult =
+  | { status: "invalid"; message: string }
+  | { status: "found"; product: { barcode: string; name: string; default_quantity: number; default_unit: InventoryUnit; default_location: InventoryLocation | null } }
+  | { status: "unknown"; barcode: string; message: string }
+  | { status: "error"; message: string };
+
+export async function lookupBarcodeProductAction(rawBarcode: string): Promise<BarcodeProductLookupResult> {
+  const validation = validateBarcodeInput(rawBarcode);
+
+  if (!validation.ok) {
+    return { status: "invalid", message: validation.message };
+  }
+
+  const supabase = await createClient();
+  const user = await requireAuthenticatedUser(supabase, "barcode product lookup");
+
+  const { data, error } = await (supabase as any)
+    .from("user_barcode_products")
+    .select("barcode, name, default_quantity, default_unit, default_location")
+    .eq("user_id", user.id)
+    .eq("barcode", validation.barcode)
+    .maybeSingle() as {
+      data: { barcode: string; name: string; default_quantity: number; default_unit: InventoryUnit; default_location: InventoryLocation | null } | null;
+      error: { message: string } | null;
+    };
+
+  if (error) {
+    console.warn("Supabase could not look up the barcode product:", error.message);
+    return { status: "error", message: "No se pudo buscar el código. Inténtalo de nuevo." };
+  }
+
+  if (!data) {
+    return { status: "unknown", barcode: validation.barcode, message: "Este código no está guardado todavía. Completa los datos manualmente." };
+  }
+
+  return { status: "found", product: data };
 }
 
 function isUuid(value: string) {
@@ -126,6 +166,35 @@ export async function addInventoryItemAction(formData: FormData) {
   if (error) {
     console.warn("Supabase could not save the inventory item:", error.message);
     redirect(`${INVENTORY_PATH}?inventoryError=save-failed`);
+  }
+
+  const rememberBarcode = formData.get("remember_barcode_product") === "on";
+  const barcodeValidation = validateBarcodeInput(String(formData.get("barcode") ?? ""));
+
+  if (rememberBarcode) {
+    if (!barcodeValidation.ok) {
+      revalidatePath(INVENTORY_PATH);
+      redirect(`${INVENTORY_PATH}?inventorySuccess=item-created-barcode-memory-failed`);
+    }
+
+    const { data: rememberedBarcodeProduct, error: barcodeError } = await (supabase as any)
+      .from("user_barcode_products")
+      .upsert({
+        user_id: user.id,
+        barcode: barcodeValidation.barcode,
+        name,
+        default_quantity: quantity,
+        default_unit: unit,
+        default_location: location,
+      }, { onConflict: "user_id,barcode" })
+      .select("id")
+      .maybeSingle() as { data: { id: string } | null; error: { message: string } | null };
+
+    if (barcodeError || !rememberedBarcodeProduct) {
+      console.warn("Supabase could not remember the barcode product:", barcodeError?.message ?? "No barcode product was returned.");
+      revalidatePath(INVENTORY_PATH);
+      redirect(`${INVENTORY_PATH}?inventorySuccess=item-created-barcode-memory-failed`);
+    }
   }
 
   revalidatePath(INVENTORY_PATH);

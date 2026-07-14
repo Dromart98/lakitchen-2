@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { InventoryConsumeForm } from "@/components/inventory/InventoryConsumeForm";
+import { BarcodeCatalogControls } from "./BarcodeCatalogControls";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import {
   getInventoryCategoryLabel,
@@ -23,7 +24,7 @@ import {
 } from "@/modules/inventory/inventory-expiration";
 import type { InventoryItemRecord, InventoryLocation } from "@/modules/inventory/inventory.types";
 
-import { addInventoryItemAction, deleteInventoryItemAction, updateInventoryItemAction } from "./actions";
+import { addInventoryItemAction, deleteInventoryItemAction, lookupBarcodeProductAction, updateInventoryItemAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +93,7 @@ const inventoryErrorMessages: Record<string, string> = {
 
 const inventorySuccessMessages: Record<string, string> = {
   "item-created": "Producto añadido al inventario correctamente.",
+  "item-created-barcode-memory-failed": "Producto añadido al inventario correctamente, pero no se pudo recordar el código.",
   "item-updated": "Producto actualizado correctamente.",
   "item-deleted": "Producto eliminado correctamente.",
   "item-consumed": "Cantidad descontada correctamente.",
@@ -228,6 +230,7 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
         {inventoryErrorMessage ? <p className="auth-message error" role="alert">{inventoryErrorMessage}</p> : null}
         {inventorySuccessMessage ? <p className="auth-message success" role="status">{inventorySuccessMessage}</p> : null}
         <form action={addInventoryItemAction} className="meal-log-form">
+          <BarcodeCatalogControls lookupAction={lookupBarcodeProductAction} />
           <label className="field" htmlFor="inventory-name">
             <span>Nombre</span>
             <input id="inventory-name" name="name" type="text" maxLength={120} required placeholder="Arroz integral" />
