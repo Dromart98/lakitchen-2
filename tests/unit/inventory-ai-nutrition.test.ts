@@ -108,14 +108,17 @@ describe("overwrite confirmation", () => {
   });
 });
 
-
 describe("OpenAI fetch provider behavior", () => {
   const successfulResponseBody = {
     status: "completed",
+    error: null,
+    incomplete_details: null,
     output: [
       {
         type: "message",
-        content: [{ type: "output_text", text: JSON.stringify(validOutput) }],
+        status: "completed",
+        role: "assistant",
+        content: [{ type: "output_text", text: JSON.stringify(validOutput), annotations: [] }],
       },
     ],
   };
@@ -174,6 +177,22 @@ describe("OpenAI fetch provider behavior", () => {
     ]);
   });
 
+  it("accepts a completed response with error null", async () => {
+    const { estimateInventoryNutritionWithOpenAi } = await import("@/lib/openai/inventory-nutrition");
+    const { fetchImpl } = createFetch(createJsonResponse(successfulResponseBody));
+
+    await expect(estimateInventoryNutritionWithOpenAi(validInput, { apiKey: "test-key", fetchImpl })).resolves.toMatchObject({ status: "success" });
+  });
+
+  it("accepts a completed response without an error property", async () => {
+    const { estimateInventoryNutritionWithOpenAi } = await import("@/lib/openai/inventory-nutrition");
+    const responseWithoutError = { ...successfulResponseBody } as Record<string, unknown>;
+    delete responseWithoutError.error;
+    const { fetchImpl } = createFetch(createJsonResponse(responseWithoutError));
+
+    await expect(estimateInventoryNutritionWithOpenAi(validInput, { apiKey: "test-key", fetchImpl })).resolves.toMatchObject({ status: "success" });
+  });
+
   it("uses a configurable model", async () => {
     const { estimateInventoryNutritionWithOpenAi } = await import("@/lib/openai/inventory-nutrition");
     const { fetchImpl, calls } = createFetch(createJsonResponse(successfulResponseBody));
@@ -193,18 +212,19 @@ describe("OpenAI fetch provider behavior", () => {
   it("handles needs_clarification", async () => {
     const { estimateInventoryNutritionWithOpenAi } = await import("@/lib/openai/inventory-nutrition");
     const output = { status: "needs_clarification", nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null, confidence: "low", assumptions: "", clarification: "Necesito más detalle." };
-    const { fetchImpl } = createFetch(createJsonResponse({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(output) }] }] }));
+    const { fetchImpl } = createFetch(createJsonResponse({ status: "completed", error: null, output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(output) }] }] }));
 
     await expect(estimateInventoryNutritionWithOpenAi(validInput, { apiKey: "test-key", fetchImpl })).resolves.toEqual({ status: "needs-clarification", message: "Necesito más detalle." });
   });
 
   it.each([
-    [{ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: "{" }] }] }, "invalid-ai-response"],
-    [{ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({ ...validOutput, calories: 5000 }) }] }] }, "invalid-ai-response"],
-    [{ status: "incomplete", output: [] }, "invalid-ai-response"],
+    [{ status: "completed", error: null, output: [{ type: "message", content: [{ type: "output_text", text: "{" }] }] }, "invalid-ai-response"],
+    [{ status: "completed", error: null, output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({ ...validOutput, calories: 5000 }) }] }] }, "invalid-ai-response"],
+    [{ status: "incomplete", error: null, output: [] }, "invalid-ai-response"],
     [{ status: "completed", error: { message: "provider failed" } }, "provider-error"],
-    [{ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: "" }] }] }, "invalid-ai-response"],
-    [{ status: "completed", output: [{ type: "message", content: [{ type: "refusal", refusal: "No" }] }] }, "invalid-ai-response"],
+    [{ status: "completed", error: "provider failed" }, "provider-error"],
+    [{ status: "completed", error: null, output: [{ type: "message", content: [{ type: "output_text", text: "" }] }] }, "invalid-ai-response"],
+    [{ status: "completed", error: null, output: [{ type: "message", content: [{ type: "refusal", refusal: "No" }] }] }, "invalid-ai-response"],
   ])("maps malformed provider body %#", async (body, code) => {
     const { estimateInventoryNutritionWithOpenAi } = await import("@/lib/openai/inventory-nutrition");
     const { fetchImpl } = createFetch(createJsonResponse(body));
