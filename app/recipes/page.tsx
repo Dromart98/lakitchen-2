@@ -15,8 +15,8 @@ import {
   type RecipeInventoryItem,
   type RecipeTemplate,
 } from "@/modules/recipes/recipe-matching";
-import { estimateRecipeNutrition, type RecipeNutritionEstimate } from "@/modules/recipes/recipe-nutrition";
-import { getMaxCookableRecipeServings, scaleRecipeToServings } from "@/modules/recipes/recipe-servings";
+import type { RecipeNutritionEstimate } from "@/modules/recipes/recipe-nutrition";
+import { getRecipeServingOptions } from "@/modules/recipes/recipe-servings";
 
 export const dynamic = "force-dynamic";
 
@@ -159,12 +159,10 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
 
       <section className="grid cards" style={{ marginTop: 16 }}>
         {matches.map((match) => {
-          const maxCookableServings = getMaxCookableRecipeServings(match.recipe, inventoryItems, todayKey);
-          const nutritionRecipe = maxCookableServings > 0 ? scaleRecipeToServings(match.recipe, maxCookableServings) : null;
-          const nutritionMatch = nutritionRecipe?.ok ? matchRecipesToInventory([nutritionRecipe.recipe], inventoryItems, todayKey)[0] : null;
-          const nutrition = nutritionMatch?.canCookNow
-            ? estimateRecipeNutrition(nutritionMatch.ingredientMatches.flatMap((ingredientMatch) => ingredientMatch.allocations), nutritionMatch.recipe.servings)
-            : null;
+          const servingOptions = getRecipeServingOptions(match.recipe, inventoryItems, todayKey);
+          const maxCookableServings = servingOptions.reduce((maxServings, option) => (option.canCookNow ? option.servings : maxServings), 0);
+          const loggableServingOptions = servingOptions.filter((option) => option.canLog && option.nutrition?.total);
+          const hasCookableButUnloggableServings = servingOptions.some((option) => option.canCookNow && !option.canLog);
 
           return (
           <article className="card" key={match.recipe.id}>
@@ -172,36 +170,40 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
             <p className="muted">{match.recipe.description}</p>
             <p>{match.recipe.prep_minutes} minutos · {match.recipe.servings} ración{match.recipe.servings === 1 ? "" : "es"}</p>
             <p><strong>{maxCookableServings > 0 ? "Puedes cocinarla ahora." : "Te faltan productos o cantidades."}</strong></p>
-            <p>Puedes preparar hasta {maxCookableServings} de {match.recipe.servings} ración{match.recipe.servings === 1 ? "" : "es"}.</p>
+            {maxCookableServings > 0 ? (
+              <p>Puedes preparar hasta {maxCookableServings} de {match.recipe.servings} ración{match.recipe.servings === 1 ? "" : "es"}.</p>
+            ) : null}
             {match.urgentItemCount > 0 ? <p>Usa pronto {match.urgentItemCount} producto{match.urgentItemCount === 1 ? "" : "s"}.</p> : null}
             {match.recipe.prep_minutes <= 15 ? <p>Lista en 15 minutos.</p> : null}
 
-            {nutrition ? (
+            {loggableServingOptions.length > 0 ? (
               <section>
                 <h3>Nutrición estimada</h3>
-                {nutrition.isComplete && nutrition.total && nutrition.perServing ? (
-                  <>
-                    <p>Por receta: {formatNutritionLine(nutrition.total)}</p>
-                    <p>Por ración: {formatNutritionLine(nutrition.perServing)}</p>
-                  </>
-                ) : (
-                  <>
-                    <p>No se puede calcular la nutrición completa porque faltan datos en {nutrition.missingNutritionItemCount} producto{nutrition.missingNutritionItemCount === 1 ? "" : "s"}.</p>
-                    <p className="muted">Completa los datos nutricionales del inventario antes de registrar esta receta.</p>
-                  </>
-                )}
+                <ul>
+                  {loggableServingOptions.map((option) => (
+                    <li key={option.servings}>
+                      {option.servings} ración{option.servings === 1 ? "" : "es"}: {formatNutritionLine(option.nutrition!.total!)}
+                    </li>
+                  ))}
+                </ul>
                 <p className="muted">Estimación basada en los valores nutricionales guardados en tu inventario.</p>
               </section>
+            ) : maxCookableServings > 0 ? (
+              <p className="muted">Puedes preparar esta receta, pero faltan datos nutricionales en alguno de los productos necesarios para registrarla.</p>
             ) : null}
 
-            {maxCookableServings > 0 && nutrition?.isComplete ? (
+            {hasCookableButUnloggableServings && loggableServingOptions.length > 0 ? (
+              <p className="muted">Algunas cantidades no están disponibles para registrar porque requieren productos sin datos nutricionales completos.</p>
+            ) : null}
+
+            {loggableServingOptions.length > 0 ? (
               <form action={cookRecipeAndLogMealAction}>
                 <input type="hidden" name="recipe_id" value={match.recipe.id} />
                 <input type="hidden" name="mode" value={mode} />
                 <label htmlFor={`servings-${match.recipe.id}`}>Raciones a preparar</label>
                 <select id={`servings-${match.recipe.id}`} name="servings" defaultValue="1">
-                  {Array.from({ length: maxCookableServings }, (_, index) => index + 1).map((servings) => (
-                    <option key={servings} value={servings}>{servings} ración{servings === 1 ? "" : "es"}</option>
+                  {loggableServingOptions.map((option) => (
+                    <option key={option.servings} value={option.servings}>{option.servings} ración{option.servings === 1 ? "" : "es"}</option>
                   ))}
                 </select>
                 <label htmlFor={`meal-type-${match.recipe.id}`}>Tipo de comida</label>

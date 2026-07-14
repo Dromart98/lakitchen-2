@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getMaxCookableRecipeServings, scaleRecipeToServings } from "@/modules/recipes/recipe-servings";
+import { getMaxCookableRecipeServings, getRecipeServingOptions, scaleRecipeToServings } from "@/modules/recipes/recipe-servings";
 import type { RecipeIngredient, RecipeInventoryItem, RecipeTemplate } from "@/modules/recipes/recipe-matching";
 
 function ingredient(overrides: Partial<RecipeIngredient> = {}): RecipeIngredient {
@@ -113,5 +113,83 @@ describe("getMaxCookableRecipeServings", () => {
 
   it("returns all servings when inventory covers the full recipe", () => {
     expect(getMaxCookableRecipeServings(recipe(), [inventory({ quantity: 400 })], "2026-07-14")).toBe(4);
+  });
+});
+
+
+describe("getRecipeServingOptions", () => {
+  it("keeps smaller loggable servings available when larger cookable servings need incomplete nutrition", () => {
+    const options = getRecipeServingOptions(recipe(), [
+      inventory({ id: "lot-a", quantity: 100, expires_at: "2026-07-15", nutrition_basis: "per_100g", calories: 165, protein_g: 31, carbs_g: 0, fat_g: 4 }),
+      inventory({ id: "lot-b", quantity: 300, expires_at: "2026-07-20", nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null }),
+    ], "2026-07-14");
+
+    expect(getMaxCookableRecipeServings(recipe(), [
+      inventory({ id: "lot-a", quantity: 100, expires_at: "2026-07-15", nutrition_basis: "per_100g", calories: 165, protein_g: 31, carbs_g: 0, fat_g: 4 }),
+      inventory({ id: "lot-b", quantity: 300, expires_at: "2026-07-20", nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null }),
+    ], "2026-07-14")).toBe(4);
+    expect(options.map((option) => option.servings)).toEqual([1, 2, 3, 4]);
+    expect(options[0].canCookNow).toBe(true);
+    expect(options[0].nutrition?.isComplete).toBe(true);
+    expect(options[0].canLog).toBe(true);
+    expect(options.slice(1).map((option) => [option.canCookNow, option.nutrition?.isComplete, option.canLog])).toEqual([
+      [true, false, false],
+      [true, false, false],
+      [true, false, false],
+    ]);
+    expect(options.filter((option) => option.canLog).map((option) => option.servings)).toEqual([1]);
+  });
+
+  it("marks all serving options loggable when all lots have complete nutrition", () => {
+    const options = getRecipeServingOptions(recipe(), [
+      inventory({ id: "lot-a", quantity: 100, expires_at: "2026-07-15", nutrition_basis: "per_100g", calories: 100, protein_g: 10, carbs_g: 1, fat_g: 2 }),
+      inventory({ id: "lot-b", quantity: 300, expires_at: "2026-07-20", nutrition_basis: "per_100g", calories: 200, protein_g: 20, carbs_g: 2, fat_g: 4 }),
+    ], "2026-07-14");
+
+    expect(options.filter((option) => option.canLog).map((option) => option.servings)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("keeps max cookable at 2 when inventory only covers 2 servings", () => {
+    const options = getRecipeServingOptions(recipe(), [inventory({ quantity: 200, nutrition_basis: "per_100g", calories: 100, protein_g: 10, carbs_g: 1, fat_g: 2 })], "2026-07-14");
+
+    expect(getMaxCookableRecipeServings(recipe(), [inventory({ quantity: 200, nutrition_basis: "per_100g", calories: 100, protein_g: 10, carbs_g: 1, fat_g: 2 })], "2026-07-14")).toBe(2);
+    expect(options.map((option) => option.canCookNow)).toEqual([true, true, false, false]);
+  });
+
+  it("returns no loggable options and max 0 when no serving is cookable", () => {
+    const options = getRecipeServingOptions(recipe(), [inventory({ quantity: 99, nutrition_basis: "per_100g", calories: 100, protein_g: 10, carbs_g: 1, fat_g: 2 })], "2026-07-14");
+
+    expect(getMaxCookableRecipeServings(recipe(), [inventory({ quantity: 99, nutrition_basis: "per_100g", calories: 100, protein_g: 10, carbs_g: 1, fat_g: 2 })], "2026-07-14")).toBe(0);
+    expect(options.filter((option) => option.canLog)).toEqual([]);
+  });
+
+  it("returns an empty list for invalid recipe servings", () => {
+    expect(getRecipeServingOptions(recipe({ servings: 0 }), [inventory()], "2026-07-14")).toEqual([]);
+  });
+
+  it("does not mutate recipe or inventory", () => {
+    const originalRecipe = recipe();
+    const originalInventory = [inventory({ nutrition_basis: "per_100g", calories: 100, protein_g: 10, carbs_g: 1, fat_g: 2 })];
+    const beforeRecipe = JSON.stringify(originalRecipe);
+    const beforeInventory = JSON.stringify(originalInventory);
+
+    getRecipeServingOptions(originalRecipe, originalInventory, "2026-07-14");
+
+    expect(JSON.stringify(originalRecipe)).toBe(beforeRecipe);
+    expect(JSON.stringify(originalInventory)).toBe(beforeInventory);
+  });
+
+  it("returns options in deterministic serving order", () => {
+    expect(getRecipeServingOptions(recipe(), [inventory({ quantity: 400 })], "2026-07-14").map((option) => option.servings)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("stores each total nutrition estimate from its own serving quantity and lot allocation", () => {
+    const options = getRecipeServingOptions(recipe(), [
+      inventory({ id: "lot-a", quantity: 100, expires_at: "2026-07-15", nutrition_basis: "per_100g", calories: 100, protein_g: 10, carbs_g: 1, fat_g: 2 }),
+      inventory({ id: "lot-b", quantity: 300, expires_at: "2026-07-20", nutrition_basis: "per_100g", calories: 200, protein_g: 20, carbs_g: 2, fat_g: 4 }),
+    ], "2026-07-14");
+
+    expect(options.map((option) => option.nutrition?.total?.calories)).toEqual([100, 300, 500, 700]);
+    expect(options.map((option) => option.nutrition?.total?.proteinG)).toEqual([10, 30, 50, 70]);
   });
 });

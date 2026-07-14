@@ -1,8 +1,16 @@
 import { matchRecipesToInventory, type RecipeInventoryItem, type RecipeTemplate } from "@/modules/recipes/recipe-matching";
+import { estimateRecipeNutrition, type RecipeNutritionEstimate } from "@/modules/recipes/recipe-nutrition";
 
 export type ScaleRecipeToServingsResult =
   | { ok: true; recipe: RecipeTemplate; scale: number }
   | { ok: false; code: "invalid-recipe-servings" | "invalid-requested-servings" | "invalid-scaled-quantity" };
+
+export type RecipeServingOption = {
+  servings: number;
+  canCookNow: boolean;
+  nutrition: RecipeNutritionEstimate | null;
+  canLog: boolean;
+};
 
 function isSafePositiveInteger(value: number): boolean {
   return Number.isSafeInteger(value) && value > 0;
@@ -42,17 +50,30 @@ export function scaleRecipeToServings(recipe: RecipeTemplate, requestedServings:
   };
 }
 
-export function getMaxCookableRecipeServings(recipe: RecipeTemplate, inventory: RecipeInventoryItem[], todayKey: string): number {
-  if (!isSafePositiveInteger(recipe.servings)) return 0;
+export function getRecipeServingOptions(recipe: RecipeTemplate, inventory: RecipeInventoryItem[], todayKey: string): RecipeServingOption[] {
+  if (!isSafePositiveInteger(recipe.servings)) return [];
 
-  let maxCookableServings = 0;
+  const options: RecipeServingOption[] = [];
   for (let servings = 1; servings <= recipe.servings; servings += 1) {
     const scaledRecipe = scaleRecipeToServings(recipe, servings);
     if (!scaledRecipe.ok) continue;
 
     const [match] = matchRecipesToInventory([scaledRecipe.recipe], inventory, todayKey);
-    if (match?.canCookNow) maxCookableServings = servings;
+    const canCookNow = match?.canCookNow === true;
+    if (!canCookNow || !match) {
+      options.push({ servings, canCookNow: false, nutrition: null, canLog: false });
+      continue;
+    }
+
+    const allocations = match.ingredientMatches.flatMap((ingredientMatch) => ingredientMatch.allocations);
+    const nutrition = estimateRecipeNutrition(allocations, match.recipe.servings);
+    const canLog = nutrition.isComplete && Boolean(nutrition.total) && Boolean(nutrition.perServing);
+    options.push({ servings, canCookNow, nutrition, canLog });
   }
 
-  return maxCookableServings;
+  return options;
+}
+
+export function getMaxCookableRecipeServings(recipe: RecipeTemplate, inventory: RecipeInventoryItem[], todayKey: string): number {
+  return getRecipeServingOptions(recipe, inventory, todayKey).reduce((maxServings, option) => (option.canCookNow ? option.servings : maxServings), 0);
 }
