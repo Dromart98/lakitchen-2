@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 import {
   normalizeBarcodeProductLocation,
   validateAndNormalizeBarcodeProductName,
+  validateBarcodeProductCategory,
+  validateBarcodeProductNutritionFields,
   validateBarcodeProductQuantity,
   validateBarcodeProductUnit,
 } from "@/modules/barcodes/barcode-catalog";
@@ -26,6 +28,12 @@ type SupabaseBarcodeCatalogClient = {
       default_quantity: number;
       default_unit: string;
       default_location: string | null;
+      default_category: string;
+      nutrition_basis: string | null;
+      calories: number | null;
+      protein_g: number | null;
+      carbs_g: number | null;
+      fat_g: number | null;
     }): {
       eq(column: string, value: string): {
         eq(column: string, value: string): {
@@ -68,8 +76,16 @@ function getValidatedBarcodeProductFields(formData: FormData) {
   const quantity = validateBarcodeProductQuantity(formData.get("default_quantity"));
   const unit = validateBarcodeProductUnit(formData.get("default_unit"));
   const location = normalizeBarcodeProductLocation(formData.get("default_location"));
+  const category = validateBarcodeProductCategory(formData.get("default_category"));
+  const nutrition = validateBarcodeProductNutritionFields({
+    nutrition_basis: formData.get("nutrition_basis"),
+    calories: formData.get("calories"),
+    protein_g: formData.get("protein_g"),
+    carbs_g: formData.get("carbs_g"),
+    fat_g: formData.get("fat_g"),
+  });
 
-  if (!isUuid(id) || !name.ok || !quantity.ok || !unit.ok || !location.ok) {
+  if (!isUuid(id) || !name.ok || !quantity.ok || !unit.ok || !location.ok || !category.ok || !nutrition.ok) {
     redirectToError("validation");
   }
 
@@ -79,11 +95,17 @@ function getValidatedBarcodeProductFields(formData: FormData) {
     defaultQuantity: quantity.value,
     defaultUnit: unit.value,
     defaultLocation: location.value,
+    defaultCategory: category.value,
+    nutritionBasis: nutrition.value.nutritionBasis,
+    calories: nutrition.value.calories,
+    proteinG: nutrition.value.proteinG,
+    carbsG: nutrition.value.carbsG,
+    fatG: nutrition.value.fatG,
   };
 }
 
 export async function updateRememberedBarcodeProductAction(formData: FormData) {
-  const { id, name, defaultQuantity, defaultUnit, defaultLocation } = getValidatedBarcodeProductFields(formData);
+  const { id, name, defaultQuantity, defaultUnit, defaultLocation, defaultCategory, nutritionBasis, calories, proteinG, carbsG, fatG } = getValidatedBarcodeProductFields(formData);
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "remembered barcode product update");
 
@@ -94,6 +116,12 @@ export async function updateRememberedBarcodeProductAction(formData: FormData) {
       default_quantity: defaultQuantity,
       default_unit: defaultUnit,
       default_location: defaultLocation,
+      default_category: defaultCategory,
+      nutrition_basis: nutritionBasis,
+      calories,
+      protein_g: proteinG,
+      carbs_g: carbsG,
+      fat_g: fatG,
     })
     .eq("id", id)
     .eq("user_id", user.id)

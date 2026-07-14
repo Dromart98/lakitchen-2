@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { INVENTORY_CATEGORIES, INVENTORY_CATEGORY_LABELS, type InventoryCategory } from "@/modules/inventory/inventory-categories";
+import { INVENTORY_NUTRITION_BASIS_LABELS, NUTRITION_BASES, type InventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
 import { deleteRememberedBarcodeProductAction, updateRememberedBarcodeProductAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +15,12 @@ type RememberedBarcodeProduct = {
   default_quantity: number;
   default_unit: "ud" | "g" | "kg" | "ml" | "l";
   default_location: "pantry" | "fridge" | "freezer" | null;
+  default_category: InventoryCategory;
+  nutrition_basis: InventoryNutritionBasis | null;
+  calories: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -29,7 +37,7 @@ type SupabaseCatalogQueryResult = {
 
 type SupabaseBarcodeCatalogClient = {
   from(table: "user_barcode_products"): {
-    select(columns: "id, barcode, name, default_quantity, default_unit, default_location, created_at, updated_at"): {
+    select(columns: "id, barcode, name, default_quantity, default_unit, default_location, default_category, nutrition_basis, calories, protein_g, carbs_g, fat_g, created_at, updated_at"): {
       eq(column: "user_id", value: string): {
         order(column: "name", options: { ascending: true }): {
           order(column: "barcode", options: { ascending: true }): Promise<SupabaseCatalogQueryResult>;
@@ -68,7 +76,7 @@ export default async function RememberedBarcodeProductsPage({
 
   const { data, error } = await (supabase as unknown as SupabaseBarcodeCatalogClient)
     .from("user_barcode_products")
-    .select("id, barcode, name, default_quantity, default_unit, default_location, created_at, updated_at")
+    .select("id, barcode, name, default_quantity, default_unit, default_location, default_category, nutrition_basis, calories, protein_g, carbs_g, fat_g, created_at, updated_at")
     .eq("user_id", user.id)
     .order("name", { ascending: true })
     .order("barcode", { ascending: true });
@@ -153,6 +161,40 @@ export default async function RememberedBarcodeProductsPage({
                     <option value="fridge">{locationLabels.fridge}</option>
                     <option value="freezer">{locationLabels.freezer}</option>
                   </select>
+                </label>
+
+                <label className="field" htmlFor={`barcode-category-${product.id}`}>
+                  <span>Categoría</span>
+                  <select id={`barcode-category-${product.id}`} name="default_category" required defaultValue={product.default_category}>
+                    {INVENTORY_CATEGORIES.map((category) => (
+                      <option key={category} value={category}>{INVENTORY_CATEGORY_LABELS[category]}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field" htmlFor={`barcode-nutrition-basis-${product.id}`}>
+                  <span>Base nutricional</span>
+                  <select id={`barcode-nutrition-basis-${product.id}`} name="nutrition_basis" defaultValue={product.nutrition_basis ?? ""}>
+                    <option value="">Sin base nutricional</option>
+                    {NUTRITION_BASES.map((basis) => (
+                      <option key={basis} value={basis}>{INVENTORY_NUTRITION_BASIS_LABELS[basis]}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field" htmlFor={`barcode-calories-${product.id}`}>
+                  <span>Calorías</span>
+                  <input id={`barcode-calories-${product.id}`} name="calories" type="number" min="0" step="any" defaultValue={product.calories ?? ""} />
+                </label>
+                <label className="field" htmlFor={`barcode-protein-${product.id}`}>
+                  <span>Proteínas (g)</span>
+                  <input id={`barcode-protein-${product.id}`} name="protein_g" type="number" min="0" step="any" defaultValue={product.protein_g ?? ""} />
+                </label>
+                <label className="field" htmlFor={`barcode-carbs-${product.id}`}>
+                  <span>Carbohidratos (g)</span>
+                  <input id={`barcode-carbs-${product.id}`} name="carbs_g" type="number" min="0" step="any" defaultValue={product.carbs_g ?? ""} />
+                </label>
+                <label className="field" htmlFor={`barcode-fat-${product.id}`}>
+                  <span>Grasas (g)</span>
+                  <input id={`barcode-fat-${product.id}`} name="fat_g" type="number" min="0" step="any" defaultValue={product.fat_g ?? ""} />
                 </label>
                 <button className="button" type="submit">Guardar cambios</button>
               </form>
