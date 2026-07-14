@@ -76,6 +76,33 @@ describe("recipe matching", () => {
     expect(match.ingredientMatches[1].status).toBe("missing");
   });
 
+
+  it("prioritizes required ingredients over optional ingredients when stock is limited", () => {
+    const [match] = matchRecipesToInventory([recipe({ recipe_ingredients: [
+      ingredient({ id: "optional", display_name: "Pollo opcional", is_required: false, sort_order: 1, required_quantity: 100 }),
+      ingredient({ id: "required", display_name: "Pollo obligatorio", is_required: true, sort_order: 2, required_quantity: 100 }),
+    ] })], [{ id: "1", name: "pollo", quantity: 100, unit: "g", expires_at: null }], "2026-07-14");
+
+    expect(match.ingredientMatches.map((item) => item.ingredient.sort_order)).toEqual([1, 2]);
+    expect(match.ingredientMatches[0].status).toBe("insufficient");
+    expect(match.ingredientMatches[1].status).toBe("available");
+    expect(match.canCookNow).toBe(true);
+    expect(match.requiredIngredientCount).toBe(1);
+    expect(match.availableRequiredIngredientCount).toBe(1);
+    expect(match.completionRatio).toBe(1);
+  });
+
+  it("lets optional and required ingredients both use stock when enough remains", () => {
+    const [match] = matchRecipesToInventory([recipe({ recipe_ingredients: [
+      ingredient({ id: "optional", display_name: "Pollo opcional", is_required: false, sort_order: 1, required_quantity: 100 }),
+      ingredient({ id: "required", display_name: "Pollo obligatorio", is_required: true, sort_order: 2, required_quantity: 100 }),
+    ] })], [{ id: "1", name: "pollo", quantity: 200, unit: "g", expires_at: null }], "2026-07-14");
+
+    expect(match.ingredientMatches.map((item) => item.ingredient.sort_order)).toEqual([1, 2]);
+    expect(match.ingredientMatches.map((item) => item.status)).toEqual(["available", "available"]);
+    expect(match.canCookNow).toBe(true);
+  });
+
   it("does not reuse the same stock for two ingredients", () => {
     const [match] = matchRecipesToInventory([recipe({ recipe_ingredients: [ingredient({ id: "a", sort_order: 1 }), ingredient({ id: "b", sort_order: 2 })] })], [{ id: "1", name: "pollo", quantity: 150, unit: "g", expires_at: null }], "2026-07-14");
     expect(match.ingredientMatches.map((item) => item.status)).toEqual(["available", "insufficient"]);

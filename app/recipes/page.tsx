@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
 import {
   filterRecipeMatches,
   matchRecipesToInventory,
@@ -73,7 +74,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
   const user = await requireAuthenticatedUser(supabase, "recipes");
   const resolvedSearchParams = await searchParams;
   const mode = normalizeRecipeFilterMode(resolvedSearchParams?.mode);
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = getCurrentInventoryExpirationDateKey();
 
   const { data: inventoryData, error: inventoryError } = await (supabase as any)
     .from("inventory_items")

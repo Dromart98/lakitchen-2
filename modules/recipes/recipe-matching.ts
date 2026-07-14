@@ -177,7 +177,12 @@ export function matchRecipesToInventory(recipes: RecipeTemplate[], inventory: Re
     });
 
     const ingredients = [...recipe.recipe_ingredients].sort((first, second) => first.sort_order - second.sort_order || first.display_name.localeCompare(second.display_name, "es"));
-    const ingredientMatches = ingredients.map((ingredient) => matchIngredient(ingredient, stock, todayKey));
+    const allocationOrder = [
+      ...ingredients.filter((ingredient) => ingredient.is_required),
+      ...ingredients.filter((ingredient) => !ingredient.is_required),
+    ];
+    const matchesByIngredientId = new Map(allocationOrder.map((ingredient) => [ingredient.id, matchIngredient(ingredient, stock, todayKey)]));
+    const ingredientMatches = ingredients.map((ingredient) => matchesByIngredientId.get(ingredient.id)).filter((match): match is RecipeIngredientMatch => Boolean(match));
     const requiredMatches = ingredientMatches.filter((match) => match.ingredient.is_required);
     const availableRequiredIngredientCount = requiredMatches.filter((match) => match.status === "available").length;
     const requiredIngredientCount = requiredMatches.length;
