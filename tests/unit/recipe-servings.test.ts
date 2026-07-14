@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getMaxCookableRecipeServings, getRecipeServingOptions, scaleRecipeToServings } from "@/modules/recipes/recipe-servings";
-import type { RecipeIngredient, RecipeInventoryItem, RecipeTemplate } from "@/modules/recipes/recipe-matching";
+import { buildRecipeMealName, buildRecipeMatchWithServingOptions, filterRecipeMatchesWithServingOptions, getMaxCookableRecipeServings, getMaxUrgentItemCountForCookableServings, getRecipeServingOptions, scaleRecipeToServings } from "@/modules/recipes/recipe-servings";
+import { matchRecipesToInventory, type RecipeIngredient, type RecipeInventoryItem, type RecipeTemplate } from "@/modules/recipes/recipe-matching";
 
 function ingredient(overrides: Partial<RecipeIngredient> = {}): RecipeIngredient {
   return {
@@ -191,5 +191,110 @@ describe("getRecipeServingOptions", () => {
 
     expect(options.map((option) => option.nutrition?.total?.calories)).toEqual([100, 300, 500, 700]);
     expect(options.map((option) => option.nutrition?.total?.proteinG)).toEqual([10, 30, 50, 70]);
+  });
+});
+
+
+describe("partial serving filters", () => {
+  function enriched(recipeOverrides: Partial<RecipeTemplate>, inventoryItems: RecipeInventoryItem[]) {
+    const targetRecipe = recipe(recipeOverrides);
+    const [fullMatch] = matchRecipesToInventory([targetRecipe], inventoryItems, "2026-07-14");
+    return buildRecipeMatchWithServingOptions(fullMatch, inventoryItems, "2026-07-14");
+  }
+
+  it("includes a 4-serving recipe with inventory for 2 in available even when the full match is not cookable", () => {
+    const item = enriched({}, [inventory({ quantity: 200 })]);
+
+    expect(item.match.canCookNow).toBe(false);
+    expect(item.maxCookableServings).toBe(2);
+    expect(filterRecipeMatchesWithServingOptions([item], "available")).toEqual([item]);
+  });
+
+  it("includes a partially cookable quick recipe when prep time is at most 15 minutes", () => {
+    const item = enriched({ prep_minutes: 15 }, [inventory({ quantity: 200 })]);
+
+    expect(filterRecipeMatchesWithServingOptions([item], "quick")).toEqual([item]);
+  });
+
+  it("excludes a partially cookable recipe from quick when prep time is above 15 minutes", () => {
+    const item = enriched({ prep_minutes: 16 }, [inventory({ quantity: 200 })]);
+
+    expect(filterRecipeMatchesWithServingOptions([item], "quick")).toEqual([]);
+  });
+
+  it("includes a recipe in urgent when a cookable partial serving uses an urgent lot", () => {
+    const item = enriched({}, [inventory({ quantity: 200, expires_at: "2026-07-15" })]);
+
+    expect(item.servingOptions.some((option) => option.canCookNow && option.urgentItemCount > 0)).toBe(true);
+    expect(filterRecipeMatchesWithServingOptions([item], "urgent")).toEqual([item]);
+    expect(getMaxUrgentItemCountForCookableServings(item.servingOptions)).toBe(1);
+  });
+
+  it("excludes a recipe from urgent when no cookable partial serving uses urgent products", () => {
+    const item = enriched({}, [inventory({ quantity: 200, expires_at: "2026-08-01" })]);
+
+    expect(filterRecipeMatchesWithServingOptions([item], "urgent")).toEqual([]);
+    expect(getMaxUrgentItemCountForCookableServings(item.servingOptions)).toBe(0);
+  });
+
+  it("keeps uncookable recipes only in all", () => {
+    const item = enriched({}, [inventory({ quantity: 99 })]);
+
+    expect(filterRecipeMatchesWithServingOptions([item], "all")).toEqual([item]);
+    expect(filterRecipeMatchesWithServingOptions([item], "available")).toEqual([]);
+    expect(filterRecipeMatchesWithServingOptions([item], "quick")).toEqual([]);
+    expect(filterRecipeMatchesWithServingOptions([item], "urgent")).toEqual([]);
+  });
+
+  it("does not require complete nutrition for available, quick, or urgent filters", () => {
+    const item = enriched({ prep_minutes: 10 }, [inventory({ quantity: 200, expires_at: "2026-07-15", nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null })]);
+
+    expect(item.servingOptions.some((option) => option.canCookNow && !option.canLog)).toBe(true);
+    expect(filterRecipeMatchesWithServingOptions([item], "available")).toEqual([item]);
+    expect(filterRecipeMatchesWithServingOptions([item], "quick")).toEqual([item]);
+    expect(filterRecipeMatchesWithServingOptions([item], "urgent")).toEqual([item]);
+    expect(item.loggableServingOptions).toEqual([]);
+  });
+});
+
+describe("buildRecipeMealName", () => {
+  it("keeps a short title with one serving", () => {
+    expect(buildRecipeMealName("Pollo con arroz", 1)).toBe("Pollo con arroz · 1 ración");
+  });
+
+  it("keeps a short title with several servings", () => {
+    expect(buildRecipeMealName("Pollo con arroz", 4)).toBe("Pollo con arroz · 4 raciones");
+  });
+
+  it("truncates a 120-character title and preserves the full suffix", () => {
+    const result = buildRecipeMealName("a".repeat(120), 4);
+
+    expect(Array.from(result)).toHaveLength(120);
+    expect(result.endsWith(" · 4 raciones")).toBe(true);
+  });
+
+  it("trims trailing spaces from a truncated or padded title before the separator", () => {
+    expect(buildRecipeMealName("Pollo con arroz   ", 1)).toBe("Pollo con arroz · 1 ración");
+  });
+
+  it("does not split Unicode surrogate pairs while enforcing the max length", () => {
+    const result = buildRecipeMealName("🍅".repeat(120), 4);
+
+    expect(Array.from(result)).toHaveLength(120);
+    expect(result.endsWith(" · 4 raciones")).toBe(true);
+    expect(result).not.toContain("�");
+  });
+
+  it.each([0, -1, 1.5, Number.NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])("uses a deterministic safe suffix for invalid servings: %s", (servings) => {
+    const result = buildRecipeMealName("Pollo", servings);
+
+    expect(result).toBe("Pollo · 1 ración");
+    expect(Array.from(result).length).toBeLessThanOrEqual(120);
+  });
+
+  it("does not truncate when the title plus suffix fit within the limit", () => {
+    const title = "a".repeat(120 - Array.from(" · 4 raciones").length);
+
+    expect(buildRecipeMealName(title, 4)).toBe(`${title} · 4 raciones`);
   });
 });

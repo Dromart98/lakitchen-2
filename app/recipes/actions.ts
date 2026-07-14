@@ -16,7 +16,7 @@ import {
   type RecipeTemplate,
 } from "@/modules/recipes/recipe-matching";
 import { estimateRecipeNutrition } from "@/modules/recipes/recipe-nutrition";
-import { scaleRecipeToServings } from "@/modules/recipes/recipe-servings";
+import { buildRecipeMealName, scaleRecipeToServings } from "@/modules/recipes/recipe-servings";
 
 const RECIPES_PATH = "/recipes";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -132,7 +132,7 @@ export async function cookRecipeAndLogMealAction(formData: FormData) {
   }
 
   const { error: consumeError } = await recipeClient.rpc("consume_meal_builder_items_and_log_meal", {
-    p_meal_name: `${match.recipe.title} · ${requestedServings} ${requestedServings === 1 ? "ración" : "raciones"}`,
+    p_meal_name: buildRecipeMealName(match.recipe.title, requestedServings),
     p_meal_type: mealType,
     p_lines: consumptionLines.lines,
   }) as { data: string | null; error: { code?: string; message: string } | null };

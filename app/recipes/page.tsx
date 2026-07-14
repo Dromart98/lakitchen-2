@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
 import { MEAL_TYPE_LABELS, MEAL_TYPES } from "@/modules/meals/meal-types";
 import {
-  filterRecipeMatches,
   matchRecipesToInventory,
   normalizeRecipeFilterMode,
   sortRecipeMatches,
@@ -16,7 +15,7 @@ import {
   type RecipeTemplate,
 } from "@/modules/recipes/recipe-matching";
 import type { RecipeNutritionEstimate } from "@/modules/recipes/recipe-nutrition";
-import { getRecipeServingOptions } from "@/modules/recipes/recipe-servings";
+import { buildRecipeMatchWithServingOptions, filterRecipeMatchesWithServingOptions, getMaxUrgentItemCountForCookableServings } from "@/modules/recipes/recipe-servings";
 
 export const dynamic = "force-dynamic";
 
@@ -125,7 +124,9 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
 
   const inventoryItems = inventoryError ? [] : inventoryData ?? [];
   const recipes = (recipeError ? [] : recipeData ?? []).map(toRecipeTemplate).filter((recipe): recipe is RecipeTemplate => Boolean(recipe));
-  const matches = filterRecipeMatches(sortRecipeMatches(matchRecipesToInventory(recipes, inventoryItems, todayKey)), mode);
+  const recipeMatchesWithServingOptions = sortRecipeMatches(matchRecipesToInventory(recipes, inventoryItems, todayKey))
+    .map((match) => buildRecipeMatchWithServingOptions(match, inventoryItems, todayKey));
+  const matches = filterRecipeMatchesWithServingOptions(recipeMatchesWithServingOptions, mode);
 
   return (
     <main className="container">
@@ -158,11 +159,9 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
       ) : null}
 
       <section className="grid cards" style={{ marginTop: 16 }}>
-        {matches.map((match) => {
-          const servingOptions = getRecipeServingOptions(match.recipe, inventoryItems, todayKey);
-          const maxCookableServings = servingOptions.reduce((maxServings, option) => (option.canCookNow ? option.servings : maxServings), 0);
-          const loggableServingOptions = servingOptions.filter((option) => option.canLog && option.nutrition?.total);
+        {matches.map(({ match, servingOptions, maxCookableServings, loggableServingOptions }) => {
           const hasCookableButUnloggableServings = servingOptions.some((option) => option.canCookNow && !option.canLog);
+          const urgentItemCount = getMaxUrgentItemCountForCookableServings(servingOptions);
 
           return (
           <article className="card" key={match.recipe.id}>
@@ -173,7 +172,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
             {maxCookableServings > 0 ? (
               <p>Puedes preparar hasta {maxCookableServings} de {match.recipe.servings} ración{match.recipe.servings === 1 ? "" : "es"}.</p>
             ) : null}
-            {match.urgentItemCount > 0 ? <p>Usa pronto {match.urgentItemCount} producto{match.urgentItemCount === 1 ? "" : "s"}.</p> : null}
+            {urgentItemCount > 0 ? <p>Usa pronto {urgentItemCount} producto{urgentItemCount === 1 ? "" : "s"}.</p> : null}
             {match.recipe.prep_minutes <= 15 ? <p>Lista en 15 minutos.</p> : null}
 
             {loggableServingOptions.length > 0 ? (
