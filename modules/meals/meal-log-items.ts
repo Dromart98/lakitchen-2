@@ -12,9 +12,28 @@ export type MealLogItemRecord = {
   fat_g: number | string | null;
 };
 
+export type MealHistoryRepeatMode = "composer" | "direct" | "none";
+
+export type MealHistoryRepeatModeInput = {
+  hasSnapshots: boolean;
+  isPastMeal: boolean;
+  snapshotsLoadedSuccessfully: boolean;
+};
+
 const NUMBER_FORMATTER = new Intl.NumberFormat("es-ES", {
   maximumFractionDigits: 1,
 });
+
+export function getMealHistoryRepeatMode({
+  hasSnapshots,
+  isPastMeal,
+  snapshotsLoadedSuccessfully,
+}: MealHistoryRepeatModeInput): MealHistoryRepeatMode {
+  if (!snapshotsLoadedSuccessfully) return "none";
+  if (hasSnapshots) return "composer";
+  if (isPastMeal) return "direct";
+  return "none";
+}
 
 export function formatMealLogItemNutritionValue(value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === "") return "—";

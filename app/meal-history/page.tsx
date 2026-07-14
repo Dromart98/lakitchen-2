@@ -11,7 +11,12 @@ import {
   isPastMealHistoryDate,
   resolveMealHistoryDate,
 } from "@/modules/meals/meal-date";
-import { formatMealLogItemNutritionValue, sortMealLogItems, type MealLogItemRecord } from "@/modules/meals/meal-log-items";
+import {
+  formatMealLogItemNutritionValue,
+  getMealHistoryRepeatMode,
+  sortMealLogItems,
+  type MealLogItemRecord,
+} from "@/modules/meals/meal-log-items";
 import { sumMacros } from "@/modules/meals/meal-summary";
 import { MEAL_TYPE_LABELS, MEAL_TYPES, normalizeMealType } from "@/modules/meals/meal-types";
 
@@ -57,7 +62,7 @@ export default async function MealHistoryPage({ searchParams }: { searchParams?:
   const nextDate = getNextUtcDate(selectedDate);
   const nextHrefDate = nextDate > today ? today : nextDate;
   const mealErrorMessage = getMealErrorMessage(resolvedSearchParams?.mealError);
-  const canRepeatMeals = isPastMealHistoryDate(selectedDate, today);
+  const isPastMeal = isPastMealHistoryDate(selectedDate, today);
 
   const { data: mealLogs, error: mealLogsError } = await (supabase as any)
     .from("daily_meal_logs")
@@ -158,46 +163,60 @@ export default async function MealHistoryPage({ searchParams }: { searchParams?:
                 <div className="card" key={group.mealType}>
                   <h2>{group.label}</h2>
                   <ul>
-                    {group.meals.map((meal) => (
-                      <li key={meal.id}>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                          <span>
-                            <strong>{meal.name}</strong> · {meal.calories} kcal · P {meal.protein_g}g · C {meal.carbs_g}g · G {meal.fat_g}g
-                          </span>
-                          {canRepeatMeals ? (
-                            <form action={repeatMealLogTodayAction}>
-                              <input type="hidden" name="id" value={meal.id} />
-                              <input
-                                type="hidden"
-                                name="source_date"
-                                value={selectedDate}
-                              />
-                              <button className="button" type="submit">
-                                Repetir hoy
-                              </button>
-                            </form>
-                          ) : null}
-                        </div>
-                        {mealItemsByMealId.get(meal.id)?.length ? (
-                          <div style={{ marginTop: 8, marginLeft: 12 }}>
-                            <p className="muted" style={{ margin: "0 0 4px" }}><strong>Ingredientes utilizados</strong></p>
-                            <ul style={{ margin: 0, paddingLeft: 16 }}>
-                              {sortMealLogItems(mealItemsByMealId.get(meal.id) ?? []).map((item) => (
-                                <li key={item.id} className="muted" style={{ marginTop: 4 }}>
-                                  <span>
-                                    <strong>{item.product_name}</strong> — {formatMealLogItemNutritionValue(item.consumed_quantity)} {item.unit}
-                                  </span>
-                                  <br />
-                                  <span>
-                                    {formatMealLogItemNutritionValue(item.calories)} kcal · P {formatMealLogItemNutritionValue(item.protein_g)} g · C {formatMealLogItemNutritionValue(item.carbs_g)} g · G {formatMealLogItemNutritionValue(item.fat_g)} g
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
+                    {group.meals.map((meal) => {
+                      const mealItems = mealItemsByMealId.get(meal.id) ?? [];
+                      const repeatMode = getMealHistoryRepeatMode({
+                        snapshotsLoadedSuccessfully: !mealItemsError,
+                        hasSnapshots: mealItems.length > 0,
+                        isPastMeal,
+                      });
+
+                      return (
+                        <li key={meal.id}>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                            <span>
+                              <strong>{meal.name}</strong> · {meal.calories} kcal · P {meal.protein_g}g · C {meal.carbs_g}g · G {meal.fat_g}g
+                            </span>
+                            {repeatMode === "composer" ? (
+                              <Link className="button" href={`/meal-builder?repeatMeal=${meal.id}`}>
+                                Repetir en el compositor
+                              </Link>
+                            ) : null}
+                            {repeatMode === "direct" ? (
+                              <form action={repeatMealLogTodayAction}>
+                                <input type="hidden" name="id" value={meal.id} />
+                                <input
+                                  type="hidden"
+                                  name="source_date"
+                                  value={selectedDate}
+                                />
+                                <button className="button" type="submit">
+                                  Repetir hoy
+                                </button>
+                              </form>
+                            ) : null}
                           </div>
-                        ) : null}
-                      </li>
-                    ))}
+                          {mealItems.length ? (
+                            <div style={{ marginTop: 8, marginLeft: 12 }}>
+                              <p className="muted" style={{ margin: "0 0 4px" }}><strong>Ingredientes utilizados</strong></p>
+                              <ul style={{ margin: 0, paddingLeft: 16 }}>
+                                {sortMealLogItems(mealItems).map((item) => (
+                                  <li key={item.id} className="muted" style={{ marginTop: 4 }}>
+                                    <span>
+                                      <strong>{item.product_name}</strong> — {formatMealLogItemNutritionValue(item.consumed_quantity)} {item.unit}
+                                    </span>
+                                    <br />
+                                    <span>
+                                      {formatMealLogItemNutritionValue(item.calories)} kcal · P {formatMealLogItemNutritionValue(item.protein_g)} g · C {formatMealLogItemNutritionValue(item.carbs_g)} g · G {formatMealLogItemNutritionValue(item.fat_g)} g
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               ))}
