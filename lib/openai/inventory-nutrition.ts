@@ -52,7 +52,7 @@ export function extractInventoryNutritionAiOutputText(responseBody: unknown):
   if (!isRecord(responseBody)) return { status: "invalid-ai-response" };
 
   const root = responseBody as OpenAiResponseObject;
-  if (root.error !== undefined) return { status: "provider-error" };
+  if (root.error !== undefined && root.error !== null) return { status: "provider-error" };
   if (root.status === "incomplete") return { status: "invalid-ai-response" };
   if (root.status !== "completed") return { status: "invalid-ai-response" };
 
