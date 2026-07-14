@@ -32,7 +32,7 @@ function isInventoryUnit(value: string): value is InventoryUnit {
 
 type BarcodeProductLookupResult =
   | { status: "invalid"; message: string }
-  | { status: "found"; product: { barcode: string; name: string; default_quantity: number; default_unit: InventoryUnit; default_location: InventoryLocation | null } }
+  | { status: "found"; product: { barcode: string; name: string; default_quantity: number; default_unit: InventoryUnit; default_location: InventoryLocation | null; category: string; nutrition_basis?: string; calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null } }
   | { status: "unknown"; barcode: string; message: string }
   | { status: "error"; message: string };
 
@@ -48,11 +48,11 @@ export async function lookupBarcodeProductAction(rawBarcode: string): Promise<Ba
 
   const { data, error } = await (supabase as any)
     .from("user_barcode_products")
-    .select("barcode, name, default_quantity, default_unit, default_location")
+    .select("barcode, name, default_quantity, default_unit, default_location, default_category, nutrition_basis, calories, protein_g, carbs_g, fat_g")
     .eq("user_id", user.id)
     .eq("barcode", validation.barcode)
     .maybeSingle() as {
-      data: { barcode: string; name: string; default_quantity: number; default_unit: InventoryUnit; default_location: InventoryLocation | null } | null;
+      data: { barcode: string; name: string; default_quantity: number; default_unit: InventoryUnit; default_location: InventoryLocation | null; default_category: string; nutrition_basis?: string; calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null } | null;
       error: { message: string } | null;
     };
 
@@ -65,7 +65,22 @@ export async function lookupBarcodeProductAction(rawBarcode: string): Promise<Ba
     return { status: "unknown", barcode: validation.barcode, message: "Este código no está guardado todavía. Completa los datos manualmente." };
   }
 
-  return { status: "found", product: data };
+  return {
+    status: "found",
+    product: {
+      barcode: data.barcode,
+      name: data.name,
+      default_quantity: data.default_quantity,
+      default_unit: data.default_unit,
+      default_location: data.default_location,
+      category: data.default_category,
+      nutrition_basis: data.nutrition_basis ?? undefined,
+      calories: data.calories,
+      protein_g: data.protein_g,
+      carbs_g: data.carbs_g,
+      fat_g: data.fat_g,
+    },
+  };
 }
 
 function isUuid(value: string) {
@@ -186,6 +201,12 @@ export async function addInventoryItemAction(formData: FormData) {
         default_quantity: quantity,
         default_unit: unit,
         default_location: location,
+        default_category: category,
+        nutrition_basis: nutritionBasis,
+        calories,
+        protein_g: proteinG,
+        carbs_g: carbsG,
+        fat_g: fatG,
       }, { onConflict: "user_id,barcode" })
       .select("id")
       .maybeSingle() as { data: { id: string } | null; error: { message: string } | null };
