@@ -8,7 +8,6 @@ import type { lookupBarcodeProductAction } from "./actions";
 type BarcodeLookupAction = typeof lookupBarcodeProductAction;
 
 type BarcodeDetectorBarcode = { rawValue: string };
-
 type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => {
   detect(source: HTMLVideoElement): Promise<BarcodeDetectorBarcode[]>;
 };
@@ -28,8 +27,38 @@ type BarcodeAutofillState = {
   fields: AutofillFieldState[];
 };
 
+type ExternalBarcodeProduct = {
+  barcode: string;
+  name: string;
+  default_quantity: number;
+  default_unit: "ud" | "g" | "kg" | "ml" | "l";
+  default_location: "pantry" | "fridge" | "freezer" | null;
+  category?: string;
+  nutrition_basis?: string;
+  calories?: number | null;
+  protein_g?: number | null;
+  carbs_g?: number | null;
+  fat_g?: number | null;
+};
+
+type ExternalLookupResult =
+  | { status: "found"; source: "open-food-facts"; product: ExternalBarcodeProduct }
+  | { status: "unknown"; barcode: string }
+  | { status: "invalid" | "error"; message: string };
+
 const unsupportedScannerMessage = "Tu navegador no permite escanear directamente. Introduce el código manualmente.";
-const autofillFieldIds = ["inventory-name", "inventory-quantity", "inventory-unit", "inventory-location"] as const;
+const autofillFieldIds = [
+  "inventory-name",
+  "inventory-quantity",
+  "inventory-unit",
+  "inventory-location",
+  "inventory-category",
+  "inventory-nutrition-basis",
+  "inventory-calories",
+  "inventory-protein",
+  "inventory-carbs",
+  "inventory-fat",
+] as const;
 
 function getInputElement(id: string): HTMLInputElement | HTMLSelectElement | null {
   return document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
@@ -39,9 +68,9 @@ function getInputValue(id: string): string {
   return getInputElement(id)?.value ?? "";
 }
 
-function setInputValue(id: string, value: string | number | null) {
+function setInputValue(id: string, value: string | number | null | undefined) {
   const element = getInputElement(id);
-  if (!element || value === null) return;
+  if (!element || value === null || value === undefined) return;
 
   element.value = String(value);
   element.dispatchEvent(new Event("input", { bubbles: true }));
@@ -53,9 +82,27 @@ function getBarcodeDetector(): BarcodeDetectorConstructor | null {
   return (window as Window & { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector ?? null;
 }
 
+function getAutofillValues(product: ExternalBarcodeProduct): Record<(typeof autofillFieldIds)[number], string> {
+  const hasNutrition = [product.calories, product.protein_g, product.carbs_g, product.fat_g]
+    .some((value) => value !== null && value !== undefined);
+
+  return {
+    "inventory-name": product.name,
+    "inventory-quantity": String(product.default_quantity),
+    "inventory-unit": product.default_unit,
+    "inventory-location": product.default_location ?? "",
+    "inventory-category": product.category ?? "",
+    "inventory-nutrition-basis": hasNutrition ? product.nutrition_basis ?? "per_100g" : "",
+    "inventory-calories": product.calories === null || product.calories === undefined ? "" : String(product.calories),
+    "inventory-protein": product.protein_g === null || product.protein_g === undefined ? "" : String(product.protein_g),
+    "inventory-carbs": product.carbs_g === null || product.carbs_g === undefined ? "" : String(product.carbs_g),
+    "inventory-fat": product.fat_g === null || product.fat_g === undefined ? "" : String(product.fat_g),
+  };
+}
+
 export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsProps) {
   const [barcode, setBarcode] = useState("");
-  const [message, setMessage] = useState("Introduce o escanea un código para buscarlo en tu catálogo personal.");
+  const [message, setMessage] = useState("Introduce o escanea un código para buscarlo en tu catálogo personal y en Open Food Facts.");
   const [isPending, startTransition] = useTransition();
   const [isScanning, setIsScanning] = useState(false);
   const [scannerError, setScannerError] = useState<string | null>(null);
@@ -70,12 +117,30 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
     if (!previousAutofill) return;
 
     previousAutofill.fields.forEach((field) => {
-      setInputValue(
-        field.id,
-        getRestoredBarcodeAutofillValue(getInputValue(field.id), field.appliedValue, field.previousValue),
-      );
+      setInputValue(field.id, getRestoredBarcodeAutofillValue(getInputValue(field.id), field.appliedValue, field.previousValue));
     });
     lastAutofillRef.current = null;
+  }
+
+  function applyProduct(product: ExternalBarcodeProduct, source: "personal" | "open-food-facts") {
+    clearPreviousAutofill();
+    const appliedValues = getAutofillValues(product);
+
+    lastAutofillRef.current = {
+      barcode: product.barcode,
+      fields: autofillFieldIds.map((id) => ({
+        id,
+        appliedValue: appliedValues[id],
+        previousValue: getInputValue(id),
+      })),
+    };
+
+    autofillFieldIds.forEach((id) => setInputValue(id, appliedValues[id]));
+    setMessage(
+      source === "personal"
+        ? "Producto encontrado en tu catálogo. Revisa los datos antes de añadirlo."
+        : "Producto encontrado en Open Food Facts. Revisa y corrige los datos antes de añadirlo.",
+    );
   }
 
   function stopScanner() {
@@ -90,9 +155,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
     setIsScanning(false);
   }
 
-  useEffect(() => {
-    return () => stopScanner();
-  }, []);
+  useEffect(() => () => stopScanner(), []);
 
   function updateBarcode(nextBarcode: string) {
     clearPreviousAutofill();
@@ -108,13 +171,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
     if (isScanning || scanningRef.current) return;
 
     const BarcodeDetector = getBarcodeDetector();
-    if (!BarcodeDetector) {
-      setScannerError(unsupportedScannerMessage);
-      setMessage(unsupportedScannerMessage);
-      return;
-    }
-
-    if (!navigator.mediaDevices?.getUserMedia) {
+    if (!BarcodeDetector || !navigator.mediaDevices?.getUserMedia) {
       setScannerError(unsupportedScannerMessage);
       setMessage(unsupportedScannerMessage);
       return;
@@ -168,54 +225,47 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
     }
   }
 
+  async function lookupOpenFoodFacts(normalized: string): Promise<ExternalLookupResult> {
+    const response = await fetch(`/api/barcodes/${encodeURIComponent(normalized)}`, { cache: "no-store" });
+    const result = await response.json() as ExternalLookupResult;
+    return result;
+  }
+
   function searchBarcode() {
     const normalized = normalizeBarcodeInput(barcode);
     setBarcode(normalized);
     setInputValue("inventory-barcode", normalized);
-    setMessage("Buscando producto...");
+    setMessage("Buscando primero en tu catálogo personal...");
 
     startTransition(async () => {
       try {
-        const result = await lookupAction(normalized);
+        const personalResult = await lookupAction(normalized);
 
-        if (result.status === "invalid") {
+        if (personalResult.status === "invalid") {
           clearPreviousAutofill();
-          setMessage(result.message);
+          setMessage(personalResult.message);
           return;
         }
 
-        if (result.status === "error") {
-          clearPreviousAutofill();
-          setMessage(result.message);
+        if (personalResult.status === "found") {
+          applyProduct(personalResult.product, "personal");
           return;
         }
 
-        if (result.status === "unknown") {
-          clearPreviousAutofill();
-          setMessage(result.message);
+        setMessage("No está en tu catálogo. Buscando en Open Food Facts...");
+        const externalResult = await lookupOpenFoodFacts(normalized);
+
+        if (externalResult.status === "found") {
+          applyProduct(externalResult.product, "open-food-facts");
           return;
         }
 
         clearPreviousAutofill();
-        const appliedValues = {
-          "inventory-name": result.product.name,
-          "inventory-quantity": String(result.product.default_quantity),
-          "inventory-unit": result.product.default_unit,
-          "inventory-location": result.product.default_location ?? "",
-        };
-        lastAutofillRef.current = {
-          barcode: result.product.barcode,
-          fields: autofillFieldIds.map((id) => ({
-            id,
-            appliedValue: appliedValues[id],
-            previousValue: getInputValue(id),
-          })),
-        };
-        setInputValue("inventory-name", result.product.name);
-        setInputValue("inventory-quantity", result.product.default_quantity);
-        setInputValue("inventory-unit", result.product.default_unit);
-        setInputValue("inventory-location", result.product.default_location);
-        setMessage("Producto encontrado. Revisa los datos antes de añadirlo al inventario.");
+        setMessage(
+          externalResult.status === "unknown"
+            ? "No encontramos este código. Completa los datos manualmente y marca la opción de recordarlo."
+            : externalResult.message,
+        );
       } catch {
         clearPreviousAutofill();
         setMessage("No se pudo buscar el código. Inténtalo de nuevo.");
