@@ -39,20 +39,19 @@ type OpenAiResponseObject = {
   output_text?: unknown;
 };
 
+type InvalidExtractionReason =
+  | "response-not-object"
+  | "response-incomplete-max-output-tokens"
+  | "response-incomplete-content-filter"
+  | "response-incomplete-other"
+  | "response-status"
+  | "response-output-missing"
+  | "response-refusal";
+
 type ExtractionResult =
   | { status: "success"; text: string }
   | { status: "provider-error"; reason: "response-error" }
-  | {
-      status: "invalid-ai-response";
-      reason:
-        | "response-not-object"
-        | "response-incomplete-max-output-tokens"
-        | "response-incomplete-content-filter"
-        | "response-incomplete-other"
-        | "response-status"
-        | "response-output-missing"
-        | "response-refusal";
-    };
+  | { status: "invalid-ai-response"; reason: InvalidExtractionReason };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -62,7 +61,7 @@ function getNonEmptyString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
-function getIncompleteReason(value: unknown): ExtractionResult["reason"] {
+function getIncompleteReason(value: unknown): InvalidExtractionReason {
   if (!isRecord(value)) return "response-incomplete-other";
   if (value.reason === "max_output_tokens") return "response-incomplete-max-output-tokens";
   if (value.reason === "content_filter") return "response-incomplete-content-filter";
