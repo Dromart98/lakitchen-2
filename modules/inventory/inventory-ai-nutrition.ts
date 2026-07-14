@@ -226,12 +226,7 @@ export function validateInventoryNutritionAiOutput(
   if (!parsed.success) return { status: "invalid", reason: "schema" };
 
   const output = parsed.data;
-  const normalizedFoodName = output.normalized_food_name.trim();
   const explicitFoodState = detectExplicitInventoryFoodState(input.name);
-
-  if (normalizedFoodName.length < 2 || normalizedFoodName.length > 120) {
-    return { status: "invalid", reason: "normalized-food-name" };
-  }
 
   if (output.status === "needs_clarification") {
     const clarification = output.clarification?.trim() ?? "";
@@ -243,6 +238,12 @@ export function validateInventoryNutritionAiOutput(
 
     if (!clarification || !hasNoNutrition) return { status: "invalid", reason: "needs-clarification" };
     return { status: "needs-clarification", message: clarification };
+  }
+
+  const normalizedFoodName = output.normalized_food_name.trim();
+
+  if (normalizedFoodName.length < 2 || normalizedFoodName.length > 120) {
+    return { status: "invalid", reason: "normalized-food-name" };
   }
 
   if (explicitFoodState && output.food_state !== explicitFoodState) {

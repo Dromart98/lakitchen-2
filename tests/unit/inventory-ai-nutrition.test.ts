@@ -109,12 +109,12 @@ describe("validateInventoryNutritionAiOutput", () => {
     expect(validateInventoryNutritionAiOutput(input, { ...validOutput, food_state: "processed", normalized_food_name: "Atún en conserva" }).status).toBe("success");
   });
 
-  it("rejects empty normalized food name", () => {
-    expect(validateInventoryNutritionAiOutput(validInput, { ...validOutput, normalized_food_name: " " })).toEqual({ status: "invalid", reason: "normalized-food-name" });
+  it.each(["", " ", "a", "a".repeat(121)])("rejects estimated output with invalid normalized food name %#", (normalizedFoodName) => {
+    expect(validateInventoryNutritionAiOutput(validInput, { ...validOutput, normalized_food_name: normalizedFoodName })).toEqual({ status: "invalid", reason: "normalized-food-name" });
   });
 
-  it("rejects overlong normalized food name", () => {
-    expect(validateInventoryNutritionAiOutput(validInput, { ...validOutput, normalized_food_name: "a".repeat(121) })).toEqual({ status: "invalid", reason: "normalized-food-name" });
+  it("accepts estimated output with a valid normalized food name", () => {
+    expect(validateInventoryNutritionAiOutput(validInput, { ...validOutput, normalized_food_name: "Pi" }).status).toBe("success");
   });
 
   it.each([
@@ -133,12 +133,68 @@ describe("validateInventoryNutritionAiOutput", () => {
     expect(validateInventoryNutritionAiOutput(validInput, output).status).toBe("invalid");
   });
 
-  it("accepts coherent needs_clarification", () => {
-    expect(validateInventoryNutritionAiOutput(validInput, { status: "needs_clarification", nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null, confidence: "low", food_state: "unknown", normalized_food_name: "Plato ambiguo", assumptions: "", clarification: "Describe el plato." })).toEqual({ status: "needs-clarification", message: "Describe el plato." });
+  it.each(["", "   ", "Plato ambiguo"])("accepts coherent needs_clarification with normalized food name %#", (normalizedFoodName) => {
+    expect(validateInventoryNutritionAiOutput(validInput, {
+      status: "needs_clarification",
+      nutrition_basis: null,
+      calories: null,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+      confidence: "low",
+      food_state: "unknown",
+      normalized_food_name: normalizedFoodName,
+      assumptions: "",
+      clarification: "Describe el plato.",
+    })).toEqual({ status: "needs-clarification", message: "Describe el plato." });
   });
 
-  it("rejects needs_clarification with macros present", () => {
-    expect(validateInventoryNutritionAiOutput(validInput, { ...validOutput, status: "needs_clarification", clarification: "Aclara." }).status).toBe("invalid");
+  it("rejects needs_clarification with empty clarification", () => {
+    expect(validateInventoryNutritionAiOutput(validInput, {
+      status: "needs_clarification",
+      nutrition_basis: null,
+      calories: null,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+      confidence: "low",
+      food_state: "unknown",
+      normalized_food_name: "",
+      assumptions: "",
+      clarification: "   ",
+    })).toEqual({ status: "invalid", reason: "needs-clarification" });
+  });
+
+  it("rejects needs_clarification with calories present", () => {
+    expect(validateInventoryNutritionAiOutput(validInput, {
+      status: "needs_clarification",
+      nutrition_basis: null,
+      calories: 1,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+      confidence: "low",
+      food_state: "unknown",
+      normalized_food_name: "",
+      assumptions: "",
+      clarification: "Aclara.",
+    })).toEqual({ status: "invalid", reason: "needs-clarification" });
+  });
+
+  it("rejects needs_clarification with a macro present", () => {
+    expect(validateInventoryNutritionAiOutput(validInput, {
+      status: "needs_clarification",
+      nutrition_basis: null,
+      calories: null,
+      protein_g: 1,
+      carbs_g: null,
+      fat_g: null,
+      confidence: "low",
+      food_state: "unknown",
+      normalized_food_name: "",
+      assumptions: "",
+      clarification: "Aclara.",
+    })).toEqual({ status: "invalid", reason: "needs-clarification" });
   });
 });
 
