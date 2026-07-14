@@ -63,10 +63,18 @@ export type InventoryNutritionAiEstimate = {
   assumptions: string;
 };
 
+export type InventoryNutritionAiValidationFailureReason =
+  | "schema"
+  | "needs-clarification"
+  | "basis"
+  | "assumptions"
+  | "values"
+  | "limits";
+
 export type InventoryNutritionAiValidationResult =
   | { status: "success"; estimate: InventoryNutritionAiEstimate }
   | { status: "needs-clarification"; message: string }
-  | { status: "invalid" };
+  | { status: "invalid"; reason: InventoryNutritionAiValidationFailureReason };
 
 export const InventoryNutritionAiInputSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -125,7 +133,7 @@ export function validateInventoryNutritionAiOutput(
   rawOutput: unknown,
 ): InventoryNutritionAiValidationResult {
   const parsed = InventoryNutritionAiOutputSchema.safeParse(rawOutput);
-  if (!parsed.success) return { status: "invalid" };
+  if (!parsed.success) return { status: "invalid", reason: "schema" };
 
   const output = parsed.data;
 
@@ -137,20 +145,23 @@ export function validateInventoryNutritionAiOutput(
       && output.carbs_g === null
       && output.fat_g === null;
 
-    if (!clarification || !hasNoNutrition) return { status: "invalid" };
+    if (!clarification || !hasNoNutrition) return { status: "invalid", reason: "needs-clarification" };
     return { status: "needs-clarification", message: clarification };
   }
 
-  if (!isCompatibleInventoryNutritionAiBasis(input.unit, output.nutrition_basis)) return { status: "invalid" };
-  if (output.clarification !== null) return { status: "invalid" };
-  if (!output.assumptions.trim()) return { status: "invalid" };
+  if (!isCompatibleInventoryNutritionAiBasis(input.unit, output.nutrition_basis)) {
+    return { status: "invalid", reason: "basis" };
+  }
+
+  if (!output.assumptions.trim()) return { status: "invalid", reason: "assumptions" };
 
   const hasCompleteValues = hasFiniteNonNegativeNumber(output.calories)
     && hasFiniteNonNegativeNumber(output.protein_g)
     && hasFiniteNonNegativeNumber(output.carbs_g)
     && hasFiniteNonNegativeNumber(output.fat_g);
 
-  if (!hasCompleteValues || !valuesWithinDefensiveLimits(output)) return { status: "invalid" };
+  if (!hasCompleteValues) return { status: "invalid", reason: "values" };
+  if (!valuesWithinDefensiveLimits(output)) return { status: "invalid", reason: "limits" };
 
   const { nutrition_basis, calories, protein_g, carbs_g, fat_g } = output as InventoryNutritionAiOutput & {
     nutrition_basis: InventoryNutritionBasis;
