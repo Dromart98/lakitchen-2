@@ -1,4 +1,5 @@
 import { getInventoryExpirationDayDifference } from "@/modules/inventory/inventory-expiration";
+import type { InventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
 
 export type RecipeUnit = "g" | "kg" | "ml" | "l" | "ud";
 export type RecipeIngredientStatus = "available" | "missing" | "insufficient" | "incompatible" | "expired";
@@ -32,6 +33,23 @@ export type RecipeInventoryItem = {
   quantity: number;
   unit: string;
   expires_at: string | null;
+  nutrition_basis?: InventoryNutritionBasis | null;
+  calories?: number | null;
+  protein_g?: number | null;
+  carbs_g?: number | null;
+  fat_g?: number | null;
+};
+
+export type RecipeIngredientAllocation = {
+  inventoryItemId: string;
+  inventoryItemName: string;
+  usedQuantity: number;
+  usedUnit: "g" | "ml" | "ud";
+  nutritionBasis: InventoryNutritionBasis | null;
+  calories: number | null;
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
 };
 
 export type RecipeIngredientMatch = {
@@ -43,6 +61,7 @@ export type RecipeIngredientMatch = {
   matchedItemCount: number;
   urgentItemCount: number;
   nearestExpirationDate: string | null;
+  allocations: RecipeIngredientAllocation[];
 };
 
 export type RecipeMatchResult = {
@@ -122,12 +141,12 @@ function matchIngredient(ingredient: RecipeIngredient, stock: StockCopy[], today
   const nameMatches = stock.filter((item) => terms.has(item.normalizedName));
 
   if (!required || nameMatches.length === 0) {
-    return { ingredient, status: "missing", availableQuantity: 0, requiredQuantity: required?.quantity ?? 0, baseUnit: required?.unit ?? null, matchedItemCount: 0, urgentItemCount: 0, nearestExpirationDate: null };
+    return { ingredient, status: "missing", availableQuantity: 0, requiredQuantity: required?.quantity ?? 0, baseUnit: required?.unit ?? null, matchedItemCount: 0, urgentItemCount: 0, nearestExpirationDate: null, allocations: [] };
   }
 
   const compatible = nameMatches.filter((item) => item.baseUnit === required.unit);
   if (compatible.length === 0) {
-    return { ingredient, status: "incompatible", availableQuantity: 0, requiredQuantity: required.quantity, baseUnit: required.unit, matchedItemCount: nameMatches.length, urgentItemCount: 0, nearestExpirationDate: null };
+    return { ingredient, status: "incompatible", availableQuantity: 0, requiredQuantity: required.quantity, baseUnit: required.unit, matchedItemCount: nameMatches.length, urgentItemCount: 0, nearestExpirationDate: null, allocations: [] };
   }
 
   const valid = compatible
@@ -137,6 +156,7 @@ function matchIngredient(ingredient: RecipeIngredient, stock: StockCopy[], today
   const expiredCompatibleCount = compatible.filter((item) => isExpired(item.expires_at, todayKey) && (item.remainingBaseQuantity ?? 0) > 0).length;
   let availableQuantity = 0;
   const used: StockCopy[] = [];
+  const allocations: RecipeIngredientAllocation[] = [];
 
   for (const item of valid) {
     if (availableQuantity >= required.quantity) break;
@@ -146,6 +166,17 @@ function matchIngredient(ingredient: RecipeIngredient, stock: StockCopy[], today
       availableQuantity += usedQuantity;
       item.remainingBaseQuantity = remaining - usedQuantity;
       used.push(item);
+      allocations.push({
+        inventoryItemId: item.id,
+        inventoryItemName: item.name,
+        usedQuantity,
+        usedUnit: required.unit,
+        nutritionBasis: item.nutrition_basis ?? null,
+        calories: item.calories ?? null,
+        proteinG: item.protein_g ?? null,
+        carbsG: item.carbs_g ?? null,
+        fatG: item.fat_g ?? null,
+      });
     }
   }
 
@@ -154,7 +185,7 @@ function matchIngredient(ingredient: RecipeIngredient, stock: StockCopy[], today
   const nearestExpirationDate = expirationDates.sort()[0] ?? null;
 
   if (availableQuantity >= required.quantity) {
-    return { ingredient, status: "available", availableQuantity, requiredQuantity: required.quantity, baseUnit: required.unit, matchedItemCount: compatible.length, urgentItemCount: urgentItemIds.size, nearestExpirationDate };
+    return { ingredient, status: "available", availableQuantity, requiredQuantity: required.quantity, baseUnit: required.unit, matchedItemCount: compatible.length, urgentItemCount: urgentItemIds.size, nearestExpirationDate, allocations };
   }
 
   return {
@@ -166,6 +197,7 @@ function matchIngredient(ingredient: RecipeIngredient, stock: StockCopy[], today
     matchedItemCount: compatible.length,
     urgentItemCount: 0,
     nearestExpirationDate,
+    allocations,
   };
 }
 
