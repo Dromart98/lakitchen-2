@@ -267,12 +267,17 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
           <h2>Recetas con tu inventario</h2>
           <p className="muted">
             {inventoryItems.length === 0
-              ? "Añade productos a tu inventario para preparar futuras sugerencias de recetas."
-              : "Tu inventario ya está conectado. Próximamente podrás generar recetas con los productos disponibles."}
+              ? "Ya puedes consultar recetas del catálogo. Añade productos para saber cuáles puedes preparar ahora."
+              : "Ya puedes consultar recetas según tu inventario, el tiempo disponible y los productos próximos a caducar."}
           </p>
-          <Link className="button nav-button" href="/inventory">
-            Gestionar inventario
+          <Link className="button nav-button" href="/recipes?mode=all">
+            Ver recetas
           </Link>
+          {inventoryItems.length === 0 ? (
+            <Link className="button nav-button" href="/inventory" style={{ marginLeft: 8 }}>
+              Gestionar inventario
+            </Link>
+          ) : null}
         </div>
       </section>
     </main>
