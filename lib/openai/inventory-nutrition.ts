@@ -22,7 +22,8 @@ La cocción puede reducir el agua y aumentar la concentración de calorías y ma
 Nunca utilices valores de un alimento cocinado cuando el nombre indica explícitamente que está crudo.
 Nunca utilices valores crudos cuando el nombre indica una preparación cocinada.
 Para Pechuga de pollo cruda, utiliza una estimación típica de pechuga cruda, no de pechuga asada, hervida o a la plancha. Este ejemplo solo explica la diferencia de estado: no copies valores concretos ni apliques reglas específicas del pollo a otros alimentos.
-Clasifica food_state como raw si es crudo, fresco o sin cocinar; cooked si está cocido, asado, hervido, horneado, frito o a la plancha; processed si es conserva, embutido, fiambre, precocinado o producto industrial transformado; not_applicable si el estado crudo/cocinado no es relevante; unknown si no hay información suficiente.
+Clasifica food_state como raw si es crudo o sin cocinar; cooked si está cocido, asado, hervido, horneado, frito o a la plancha; processed si es conserva, embutido, fiambre, precocinado o producto industrial transformado; not_applicable si el estado crudo/cocinado no es relevante; unknown si no hay información suficiente.
+Las palabras fresco o fresca, por sí solas, no significan necesariamente que el alimento esté crudo. Productos como queso fresco, pasta fresca o leche fresca no deben clasificarse automáticamente como raw.
 normalized_food_name debe ser breve y normalizado, sin inventar marca, ingredientes o preparación.
 Si el estado modifica sustancialmente los valores y no puede deducirse de la entrada, devuelve status needs_clarification, food_state unknown, nutrition_basis null, calories null, protein_g null, carbs_g null, fat_g null y clarification explicando qué información falta.
 Para una estimación correcta utiliza status estimated y clarification null.

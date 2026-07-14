@@ -30,8 +30,17 @@ describe("detectExplicitInventoryFoodState", () => {
     expect(detectExplicitInventoryFoodState(name)).toBe(expected);
   });
 
-  it("returns null when no explicit state is present", () => {
-    expect(detectExplicitInventoryFoodState("Pechuga de pollo")).toBeNull();
+  it.each([
+    "Pechuga de pollo",
+    "Queso fresco",
+    "Pasta fresca",
+    "Leche fresca",
+  ])("returns null for %s when no explicit state is present", (name) => {
+    expect(detectExplicitInventoryFoodState(name)).toBeNull();
+  });
+
+  it("keeps detecting raw food without fresco markers", () => {
+    expect(detectExplicitInventoryFoodState("Carne cruda")).toBe("raw");
   });
 
   it("does not match partial words", () => {
@@ -139,15 +148,75 @@ describe("calibrateInventoryNutritionAiConfidence", () => {
     expect(calibrateInventoryNutritionAiConfidence(validInput, { ...validOutput, confidence: "low" })).toBe("low");
   });
 
+  it("keeps medium confidence unchanged", () => {
+    expect(calibrateInventoryNutritionAiConfidence(validInput, { ...validOutput, confidence: "medium" })).toBe("medium");
+  });
+
   it("reduces high confidence with unknown state", () => {
     expect(calibrateInventoryNutritionAiConfidence(validInput, { ...validOutput, confidence: "high", food_state: "unknown" })).toBe("medium");
   });
 
-  it("keeps high confidence with matching explicit state", () => {
-    expect(calibrateInventoryNutritionAiConfidence(validInput, { ...validOutput, confidence: "high" })).toBe("high");
+  it("keeps high confidence with matching raw assumptions", () => {
+    expect(calibrateInventoryNutritionAiConfidence(validInput, {
+      ...validOutput,
+      confidence: "high",
+      assumptions: "Pechuga de pollo cruda típica",
+    })).toBe("high");
   });
 
-  it("reduces high confidence when an invented preparation appears", () => {
+  it("keeps high confidence with matching cooked assumptions", () => {
+    const input: InventoryNutritionAiInput = { ...validInput, name: "Pechuga de pollo a la plancha" };
+
+    expect(calibrateInventoryNutritionAiConfidence(input, {
+      ...validOutput,
+      confidence: "high",
+      food_state: "cooked",
+      normalized_food_name: "Pechuga de pollo a la plancha",
+      assumptions: "Pechuga de pollo a la plancha típica",
+    })).toBe("high");
+  });
+
+  it("keeps high confidence with matching processed assumptions", () => {
+    const input: InventoryNutritionAiInput = { ...validInput, name: "Atún en conserva" };
+
+    expect(calibrateInventoryNutritionAiConfidence(input, {
+      ...validOutput,
+      confidence: "high",
+      food_state: "processed",
+      normalized_food_name: "Atún en conserva",
+      assumptions: "Atún en conserva típico",
+    })).toBe("high");
+  });
+
+  it("reduces high confidence when assumptions contradict the explicit raw state", () => {
+    expect(calibrateInventoryNutritionAiConfidence(validInput, {
+      ...validOutput,
+      confidence: "high",
+      assumptions: "Se ha supuesto pechuga a la plancha",
+    })).toBe("medium");
+  });
+
+  it("reduces high confidence when assumptions introduce a cooked state without input state", () => {
+    const input: InventoryNutritionAiInput = { ...validInput, name: "Pechuga de pollo" };
+
+    expect(calibrateInventoryNutritionAiConfidence(input, {
+      ...validOutput,
+      confidence: "high",
+      food_state: "cooked",
+      normalized_food_name: "Pechuga de pollo",
+      assumptions: "Se ha supuesto preparación a la plancha",
+    })).toBe("medium");
+  });
+
+  it("reduces high confidence when assumptions introduce an unprovided brand", () => {
+    expect(calibrateInventoryNutritionAiConfidence(validInput, {
+      ...validOutput,
+      confidence: "high",
+      assumptions: "Se ha supuesto una marca habitual",
+    })).toBe("medium");
+  });
+
+  it("reduces high confidence when an invented preparation appears in normalized name", () => {
     expect(calibrateInventoryNutritionAiConfidence(validInput, { ...validOutput, confidence: "high", normalized_food_name: "Pechuga de pollo a la plancha" })).toBe("medium");
   });
 });

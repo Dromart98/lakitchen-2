@@ -127,7 +127,7 @@ export function detectExplicitInventoryFoodState(
   const normalizedName = normalizeForFoodStateDetection(name);
   const processed = ["en conserva", "embutido", "embutida", "fiambre", "precocinado", "precocinada", "preparado", "preparada"];
   const cooked = ["cocido", "cocida", "asado", "asada", "a la plancha", "plancha", "hervido", "hervida", "horneado", "horneada", "frito", "frita"];
-  const raw = ["crudo", "cruda", "sin cocinar", "fresco", "fresca"];
+  const raw = ["crudo", "cruda", "sin cocinar"];
 
   if (processed.some((phrase) => containsFoodStatePhrase(normalizedName, phrase))) return "processed";
   if (cooked.some((phrase) => containsFoodStatePhrase(normalizedName, phrase))) return "cooked";
@@ -140,8 +140,24 @@ function isExcessivelyGenericFoodName(name: string) {
   return normalizedName.length < 4 || normalizedName.split(" ").length <= 1;
 }
 
-function textMentionsMaterialAssumption(text: string) {
-  return /(^|[^a-z0-9])(marca|receta|aceite|salsa|cocid[ao]|asad[ao]|plancha|hervid[ao]|hornead[ao]|frit[ao]|preparad[ao])([^a-z0-9]|$)/u.test(normalizeForFoodStateDetection(text));
+function textMentionsUnprovidedMaterialAssumption(inputName: string, assumptions: string) {
+  const normalizedInput = normalizeForFoodStateDetection(inputName);
+  const normalizedAssumptions = normalizeForFoodStateDetection(assumptions);
+  const materialMarkers = ["marca", "receta", "aceite", "salsa"];
+
+  return materialMarkers.some((marker) => (
+    containsFoodStatePhrase(normalizedAssumptions, marker)
+    && !containsFoodStatePhrase(normalizedInput, marker)
+  ));
+}
+
+function assumptionsIntroduceMismatchedFoodState(inputName: string, assumptions: string) {
+  const inputState = detectExplicitInventoryFoodState(inputName);
+  const assumptionsState = detectExplicitInventoryFoodState(assumptions);
+
+  if (!assumptionsState) return false;
+  if (!inputState) return true;
+  return assumptionsState !== inputState;
 }
 
 function normalizedNameIntroducesPreparation(inputName: string, normalizedFoodName: string) {
@@ -164,7 +180,8 @@ export function calibrateInventoryNutritionAiConfidence(
   if (output.food_state === "unknown") return "medium";
   if (!explicitState && output.food_state !== "not_applicable") return "medium";
   if (normalizedNameIntroducesPreparation(input.name, output.normalized_food_name)) return "medium";
-  if (textMentionsMaterialAssumption(output.assumptions)) return "medium";
+  if (textMentionsUnprovidedMaterialAssumption(input.name, output.assumptions)) return "medium";
+  if (assumptionsIntroduceMismatchedFoodState(input.name, output.assumptions)) return "medium";
   if (isExcessivelyGenericFoodName(input.name)) return "medium";
 
   return "high";
