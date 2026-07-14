@@ -4,9 +4,12 @@ import {
   calculateMealBuilderLineNutrition,
   calculateMealBuilderTotals,
   createMealBuilderConsumptionPayload,
+  createRepeatedMealBuilderDraft,
   formatMealBuilderNutritionValue,
   isMealBuilderInventoryItemEligible,
+  type MealBuilderInventoryItem,
   type MealBuilderLine,
+  type RepeatedMealBuilderSnapshot,
 } from "@/modules/meals/meal-builder";
 
 const pasta: MealBuilderLine = {
@@ -46,6 +49,30 @@ const egg: MealBuilderLine = {
   carbs_g: 1,
   fat_g: 5,
   consumed_quantity: 2,
+};
+
+const currentPasta: MealBuilderInventoryItem = {
+  id: pasta.id,
+  name: pasta.name,
+  quantity: pasta.quantity,
+  unit: pasta.unit,
+  nutrition_basis: pasta.nutrition_basis,
+  calories: pasta.calories,
+  protein_g: pasta.protein_g,
+  carbs_g: pasta.carbs_g,
+  fat_g: pasta.fat_g,
+};
+
+const currentJuice: MealBuilderInventoryItem = {
+  id: juice.id,
+  name: juice.name,
+  quantity: juice.quantity,
+  unit: juice.unit,
+  nutrition_basis: juice.nutrition_basis,
+  calories: juice.calories,
+  protein_g: juice.protein_g,
+  carbs_g: juice.carbs_g,
+  fat_g: juice.fat_g,
 };
 
 describe("meal builder totals", () => {
@@ -127,7 +154,6 @@ describe("meal builder totals", () => {
     });
   });
 });
-
 
 describe("meal builder consumption payload", () => {
   it("creates a payload with two valid products", () => {
@@ -217,3 +243,153 @@ describe("meal builder consumption payload", () => {
     expect(Math.round(productA.protein_g) + Math.round(productB.protein_g)).toBe(20);
   });
 });
+
+describe("repeated meal builder drafts", () => {
+  const meal = { name: "Bowl de pasta", meal_type: "lunch" };
+
+  it("creates available lines for two current products", () => {
+    const draft = createRepeatedMealBuilderDraft(
+      meal,
+      [snapshot("pasta", "Pasta", 250, "g"), snapshot("juice", "Zumo", 200, "ml")],
+      [currentPasta, currentJuice],
+    );
+
+    expect(draft.availableLines).toEqual([
+      { itemId: "pasta", quantity: "250" },
+      { itemId: "juice", quantity: "200" },
+    ]);
+    expect(draft.unavailableItems).toEqual([]);
+  });
+
+  it("marks deleted inventory products as missing", () => {
+    const draft = createRepeatedMealBuilderDraft(meal, [snapshot("missing", "Yogur", 1, "ud")], [currentPasta]);
+
+    expect(draft.availableLines).toEqual([]);
+    expect(draft.unavailableItems).toEqual([
+      { sourceInventoryItemId: "missing", productName: "Yogur", consumedQuantity: 1, unit: "ud", reason: "missing" },
+    ]);
+  });
+
+  it("marks current products with incomplete nutrition as incompatible", () => {
+    const draft = createRepeatedMealBuilderDraft(
+      meal,
+      [snapshot("pasta", "Pasta", 250, "g")],
+      [{ ...currentPasta, calories: null }],
+    );
+
+    expect(draft.availableLines).toEqual([]);
+    expect(draft.unavailableItems[0]?.reason).toBe("incompatible");
+  });
+
+  it("marks current products with incompatible current units as incompatible", () => {
+    const draft = createRepeatedMealBuilderDraft(
+      meal,
+      [snapshot("juice", "Zumo", 250, "ml")],
+      [{ ...currentJuice, unit: "g" }],
+    );
+
+    expect(draft.availableLines).toEqual([]);
+    expect(draft.unavailableItems[0]?.reason).toBe("incompatible");
+  });
+
+  it("keeps the historical quantity when current stock is lower", () => {
+    const draft = createRepeatedMealBuilderDraft(
+      meal,
+      [snapshot("pasta", "Pasta", 250, "g")],
+      [{ ...currentPasta, quantity: 100 }],
+    );
+
+    expect(draft.availableLines).toEqual([{ itemId: "pasta", quantity: "250" }]);
+  });
+
+  it("preloads the historical meal name and valid type", () => {
+    const draft = createRepeatedMealBuilderDraft(meal, [], []);
+
+    expect(draft.mealName).toBe("Bowl de pasta");
+    expect(draft.mealType).toBe("lunch");
+  });
+
+  it("leaves invalid historical meal types unselected", () => {
+    const draft = createRepeatedMealBuilderDraft({ ...meal, meal_type: "brunch" }, [], []);
+
+    expect(draft.mealType).toBe("");
+  });
+
+  it("deduplicates duplicated snapshots", () => {
+    const draft = createRepeatedMealBuilderDraft(
+      meal,
+      [snapshot("pasta", "Pasta", 250, "g"), snapshot("pasta", "Pasta", 100, "g")],
+      [currentPasta],
+    );
+
+    expect(draft.availableLines).toEqual([{ itemId: "pasta", quantity: "250" }]);
+  });
+
+  it("limits available lines to ten snapshots", () => {
+    const snapshots = Array.from({ length: 11 }, (_, index) => snapshot(`item-${index}`, `Producto ${index}`, 1, "ud"));
+    const inventory: MealBuilderInventoryItem[] = snapshots.map((entry) => ({
+      id: entry.source_inventory_item_id,
+      name: entry.product_name,
+      quantity: 2,
+      unit: "ud",
+      nutrition_basis: "per_unit",
+      calories: 1,
+      protein_g: 1,
+      carbs_g: 1,
+      fat_g: 1,
+    }));
+
+    const draft = createRepeatedMealBuilderDraft(meal, snapshots, inventory);
+
+    expect(draft.availableLines).toHaveLength(10);
+  });
+
+  it("handles an empty snapshot list", () => {
+    const draft = createRepeatedMealBuilderDraft(meal, [], [currentPasta]);
+
+    expect(draft.availableLines).toEqual([]);
+    expect(draft.unavailableItems).toEqual([]);
+  });
+
+  it("uses current inventory compatibility instead of the historical unit", () => {
+    const draft = createRepeatedMealBuilderDraft(
+      meal,
+      [snapshot("pasta", "Pasta", 250, "kg")],
+      [currentPasta],
+    );
+
+    expect(draft.availableLines).toEqual([{ itemId: "pasta", quantity: "250" }]);
+  });
+
+  it("does not copy historical macros into draft lines", () => {
+    const draft = createRepeatedMealBuilderDraft(meal, [snapshot("pasta", "Pasta", 250, "g")], [currentPasta]);
+
+    expect(draft.availableLines[0]).toEqual({ itemId: "pasta", quantity: "250" });
+    expect(draft.availableLines[0]).not.toHaveProperty("calories");
+    expect(draft.availableLines[0]).not.toHaveProperty("protein_g");
+  });
+
+  it("sorts unavailable items stably", () => {
+    const draft = createRepeatedMealBuilderDraft(meal, [
+      snapshot("b", "Yogur", 1, "ud"),
+      snapshot("c", "Arroz", 1, "g"),
+      snapshot("a", "Yogur", 1, "ud"),
+    ], []);
+
+    expect(draft.unavailableItems.map((item) => item.sourceInventoryItemId)).toEqual(["c", "a", "b"]);
+  });
+});
+
+function snapshot(
+  sourceInventoryItemId: string,
+  productName: string,
+  consumedQuantity: number | string,
+  unit: string,
+): RepeatedMealBuilderSnapshot {
+  return {
+    source_inventory_item_id: sourceInventoryItemId,
+    product_name: productName,
+    consumed_quantity: consumedQuantity,
+    unit,
+  };
+}

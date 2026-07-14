@@ -1,9 +1,10 @@
 import {
   calculateConsumedInventoryNutrition,
   hasCompleteInventoryNutritionValues,
-  type InventoryNutritionBasis,
   type InventoryAvailableNutritionTotals,
+  type InventoryNutritionBasis,
 } from "@/modules/inventory/inventory-nutrition";
+import { isMealType, type MealType } from "@/modules/meals/meal-types";
 
 export type MealBuilderInventoryItem = {
   id: string;
@@ -56,6 +57,7 @@ export function calculateMealBuilderLineNutrition(line: MealBuilderLine): MealBu
 export function isMealBuilderInventoryItemEligible(item: MealBuilderInventoryItem): boolean {
   if (!item.nutrition_basis) return false;
   if (!hasCompleteInventoryNutritionValues(item)) return false;
+  if (!Number.isFinite(item.quantity) || item.quantity <= 0) return false;
 
   return calculateConsumedInventoryNutrition({
     ...item,
@@ -116,6 +118,103 @@ export function createMealBuilderConsumptionPayload(
   }
 
   return payload;
+}
+
+export type RepeatedMealBuilderMeal = {
+  name: string;
+  meal_type: string | null;
+};
+
+export type RepeatedMealBuilderSnapshot = {
+  source_inventory_item_id: string;
+  product_name: string;
+  consumed_quantity: number | string;
+  unit: string;
+};
+
+export type RepeatedMealBuilderDraftLine = {
+  itemId: string;
+  quantity: string;
+};
+
+export type RepeatedMealBuilderUnavailableItem = {
+  sourceInventoryItemId: string;
+  productName: string;
+  consumedQuantity: number;
+  unit: string;
+  reason: "missing" | "incompatible";
+};
+
+export type RepeatedMealBuilderDraft = {
+  mealName: string;
+  mealType: MealType | "";
+  availableLines: RepeatedMealBuilderDraftLine[];
+  unavailableItems: RepeatedMealBuilderUnavailableItem[];
+};
+
+const MAX_REPEATED_MEAL_BUILDER_LINES = 10;
+
+export function createRepeatedMealBuilderDraft(
+  meal: RepeatedMealBuilderMeal,
+  snapshots: RepeatedMealBuilderSnapshot[],
+  inventoryItems: MealBuilderInventoryItem[],
+): RepeatedMealBuilderDraft {
+  const inventoryItemsById = new Map(inventoryItems.map((item) => [item.id, item]));
+  const seenSnapshotItemIds = new Set<string>();
+  const availableLines: RepeatedMealBuilderDraftLine[] = [];
+  const unavailableItems: RepeatedMealBuilderUnavailableItem[] = [];
+
+  for (const snapshot of snapshots) {
+    if (seenSnapshotItemIds.has(snapshot.source_inventory_item_id)) continue;
+    seenSnapshotItemIds.add(snapshot.source_inventory_item_id);
+
+    const consumedQuantity = Number(snapshot.consumed_quantity);
+    const unavailableItem: RepeatedMealBuilderUnavailableItem = {
+      sourceInventoryItemId: snapshot.source_inventory_item_id,
+      productName: snapshot.product_name,
+      consumedQuantity: Number.isFinite(consumedQuantity) ? consumedQuantity : 0,
+      unit: snapshot.unit,
+      reason: "missing",
+    };
+    const currentItem = inventoryItemsById.get(snapshot.source_inventory_item_id);
+
+    if (!currentItem) {
+      unavailableItems.push(unavailableItem);
+      continue;
+    }
+
+    if (
+      !Number.isFinite(consumedQuantity) ||
+      consumedQuantity <= 0 ||
+      !isMealBuilderInventoryItemEligible(currentItem)
+    ) {
+      unavailableItems.push({ ...unavailableItem, reason: "incompatible" });
+      continue;
+    }
+
+    if (availableLines.length >= MAX_REPEATED_MEAL_BUILDER_LINES) continue;
+
+    availableLines.push({
+      itemId: currentItem.id,
+      quantity: String(consumedQuantity),
+    });
+  }
+
+  return {
+    mealName: meal.name,
+    mealType: isMealType(meal.meal_type) ? meal.meal_type : "",
+    availableLines,
+    unavailableItems: unavailableItems.sort((a, b) => {
+      const nameComparison = a.productName.localeCompare(b.productName, "es", {
+        sensitivity: "base",
+        numeric: true,
+      });
+
+      if (nameComparison !== 0) return nameComparison;
+
+      return a.sourceInventoryItemId.localeCompare(b.sourceInventoryItemId);
+    }),
+  };
 }
 
 export function formatMealBuilderNutritionValue(value: number): string | null {
