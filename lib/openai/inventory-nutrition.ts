@@ -17,19 +17,35 @@ export type InventoryNutritionProviderResult =
   | { status: "error"; code: "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response" };
 
 export const INVENTORY_NUTRITION_AI_SYSTEM_PROMPT = `Estima valores nutricionales típicos de un alimento o producto.
-Los valores deben corresponder a la base nutricional, no al total comprado.
-Para unidades g o kg, devuelve valores por 100 g con nutrition_basis per_100g.
-Para unidades ml o l, devuelve valores por 100 ml con nutrition_basis per_100ml.
-Para unidad ud, devuelve valores por una unidad con nutrition_basis per_unit.
+Diferencia siempre entre alimento crudo, cocinado, procesado, no aplicable y desconocido.
+La cocción puede reducir el agua y aumentar la concentración de calorías y macros expresados por 100 g.
+Nunca utilices valores de un alimento cocinado cuando el nombre indica explícitamente que está crudo.
+Nunca utilices valores crudos cuando el nombre indica una preparación cocinada.
+Para Pechuga de pollo cruda, utiliza una estimación típica de pechuga cruda, no de pechuga asada, hervida o a la plancha. Este ejemplo solo explica la diferencia de estado: no copies valores concretos ni apliques reglas específicas del pollo a otros alimentos.
+Clasifica food_state como raw si es crudo o sin cocinar; cooked si está cocido, asado, hervido, horneado, frito o a la plancha; processed si es conserva, embutido, fiambre, precocinado o producto industrial transformado; not_applicable si el estado crudo/cocinado no es relevante; unknown si no hay información suficiente.
+Las palabras fresco o fresca, por sí solas, no significan necesariamente que el alimento esté crudo. Productos como queso fresco, pasta fresca o leche fresca no deben clasificarse automáticamente como raw.
+normalized_food_name debe ser breve y normalizado, sin inventar marca, ingredientes o preparación.
+Si el estado modifica sustancialmente los valores y no puede deducirse de la entrada, devuelve status needs_clarification, food_state unknown, nutrition_basis null, calories null, protein_g null, carbs_g null, fat_g null y clarification explicando qué información falta.
+Para una estimación correcta utiliza status estimated y clarification null.
+Respeta la variante o expectativa detectada por la aplicación en el contexto del usuario.
+Jamón sin más detalles representa por defecto un jamón curado tipo serrano genérico; no lo conviertas en ibérico, bellota ni en una marca concreta.
+Jamón cocido y Jamón York son productos procesados diferentes del jamón serrano.
+Queso sin más detalles representa un queso genérico.
+Usa fresco, tierno, semicurado, curado, viejo, añejo, ahumado o azul para diferenciar el tipo de queso cuando aparezcan en la entrada o en la expectativa detectada.
+Queso fresco no significa alimento crudo; queso fresco, semicurado y curado no deben mezclar sus valores.
+No copies valores concretos de los ejemplos.
+No inventes marca, receta, cantidad de aceite, salsa, método de cocción, peso por unidad, ingredientes no indicados, porcentaje de grasa ni tipo de leche.
 No multipliques calorías ni macros por la cantidad del inventario.
+Los valores deben representar: g o kg por 100 g; ml o l por 100 ml; ud por unidad.
 Utiliza la categoría únicamente como contexto.
-No inventes marca, receta, peso por unidad ni preparación concreta.
-Si status es estimated, devuelve los cuatro valores nutricionales, assumptions con una frase breve y clarification como null.
-Si el nombre es demasiado ambiguo, devuelve status needs_clarification, clarification con una pregunta breve y deja nutrition_basis, calories, protein_g, carbs_g y fat_g en null.
-Si hay varias versiones razonables, usa una estimación típica y marca confidence low.
+La confidence representa cuánto se ha identificado correctamente el alimento, su estado, la base nutricional y las suposiciones necesarias.
+high: alimento habitual claramente identificado, estado explícito o no aplicable, sin marca concreta, sin preparación inventada, valores típicos estables y sin suposiciones importantes. Pechuga de pollo cruda puede ser high porque alimento y estado están expresamente indicados.
+medium: alimento identificado con variaciones relevantes por variedad, marca o composición, pero puede estimarse razonablemente sin aclaración.
+low: identificación con suposiciones importantes, variación elevada o estimación solo orientativa. Si la ambigüedad puede cambiar sustancialmente los macros, no devuelvas low: devuelve needs_clarification.
+No utilices siempre low solo porque los valores sean estimaciones y no utilices siempre high.
 Escribe assumptions y clarification en español.
 No afirmes que la estimación procede de una etiqueta, base de datos o fuente verificada.
-No incluyas explicaciones fuera del esquema estructurado.`;
+No incluyas explicaciones fuera del esquema estructurado.`
 
 type OpenAiResponseObject = {
   status?: unknown;
@@ -180,7 +196,7 @@ export async function estimateInventoryNutritionWithOpenAi(
         },
         store: false,
         max_output_tokens: INVENTORY_NUTRITION_AI_MAX_OUTPUT_TOKENS,
-        reasoning: { effort: "none" },
+        reasoning: { effort: "low" },
       }),
       signal: controller.signal,
     });
