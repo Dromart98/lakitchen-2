@@ -1,17 +1,43 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
   buildInventoryNutritionAiInputText,
+  calibrateInventoryNutritionAiConfidence,
+  detectExplicitInventoryFoodState,
   getExpectedInventoryNutritionBasis,
   isCompatibleInventoryNutritionAiBasis,
   parseInventoryNutritionAiInput,
   requiresInventoryNutritionAiOverwriteConfirmation,
   validateInventoryNutritionAiOutput,
   type InventoryNutritionAiInput,
+  type InventoryNutritionAiOutput,
 } from "@/modules/inventory/inventory-ai-nutrition";
 
 const validInput: InventoryNutritionAiInput = { name: "Pechuga de pollo cruda", quantity: 2, unit: "kg", category: "protein" };
-const validOutput = { status: "estimated", nutrition_basis: "per_100g", calories: 120, protein_g: 23, carbs_g: 0, fat_g: 2, confidence: "medium", assumptions: "Pollo crudo típico.", clarification: null };
+const validOutput = { status: "estimated", nutrition_basis: "per_100g", calories: 120, protein_g: 23, carbs_g: 0, fat_g: 2, confidence: "medium", food_state: "raw", normalized_food_name: "Pechuga de pollo cruda", assumptions: "Pollo crudo típico.", clarification: null } satisfies InventoryNutritionAiOutput;
+
+
+describe("detectExplicitInventoryFoodState", () => {
+  it.each([
+    ["Pechuga de pollo cruda", "raw"],
+    ["Pechuga de pollo sin cocinar", "raw"],
+    ["Pechuga de pollo a la plancha", "cooked"],
+    ["Pollo asado", "cooked"],
+    ["Atún en conserva", "processed"],
+  ] as const)("detects %s as %s", (name, expected) => {
+    expect(detectExplicitInventoryFoodState(name)).toBe(expected);
+  });
+
+  it("returns null when no explicit state is present", () => {
+    expect(detectExplicitInventoryFoodState("Pechuga de pollo")).toBeNull();
+  });
+
+  it("does not match partial words", () => {
+    expect(detectExplicitInventoryFoodState("crudoria planchado frescoide conservador")).toBeNull();
+  });
+});
 
 describe("parseInventoryNutritionAiInput", () => {
   it.each([
@@ -56,6 +82,32 @@ describe("validateInventoryNutritionAiOutput", () => {
     expect(validateInventoryNutritionAiOutput(validInput, validOutput)).toMatchObject({ status: "success", estimate: { calories: 120 } });
   });
 
+  it("accepts raw input with raw output", () => {
+    expect(validateInventoryNutritionAiOutput(validInput, { ...validOutput, food_state: "raw" }).status).toBe("success");
+  });
+
+  it("rejects raw input with cooked output", () => {
+    expect(validateInventoryNutritionAiOutput(validInput, { ...validOutput, food_state: "cooked" })).toEqual({ status: "invalid", reason: "food-state" });
+  });
+
+  it("rejects cooked input with raw output", () => {
+    const input: InventoryNutritionAiInput = { ...validInput, name: "Pechuga de pollo a la plancha" };
+    expect(validateInventoryNutritionAiOutput(input, { ...validOutput, food_state: "raw" })).toEqual({ status: "invalid", reason: "food-state" });
+  });
+
+  it("accepts processed input with processed output", () => {
+    const input: InventoryNutritionAiInput = { ...validInput, name: "Atún en conserva" };
+    expect(validateInventoryNutritionAiOutput(input, { ...validOutput, food_state: "processed", normalized_food_name: "Atún en conserva" }).status).toBe("success");
+  });
+
+  it("rejects empty normalized food name", () => {
+    expect(validateInventoryNutritionAiOutput(validInput, { ...validOutput, normalized_food_name: " " })).toEqual({ status: "invalid", reason: "normalized-food-name" });
+  });
+
+  it("rejects overlong normalized food name", () => {
+    expect(validateInventoryNutritionAiOutput(validInput, { ...validOutput, normalized_food_name: "a".repeat(121) })).toEqual({ status: "invalid", reason: "normalized-food-name" });
+  });
+
   it.each([
     { ...validOutput, protein_g: -1 },
     { ...validOutput, protein_g: Number.NaN },
@@ -73,11 +125,30 @@ describe("validateInventoryNutritionAiOutput", () => {
   });
 
   it("accepts coherent needs_clarification", () => {
-    expect(validateInventoryNutritionAiOutput(validInput, { status: "needs_clarification", nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null, confidence: "low", assumptions: "", clarification: "Describe el plato." })).toEqual({ status: "needs-clarification", message: "Describe el plato." });
+    expect(validateInventoryNutritionAiOutput(validInput, { status: "needs_clarification", nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null, confidence: "low", food_state: "unknown", normalized_food_name: "Plato ambiguo", assumptions: "", clarification: "Describe el plato." })).toEqual({ status: "needs-clarification", message: "Describe el plato." });
   });
 
   it("rejects needs_clarification with macros present", () => {
     expect(validateInventoryNutritionAiOutput(validInput, { ...validOutput, status: "needs_clarification", clarification: "Aclara." }).status).toBe("invalid");
+  });
+});
+
+
+describe("calibrateInventoryNutritionAiConfidence", () => {
+  it("never raises low confidence to high", () => {
+    expect(calibrateInventoryNutritionAiConfidence(validInput, { ...validOutput, confidence: "low" })).toBe("low");
+  });
+
+  it("reduces high confidence with unknown state", () => {
+    expect(calibrateInventoryNutritionAiConfidence(validInput, { ...validOutput, confidence: "high", food_state: "unknown" })).toBe("medium");
+  });
+
+  it("keeps high confidence with matching explicit state", () => {
+    expect(calibrateInventoryNutritionAiConfidence(validInput, { ...validOutput, confidence: "high" })).toBe("high");
+  });
+
+  it("reduces high confidence when an invented preparation appears", () => {
+    expect(calibrateInventoryNutritionAiConfidence(validInput, { ...validOutput, confidence: "high", normalized_food_name: "Pechuga de pollo a la plancha" })).toBe("medium");
   });
 });
 
@@ -105,6 +176,20 @@ describe("overwrite confirmation", () => {
     [{ nutritionBasis: " ", calories: " ", proteinG: " ", carbsG: " ", fatG: " " }, false],
   ])("returns %s", (values, expected) => {
     expect(requiresInventoryNutritionAiOverwriteConfirmation(values)).toBe(expected);
+  });
+});
+
+
+describe("InventoryNutritionAiControls confidence labels", () => {
+  it("shows Spanish confidence labels instead of raw enum values", () => {
+    const source = readFileSync("components/inventory/InventoryNutritionAiControls.tsx", "utf8");
+
+    expect(source).toContain("Confianza alta");
+    expect(source).toContain("Confianza media");
+    expect(source).toContain("Confianza baja");
+    expect(source).not.toContain("HIGH");
+    expect(source).not.toContain("MEDIUM");
+    expect(source).not.toContain("LOW");
   });
 });
 
@@ -158,10 +243,10 @@ describe("OpenAI fetch provider behavior", () => {
       text: { format: { type: string; strict: boolean; schema: { required: string[] } } };
     };
 
-    expect(body.model).toBe("gpt-5.6-luna");
+    expect(body.model).toBe("gpt-5.6-terra");
     expect(body.store).toBe(false);
-    expect(body.max_output_tokens).toBe(300);
-    expect(body.reasoning.effort).toBe("none");
+    expect(body.max_output_tokens).toBe(500);
+    expect(body.reasoning.effort).toBe("low");
     expect(body.text.format.type).toBe("json_schema");
     expect(body.text.format.strict).toBe(true);
     expect(body.text.format.schema.required).toEqual([
@@ -172,6 +257,8 @@ describe("OpenAI fetch provider behavior", () => {
       "carbs_g",
       "fat_g",
       "confidence",
+      "food_state",
+      "normalized_food_name",
       "assumptions",
       "clarification",
     ]);
@@ -211,7 +298,7 @@ describe("OpenAI fetch provider behavior", () => {
 
   it("handles needs_clarification", async () => {
     const { estimateInventoryNutritionWithOpenAi } = await import("@/lib/openai/inventory-nutrition");
-    const output = { status: "needs_clarification", nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null, confidence: "low", assumptions: "", clarification: "Necesito más detalle." };
+    const output = { status: "needs_clarification", nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null, confidence: "low", food_state: "unknown", normalized_food_name: "Alimento ambiguo", assumptions: "", clarification: "Necesito más detalle." };
     const { fetchImpl } = createFetch(createJsonResponse({ status: "completed", error: null, output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(output) }] }] }));
 
     await expect(estimateInventoryNutritionWithOpenAi(validInput, { apiKey: "test-key", fetchImpl })).resolves.toEqual({ status: "needs-clarification", message: "Necesito más detalle." });
