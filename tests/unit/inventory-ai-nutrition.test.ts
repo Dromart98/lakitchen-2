@@ -6,6 +6,9 @@ import {
   buildInventoryNutritionAiInputText,
   calibrateInventoryNutritionAiConfidence,
   detectExplicitInventoryFoodState,
+  detectInventoryCheeseVariant,
+  detectInventoryHamVariant,
+  getInventoryNutritionFoodStateExpectation,
   getExpectedInventoryNutritionBasis,
   isCompatibleInventoryNutritionAiBasis,
   parseInventoryNutritionAiInput,
@@ -45,6 +48,57 @@ describe("detectExplicitInventoryFoodState", () => {
 
   it("does not match partial words", () => {
     expect(detectExplicitInventoryFoodState("crudoria planchado frescoide conservador")).toBeNull();
+  });
+});
+
+
+describe("food state expectations", () => {
+  it.each([
+    ["Jamón", { state: "processed", source: "default", normalizedHint: "Jamón curado tipo serrano genérico" }],
+    ["Jamon", { state: "processed", source: "default", normalizedHint: "Jamón curado tipo serrano genérico" }],
+    ["Jamón serrano", { state: "processed", source: "explicit", normalizedHint: "Jamón serrano" }],
+    ["Jamón ibérico", { state: "processed", source: "explicit", normalizedHint: "Jamón ibérico" }],
+    ["Jamón de bellota", { state: "processed", source: "explicit", normalizedHint: "Jamón de bellota" }],
+    ["Jamón cocido", { state: "processed", source: "explicit", normalizedHint: "Jamón cocido" }],
+    ["Jamón York", { state: "processed", source: "explicit", normalizedHint: "Jamón cocido tipo York" }],
+    ["Paleta ibérica", { state: "processed", source: "explicit", normalizedHint: "Paleta ibérica" }],
+  ] as const)("detects ham expectation for %s", (name, expected) => {
+    expect(getInventoryNutritionFoodStateExpectation(name)).toEqual(expected);
+    expect(detectInventoryHamVariant(name)).toEqual({ variant: expected.normalizedHint, source: expected.source });
+  });
+
+  it.each([
+    ["Queso", { state: "processed", source: "default", normalizedHint: "Queso genérico" }],
+    ["Queso fresco", { state: "processed", source: "explicit", normalizedHint: "Queso fresco" }],
+    ["Queso tierno", { state: "processed", source: "explicit", normalizedHint: "Queso tierno" }],
+    ["Queso semicurado", { state: "processed", source: "explicit", normalizedHint: "Queso semicurado" }],
+    ["Queso curado", { state: "processed", source: "explicit", normalizedHint: "Queso curado" }],
+    ["Queso ahumado", { state: "processed", source: "explicit", normalizedHint: "Queso ahumado" }],
+    ["Queso azul", { state: "processed", source: "explicit", normalizedHint: "Queso azul" }],
+    ["Queso de cabra", { state: "processed", source: "explicit", normalizedHint: "Queso de cabra" }],
+    ["Queso de oveja", { state: "processed", source: "explicit", normalizedHint: "Queso de oveja" }],
+  ] as const)("detects cheese expectation for %s", (name, expected) => {
+    expect(getInventoryNutritionFoodStateExpectation(name)).toEqual(expected);
+    expect(detectInventoryCheeseVariant(name)).toEqual({ variant: expected.normalizedHint, source: expected.source });
+  });
+
+  it.each([
+    ["Jamón cocido", "processed"],
+    ["Queso ahumado", "processed"],
+    ["Queso fresco", "processed"],
+    ["Pasta cocida", "cooked"],
+    ["Pechuga de pollo a la plancha", "cooked"],
+    ["Arroz precocinado", "processed"],
+    ["Pechuga de pollo", "raw"],
+    ["Pasta", "raw"],
+    ["Arroz", "raw"],
+    ["Brócoli", "raw"],
+  ] as const)("applies food state priority for %s", (name, state) => {
+    expect(getInventoryNutritionFoodStateExpectation(name)?.state).toBe(state);
+  });
+
+  it.each(["Atún", "Pasta fresca", "Leche", "Yogur", "Pan", "Salsa", "Pizza"])("does not infer a default state for %s", (name) => {
+    expect(getInventoryNutritionFoodStateExpectation(name)).toBeNull();
   });
 });
 
@@ -107,6 +161,26 @@ describe("validateInventoryNutritionAiOutput", () => {
   it("accepts processed input with processed output", () => {
     const input: InventoryNutritionAiInput = { ...validInput, name: "Atún en conserva" };
     expect(validateInventoryNutritionAiOutput(input, { ...validOutput, food_state: "processed", normalized_food_name: "Atún en conserva" }).status).toBe("success");
+  });
+
+  it.each([
+    ["Jamón", "processed", "success"],
+    ["Jamón", "raw", "invalid"],
+    ["Jamón cocido", "processed", "success"],
+    ["Jamón cocido", "cooked", "invalid"],
+    ["Queso curado", "processed", "success"],
+    ["Queso fresco", "raw", "invalid"],
+  ] as const)("validates expected processed state for %s with %s output", (name, foodState, expectedStatus) => {
+    const input: InventoryNutritionAiInput = { ...validInput, name };
+    const result = validateInventoryNutritionAiOutput(input, {
+      ...validOutput,
+      food_state: foodState,
+      normalized_food_name: name,
+      assumptions: `${name} típico`,
+    });
+
+    expect(result.status).toBe(expectedStatus);
+    if (expectedStatus === "invalid") expect(result).toEqual({ status: "invalid", reason: "food-state" });
   });
 
   it.each(["", " ", "a", "a".repeat(121)])("rejects estimated output with invalid normalized food name %#", (normalizedFoodName) => {
@@ -272,6 +346,33 @@ describe("calibrateInventoryNutritionAiConfidence", () => {
     })).toBe("medium");
   });
 
+  it.each(["Jamón", "Queso", "Pechuga de pollo", "Pasta", "Arroz"])("reduces generic default %s high confidence to medium", (name) => {
+    const input: InventoryNutritionAiInput = { ...validInput, name };
+    const expectation = getInventoryNutritionFoodStateExpectation(name);
+    expect(calibrateInventoryNutritionAiConfidence(input, {
+      ...validOutput,
+      confidence: "high",
+      food_state: expectation?.state ?? "raw",
+      normalized_food_name: expectation?.normalizedHint ?? name,
+      assumptions: "Estimación típica con variante asumida.",
+    })).toBe("medium");
+  });
+
+  it.each([
+    ["Jamón serrano", "Jamón serrano"],
+    ["Jamón cocido", "Jamón cocido"],
+    ["Queso curado", "Queso curado"],
+    ["Queso semicurado", "Queso semicurado"],
+  ] as const)("keeps explicit variant %s high confidence", (name, normalizedName) => {
+    expect(calibrateInventoryNutritionAiConfidence({ ...validInput, name }, {
+      ...validOutput,
+      confidence: "high",
+      food_state: "processed",
+      normalized_food_name: normalizedName,
+      assumptions: `${normalizedName} típico`,
+    })).toBe("high");
+  });
+
   it("reduces high confidence when an invented preparation appears in normalized name", () => {
     expect(calibrateInventoryNutritionAiConfidence(validInput, { ...validOutput, confidence: "high", normalized_food_name: "Pechuga de pollo a la plancha" })).toBe("medium");
   });
@@ -288,6 +389,18 @@ describe("base values are not multiplied by quantity", () => {
     const input: InventoryNutritionAiInput = { name: "Huevo L", quantity: 12, unit: "ud", category: "protein" };
     const result = validateInventoryNutritionAiOutput(input, { ...validOutput, nutrition_basis: "per_unit", calories: 72, protein_g: 6, fat_g: 5 });
     expect(result.status === "success" && result.estimate.calories).toBe(72);
+  });
+
+
+  it.each([
+    ["Jamón", "Jamón curado tipo serrano genérico"],
+    ["Jamón ibérico", "Producto procesado identificado: Jamón ibérico"],
+    ["Queso", "Producto procesado asumido por defecto: Queso genérico"],
+    ["Queso curado", "Producto procesado identificado: Queso curado"],
+    ["Pechuga de pollo", "Estado asumido por defecto por la aplicación: raw"],
+    ["Atún", "Estado o variante del alimento: no determinado"],
+  ] as const)("adds food expectation context for %s", (name, expectedText) => {
+    expect(buildInventoryNutritionAiInputText({ ...validInput, name })).toContain(expectedText);
   });
 });
 

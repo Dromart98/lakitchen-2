@@ -27,7 +27,14 @@ Las palabras fresco o fresca, por sí solas, no significan necesariamente que el
 normalized_food_name debe ser breve y normalizado, sin inventar marca, ingredientes o preparación.
 Si el estado modifica sustancialmente los valores y no puede deducirse de la entrada, devuelve status needs_clarification, food_state unknown, nutrition_basis null, calories null, protein_g null, carbs_g null, fat_g null y clarification explicando qué información falta.
 Para una estimación correcta utiliza status estimated y clarification null.
-No inventes marca, receta, cantidad de aceite, salsa, método de cocción, peso por unidad ni ingredientes no indicados.
+Respeta la variante o expectativa detectada por la aplicación en el contexto del usuario.
+Jamón sin más detalles representa por defecto un jamón curado tipo serrano genérico; no lo conviertas en ibérico, bellota ni en una marca concreta.
+Jamón cocido y Jamón York son productos procesados diferentes del jamón serrano.
+Queso sin más detalles representa un queso genérico.
+Usa fresco, tierno, semicurado, curado, viejo, añejo, ahumado o azul para diferenciar el tipo de queso cuando aparezcan en la entrada o en la expectativa detectada.
+Queso fresco no significa alimento crudo; queso fresco, semicurado y curado no deben mezclar sus valores.
+No copies valores concretos de los ejemplos.
+No inventes marca, receta, cantidad de aceite, salsa, método de cocción, peso por unidad, ingredientes no indicados, porcentaje de grasa ni tipo de leche.
 No multipliques calorías ni macros por la cantidad del inventario.
 Los valores deben representar: g o kg por 100 g; ml o l por 100 ml; ud por unidad.
 Utiliza la categoría únicamente como contexto.

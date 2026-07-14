@@ -135,6 +135,98 @@ export function detectExplicitInventoryFoodState(
   return null;
 }
 
+
+export type InventoryNutritionFoodStateExpectation =
+  | { state: "raw" | "cooked" | "processed"; source: "explicit"; normalizedHint: string | null }
+  | { state: "raw" | "processed"; source: "default"; normalizedHint: string }
+  | null;
+
+function findFirstVariant(normalizedName: string, variants: ReadonlyArray<readonly [string, string]>) {
+  return variants.find(([phrase]) => containsFoodStatePhrase(normalizedName, phrase))?.[1] ?? null;
+}
+
+export function detectInventoryHamVariant(
+  name: string,
+): { variant: string; source: "explicit" | "default" } | null {
+  const normalizedName = normalizeForFoodStateDetection(name);
+  const explicitVariant = findFirstVariant(normalizedName, [
+    ["jamon gran reserva", "Jamón gran reserva"],
+    ["jamon de bellota", "Jamón de bellota"],
+    ["jamon de recebo", "Jamón de recebo"],
+    ["jamon de bodega", "Jamón de bodega"],
+    ["jamon serrano", "Jamón serrano"],
+    ["jamon iberico", "Jamón ibérico"],
+    ["jamon de cebo", "Jamón de cebo"],
+    ["jamon cocido", "Jamón cocido"],
+    ["jamon york", "Jamón cocido tipo York"],
+    ["jamon dulce", "Jamón cocido"],
+    ["paleta serrana", "Paleta serrana"],
+    ["paleta iberica", "Paleta ibérica"],
+  ]);
+
+  if (explicitVariant) return { variant: explicitVariant, source: "explicit" };
+  if (containsFoodStatePhrase(normalizedName, "jamon")) {
+    return { variant: "Jamón curado tipo serrano genérico", source: "default" };
+  }
+  return null;
+}
+
+export function detectInventoryCheeseVariant(
+  name: string,
+): { variant: string; source: "explicit" | "default" } | null {
+  const normalizedName = normalizeForFoodStateDetection(name);
+  const explicitVariant = findFirstVariant(normalizedName, [
+    ["queso semicurado", "Queso semicurado"],
+    ["queso fresco", "Queso fresco"],
+    ["queso tierno", "Queso tierno"],
+    ["queso curado", "Queso curado"],
+    ["queso viejo", "Queso viejo"],
+    ["queso anejo", "Queso añejo"],
+    ["queso ahumado", "Queso ahumado"],
+    ["queso azul", "Queso azul"],
+    ["queso manchego", "Queso manchego"],
+    ["queso de cabra", "Queso de cabra"],
+    ["queso de oveja", "Queso de oveja"],
+    ["queso de vaca", "Queso de vaca"],
+    ["mozzarella", "Mozzarella"],
+    ["cheddar", "Cheddar"],
+  ]);
+
+  if (explicitVariant) return { variant: explicitVariant, source: "explicit" };
+  if (containsFoodStatePhrase(normalizedName, "queso")) {
+    return { variant: "Queso genérico", source: "default" };
+  }
+  return null;
+}
+
+function detectDefaultRawInventoryFood(name: string) {
+  const normalizedName = normalizeForFoodStateDetection(name);
+  const excluded = ["leche", "yogur", "pan", "salsa", "mayonesa", "pizza", "tortilla", "croquetas", "ensalada", "comida casera", "plato preparado", "atun", "pasta fresca"];
+  if (excluded.some((phrase) => containsFoodStatePhrase(normalizedName, phrase))) return null;
+
+  const rawFoods = ["pechuga de pollo", "pollo", "pechuga de pavo", "pavo", "ternera", "carne picada", "cerdo", "solomillo", "merluza", "salmon", "tilapia", "bacalao", "pescado", "gambas", "langostinos", "pasta", "macarrones", "espaguetis", "arroz", "quinoa", "cuscus", "avena", "lentejas", "garbanzos", "alubias", "brocoli", "espinacas", "calabacin", "zanahoria", "pimiento", "cebolla", "papas", "patatas", "huevos"];
+  const matched = rawFoods.find((phrase) => containsFoodStatePhrase(normalizedName, phrase));
+  return matched ? "Alimento sin cocinar" : null;
+}
+
+export function getInventoryNutritionFoodStateExpectation(
+  name: string,
+): InventoryNutritionFoodStateExpectation {
+  const ham = detectInventoryHamVariant(name);
+  if (ham) return { state: "processed", source: ham.source, normalizedHint: ham.variant };
+
+  const cheese = detectInventoryCheeseVariant(name);
+  if (cheese) return { state: "processed", source: cheese.source, normalizedHint: cheese.variant };
+
+  const explicitState = detectExplicitInventoryFoodState(name);
+  if (explicitState) return { state: explicitState, source: "explicit", normalizedHint: null };
+
+  const defaultRaw = detectDefaultRawInventoryFood(name);
+  if (defaultRaw) return { state: "raw", source: "default", normalizedHint: defaultRaw };
+
+  return null;
+}
+
 function isExcessivelyGenericFoodName(name: string) {
   const normalizedName = normalizeForFoodStateDetection(name);
   return normalizedName.length < 4 || normalizedName.split(" ").length <= 1;
@@ -151,9 +243,13 @@ function textMentionsUnprovidedMaterialAssumption(inputName: string, assumptions
   ));
 }
 
+function getExpectedStateForComparison(name: string) {
+  return getInventoryNutritionFoodStateExpectation(name)?.state ?? detectExplicitInventoryFoodState(name);
+}
+
 function assumptionsIntroduceMismatchedFoodState(inputName: string, assumptions: string) {
-  const inputState = detectExplicitInventoryFoodState(inputName);
-  const assumptionsState = detectExplicitInventoryFoodState(assumptions);
+  const inputState = getExpectedStateForComparison(inputName);
+  const assumptionsState = getExpectedStateForComparison(assumptions);
 
   if (!assumptionsState) return false;
   if (!inputState) return true;
@@ -161,9 +257,9 @@ function assumptionsIntroduceMismatchedFoodState(inputName: string, assumptions:
 }
 
 function normalizedNameIntroducesPreparation(inputName: string, normalizedFoodName: string) {
-  const explicitState = detectExplicitInventoryFoodState(inputName);
-  const normalizedState = detectExplicitInventoryFoodState(normalizedFoodName);
-  return normalizedState !== null && normalizedState !== explicitState;
+  const expectedState = getExpectedStateForComparison(inputName);
+  const normalizedState = getExpectedStateForComparison(normalizedFoodName);
+  return normalizedState !== null && normalizedState !== expectedState;
 }
 
 function foodStateCanSubstantiallyChangeEstimate(input: InventoryNutritionAiInput) {
@@ -176,9 +272,11 @@ export function calibrateInventoryNutritionAiConfidence(
 ): InventoryNutritionAiConfidence {
   if (output.confidence !== "high") return output.confidence;
 
-  const explicitState = detectExplicitInventoryFoodState(input.name);
+  const expectation = getInventoryNutritionFoodStateExpectation(input.name);
+  const expectedState = expectation?.state ?? detectExplicitInventoryFoodState(input.name);
   if (output.food_state === "unknown") return "medium";
-  if (!explicitState && output.food_state !== "not_applicable") return "medium";
+  if (expectation?.source === "default") return "medium";
+  if (!expectedState && output.food_state !== "not_applicable") return "medium";
   if (normalizedNameIntroducesPreparation(input.name, output.normalized_food_name)) return "medium";
   if (textMentionsUnprovidedMaterialAssumption(input.name, output.assumptions)) return "medium";
   if (assumptionsIntroduceMismatchedFoodState(input.name, output.assumptions)) return "medium";
@@ -226,7 +324,7 @@ export function validateInventoryNutritionAiOutput(
   if (!parsed.success) return { status: "invalid", reason: "schema" };
 
   const output = parsed.data;
-  const explicitFoodState = detectExplicitInventoryFoodState(input.name);
+  const expectedFoodState = getInventoryNutritionFoodStateExpectation(input.name)?.state ?? detectExplicitInventoryFoodState(input.name);
 
   if (output.status === "needs_clarification") {
     const clarification = output.clarification?.trim() ?? "";
@@ -246,7 +344,7 @@ export function validateInventoryNutritionAiOutput(
     return { status: "invalid", reason: "normalized-food-name" };
   }
 
-  if (explicitFoodState && output.food_state !== explicitFoodState) {
+  if (expectedFoodState && output.food_state !== expectedFoodState) {
     return { status: "invalid", reason: "food-state" };
   }
 
@@ -304,11 +402,34 @@ export function requiresInventoryNutritionAiOverwriteConfirmation(values: Invent
   );
 }
 
+function buildFoodStateExpectationText(input: InventoryNutritionAiInput) {
+  const expectation = getInventoryNutritionFoodStateExpectation(input.name);
+
+  if (!expectation) return "Estado o variante del alimento: no determinado.";
+  if (expectation.source === "explicit") {
+    if (expectation.state === "processed" && expectation.normalizedHint) {
+      return `Producto procesado identificado: ${expectation.normalizedHint}.`;
+    }
+    return `Estado indicado explícitamente por el usuario: ${expectation.state}.`;
+  }
+
+  if (expectation.state === "raw") {
+    return "Estado asumido por defecto por la aplicación: raw. El usuario no indicó una preparación; utiliza valores del alimento sin cocinar.";
+  }
+
+  if (expectation.normalizedHint === "Jamón curado tipo serrano genérico") {
+    return "Producto procesado asumido por defecto: Jamón curado tipo serrano genérico. No asumir una marca ni una categoría ibérica.";
+  }
+
+  return "Producto procesado asumido por defecto: Queso genérico. No asumir una variedad, leche o maduración concreta.";
+}
+
 export function buildInventoryNutritionAiInputText(input: InventoryNutritionAiInput): string {
   return [
     `Nombre: ${input.name}`,
     `Unidad: ${input.unit}`,
     `Cantidad de inventario (solo contexto, no multiplicar): ${input.quantity ?? "sin cantidad"}`,
     `Categoría (solo contexto): ${input.category ?? "sin categoría"}`,
+    buildFoodStateExpectationText(input),
   ].join("\n");
 }
