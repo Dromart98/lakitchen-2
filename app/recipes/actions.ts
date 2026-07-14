@@ -16,6 +16,7 @@ import {
   type RecipeTemplate,
 } from "@/modules/recipes/recipe-matching";
 import { estimateRecipeNutrition } from "@/modules/recipes/recipe-nutrition";
+import { buildRecipeMealName, scaleRecipeToServings } from "@/modules/recipes/recipe-servings";
 
 const RECIPES_PATH = "/recipes";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -70,9 +71,14 @@ export async function cookRecipeAndLogMealAction(formData: FormData) {
   const mode = normalizeRecipeFilterMode(String(formData.get("mode") ?? ""));
   const recipeId = String(formData.get("recipe_id") ?? "").trim();
   const mealType = String(formData.get("meal_type") ?? "").trim();
+  const servingsValue = String(formData.get("servings") ?? "").trim();
 
   if (!UUID_PATTERN.test(recipeId)) redirectWithRecipeError(mode, "recipe-not-found");
   if (!isMealType(mealType)) redirectWithRecipeError(mode, "consume-failed");
+  if (!/^[1-9]\d*$/.test(servingsValue)) redirectWithRecipeError(mode, "invalid-servings");
+
+  const requestedServings = Number(servingsValue);
+  if (!Number.isSafeInteger(requestedServings)) redirectWithRecipeError(mode, "invalid-servings");
 
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "recipe consumption");
@@ -104,7 +110,10 @@ export async function cookRecipeAndLogMealAction(formData: FormData) {
 
   const inventoryItems = inventoryData ?? [];
   const recipe = toRecipeTemplate(recipeData);
-  const [match] = matchRecipesToInventory([recipe], inventoryItems, getCurrentInventoryExpirationDateKey());
+  const scaledRecipe = scaleRecipeToServings(recipe, requestedServings);
+  if (!scaledRecipe.ok) redirectWithRecipeError(mode, "invalid-servings");
+
+  const [match] = matchRecipesToInventory([scaledRecipe.recipe], inventoryItems, getCurrentInventoryExpirationDateKey());
 
   if (!match?.canCookNow) redirectWithRecipeError(mode, "recipe-not-cookable");
 
@@ -123,7 +132,7 @@ export async function cookRecipeAndLogMealAction(formData: FormData) {
   }
 
   const { error: consumeError } = await recipeClient.rpc("consume_meal_builder_items_and_log_meal", {
-    p_meal_name: match.recipe.title,
+    p_meal_name: buildRecipeMealName(match.recipe.title, requestedServings),
     p_meal_type: mealType,
     p_lines: consumptionLines.lines,
   }) as { data: string | null; error: { code?: string; message: string } | null };

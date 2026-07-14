@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
 import { MEAL_TYPE_LABELS, MEAL_TYPES } from "@/modules/meals/meal-types";
 import {
-  filterRecipeMatches,
   matchRecipesToInventory,
   normalizeRecipeFilterMode,
   sortRecipeMatches,
@@ -15,7 +14,8 @@ import {
   type RecipeInventoryItem,
   type RecipeTemplate,
 } from "@/modules/recipes/recipe-matching";
-import { estimateRecipeNutrition, type RecipeNutritionEstimate } from "@/modules/recipes/recipe-nutrition";
+import type { RecipeNutritionEstimate } from "@/modules/recipes/recipe-nutrition";
+import { buildRecipeMatchWithServingOptions, filterRecipeMatchesWithServingOptions, getMaxUrgentItemCountForCookableServings } from "@/modules/recipes/recipe-servings";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +44,7 @@ const recipeErrorMessages: Record<string, string> = {
   "incomplete-nutrition": "Faltan datos nutricionales completos en los productos utilizados.",
   "incompatible-nutrition-unit": "Algún producto tiene una unidad nutricional incompatible.",
   "consume-failed": "No se pudo registrar la receta.",
+  "invalid-servings": "Selecciona un número válido de raciones.",
 };
 
 const ingredientStatusMessages = {
@@ -123,7 +124,9 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
 
   const inventoryItems = inventoryError ? [] : inventoryData ?? [];
   const recipes = (recipeError ? [] : recipeData ?? []).map(toRecipeTemplate).filter((recipe): recipe is RecipeTemplate => Boolean(recipe));
-  const matches = filterRecipeMatches(sortRecipeMatches(matchRecipesToInventory(recipes, inventoryItems, todayKey)), mode);
+  const recipeMatchesWithServingOptions = sortRecipeMatches(matchRecipesToInventory(recipes, inventoryItems, todayKey))
+    .map((match) => buildRecipeMatchWithServingOptions(match, inventoryItems, todayKey));
+  const matches = filterRecipeMatchesWithServingOptions(recipeMatchesWithServingOptions, mode);
 
   return (
     <main className="container">
@@ -156,42 +159,52 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
       ) : null}
 
       <section className="grid cards" style={{ marginTop: 16 }}>
-        {matches.map((match) => {
-          const nutrition = match.canCookNow
-            ? estimateRecipeNutrition(match.ingredientMatches.flatMap((ingredientMatch) => ingredientMatch.allocations), match.recipe.servings)
-            : null;
+        {matches.map(({ match, servingOptions, maxCookableServings, loggableServingOptions }) => {
+          const hasCookableButUnloggableServings = servingOptions.some((option) => option.canCookNow && !option.canLog);
+          const urgentItemCount = getMaxUrgentItemCountForCookableServings(servingOptions);
 
           return (
           <article className="card" key={match.recipe.id}>
             <h2>{match.recipe.title}</h2>
             <p className="muted">{match.recipe.description}</p>
             <p>{match.recipe.prep_minutes} minutos · {match.recipe.servings} ración{match.recipe.servings === 1 ? "" : "es"}</p>
-            <p><strong>{match.canCookNow ? "Puedes cocinarla ahora." : "Te faltan productos o cantidades."}</strong></p>
-            {match.urgentItemCount > 0 ? <p>Usa pronto {match.urgentItemCount} producto{match.urgentItemCount === 1 ? "" : "s"}.</p> : null}
+            <p><strong>{maxCookableServings > 0 ? "Puedes cocinarla ahora." : "Te faltan productos o cantidades."}</strong></p>
+            {maxCookableServings > 0 ? (
+              <p>Puedes preparar hasta {maxCookableServings} de {match.recipe.servings} ración{match.recipe.servings === 1 ? "" : "es"}.</p>
+            ) : null}
+            {urgentItemCount > 0 ? <p>Usa pronto {urgentItemCount} producto{urgentItemCount === 1 ? "" : "s"}.</p> : null}
             {match.recipe.prep_minutes <= 15 ? <p>Lista en 15 minutos.</p> : null}
 
-            {nutrition ? (
+            {loggableServingOptions.length > 0 ? (
               <section>
                 <h3>Nutrición estimada</h3>
-                {nutrition.isComplete && nutrition.total && nutrition.perServing ? (
-                  <>
-                    <p>Por receta: {formatNutritionLine(nutrition.total)}</p>
-                    <p>Por ración: {formatNutritionLine(nutrition.perServing)}</p>
-                  </>
-                ) : (
-                  <>
-                    <p>No se puede calcular la nutrición completa porque faltan datos en {nutrition.missingNutritionItemCount} producto{nutrition.missingNutritionItemCount === 1 ? "" : "s"}.</p>
-                    <p className="muted">Completa los datos nutricionales del inventario antes de registrar esta receta.</p>
-                  </>
-                )}
+                <ul>
+                  {loggableServingOptions.map((option) => (
+                    <li key={option.servings}>
+                      {option.servings} ración{option.servings === 1 ? "" : "es"}: {formatNutritionLine(option.nutrition!.total!)}
+                    </li>
+                  ))}
+                </ul>
                 <p className="muted">Estimación basada en los valores nutricionales guardados en tu inventario.</p>
               </section>
+            ) : maxCookableServings > 0 ? (
+              <p className="muted">Puedes preparar esta receta, pero faltan datos nutricionales en alguno de los productos necesarios para registrarla.</p>
             ) : null}
 
-            {match.canCookNow && nutrition?.isComplete ? (
+            {hasCookableButUnloggableServings && loggableServingOptions.length > 0 ? (
+              <p className="muted">Algunas cantidades no están disponibles para registrar porque requieren productos sin datos nutricionales completos.</p>
+            ) : null}
+
+            {loggableServingOptions.length > 0 ? (
               <form action={cookRecipeAndLogMealAction}>
                 <input type="hidden" name="recipe_id" value={match.recipe.id} />
                 <input type="hidden" name="mode" value={mode} />
+                <label htmlFor={`servings-${match.recipe.id}`}>Raciones a preparar</label>
+                <select id={`servings-${match.recipe.id}`} name="servings" defaultValue="1">
+                  {loggableServingOptions.map((option) => (
+                    <option key={option.servings} value={option.servings}>{option.servings} ración{option.servings === 1 ? "" : "es"}</option>
+                  ))}
+                </select>
                 <label htmlFor={`meal-type-${match.recipe.id}`}>Tipo de comida</label>
                 <select id={`meal-type-${match.recipe.id}`} name="meal_type" defaultValue="lunch">
                   {MEAL_TYPES.map((mealType) => (
