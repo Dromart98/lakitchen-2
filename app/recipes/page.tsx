@@ -16,6 +16,7 @@ import {
   type RecipeTemplate,
 } from "@/modules/recipes/recipe-matching";
 import { estimateRecipeNutrition, type RecipeNutritionEstimate } from "@/modules/recipes/recipe-nutrition";
+import { getMaxCookableRecipeServings, scaleRecipeToServings } from "@/modules/recipes/recipe-servings";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,7 @@ const recipeErrorMessages: Record<string, string> = {
   "incomplete-nutrition": "Faltan datos nutricionales completos en los productos utilizados.",
   "incompatible-nutrition-unit": "Algún producto tiene una unidad nutricional incompatible.",
   "consume-failed": "No se pudo registrar la receta.",
+  "invalid-servings": "Selecciona un número válido de raciones.",
 };
 
 const ingredientStatusMessages = {
@@ -157,8 +159,11 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
 
       <section className="grid cards" style={{ marginTop: 16 }}>
         {matches.map((match) => {
-          const nutrition = match.canCookNow
-            ? estimateRecipeNutrition(match.ingredientMatches.flatMap((ingredientMatch) => ingredientMatch.allocations), match.recipe.servings)
+          const maxCookableServings = getMaxCookableRecipeServings(match.recipe, inventoryItems, todayKey);
+          const nutritionRecipe = maxCookableServings > 0 ? scaleRecipeToServings(match.recipe, maxCookableServings) : null;
+          const nutritionMatch = nutritionRecipe?.ok ? matchRecipesToInventory([nutritionRecipe.recipe], inventoryItems, todayKey)[0] : null;
+          const nutrition = nutritionMatch?.canCookNow
+            ? estimateRecipeNutrition(nutritionMatch.ingredientMatches.flatMap((ingredientMatch) => ingredientMatch.allocations), nutritionMatch.recipe.servings)
             : null;
 
           return (
@@ -166,7 +171,8 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
             <h2>{match.recipe.title}</h2>
             <p className="muted">{match.recipe.description}</p>
             <p>{match.recipe.prep_minutes} minutos · {match.recipe.servings} ración{match.recipe.servings === 1 ? "" : "es"}</p>
-            <p><strong>{match.canCookNow ? "Puedes cocinarla ahora." : "Te faltan productos o cantidades."}</strong></p>
+            <p><strong>{maxCookableServings > 0 ? "Puedes cocinarla ahora." : "Te faltan productos o cantidades."}</strong></p>
+            <p>Puedes preparar hasta {maxCookableServings} de {match.recipe.servings} ración{match.recipe.servings === 1 ? "" : "es"}.</p>
             {match.urgentItemCount > 0 ? <p>Usa pronto {match.urgentItemCount} producto{match.urgentItemCount === 1 ? "" : "s"}.</p> : null}
             {match.recipe.prep_minutes <= 15 ? <p>Lista en 15 minutos.</p> : null}
 
@@ -188,10 +194,16 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
               </section>
             ) : null}
 
-            {match.canCookNow && nutrition?.isComplete ? (
+            {maxCookableServings > 0 && nutrition?.isComplete ? (
               <form action={cookRecipeAndLogMealAction}>
                 <input type="hidden" name="recipe_id" value={match.recipe.id} />
                 <input type="hidden" name="mode" value={mode} />
+                <label htmlFor={`servings-${match.recipe.id}`}>Raciones a preparar</label>
+                <select id={`servings-${match.recipe.id}`} name="servings" defaultValue="1">
+                  {Array.from({ length: maxCookableServings }, (_, index) => index + 1).map((servings) => (
+                    <option key={servings} value={servings}>{servings} ración{servings === 1 ? "" : "es"}</option>
+                  ))}
+                </select>
                 <label htmlFor={`meal-type-${match.recipe.id}`}>Tipo de comida</label>
                 <select id={`meal-type-${match.recipe.id}`} name="meal_type" defaultValue="lunch">
                   {MEAL_TYPES.map((mealType) => (
