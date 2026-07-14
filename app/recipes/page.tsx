@@ -13,6 +13,7 @@ import {
   type RecipeInventoryItem,
   type RecipeTemplate,
 } from "@/modules/recipes/recipe-matching";
+import { estimateRecipeNutrition, type RecipeNutritionEstimate } from "@/modules/recipes/recipe-nutrition";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,14 @@ function formatQuantity(quantity: number): string {
   return new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(quantity);
 }
 
+function formatNutritionValue(value: number): string {
+  return new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 }).format(value);
+}
+
+function formatNutritionLine(values: NonNullable<RecipeNutritionEstimate["total"]>): string {
+  return `${formatNutritionValue(values.calories)} kcal · ${formatNutritionValue(values.proteinG)} g proteínas · ${formatNutritionValue(values.carbsG)} g carbohidratos · ${formatNutritionValue(values.fatG)} g grasas`;
+}
+
 export default async function RecipesPage({ searchParams }: { searchParams?: Promise<RecipesPageSearchParams> }) {
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "recipes");
@@ -78,7 +87,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
 
   const { data: inventoryData, error: inventoryError } = await (supabase as any)
     .from("inventory_items")
-    .select("id, name, quantity, unit, expires_at")
+    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g")
     .eq("user_id", user.id)
     .gt("quantity", 0) as { data: RecipeInventoryItem[] | null; error: { message: string } | null };
 
@@ -128,7 +137,12 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
       ) : null}
 
       <section className="grid cards" style={{ marginTop: 16 }}>
-        {matches.map((match) => (
+        {matches.map((match) => {
+          const nutrition = match.canCookNow
+            ? estimateRecipeNutrition(match.ingredientMatches.flatMap((ingredientMatch) => ingredientMatch.allocations), match.recipe.servings)
+            : null;
+
+          return (
           <article className="card" key={match.recipe.id}>
             <h2>{match.recipe.title}</h2>
             <p className="muted">{match.recipe.description}</p>
@@ -136,6 +150,21 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
             <p><strong>{match.canCookNow ? "Puedes cocinarla ahora." : "Te faltan productos o cantidades."}</strong></p>
             {match.urgentItemCount > 0 ? <p>Usa pronto {match.urgentItemCount} producto{match.urgentItemCount === 1 ? "" : "s"}.</p> : null}
             {match.recipe.prep_minutes <= 15 ? <p>Lista en 15 minutos.</p> : null}
+
+            {nutrition ? (
+              <section>
+                <h3>Nutrición estimada</h3>
+                {nutrition.isComplete && nutrition.total && nutrition.perServing ? (
+                  <>
+                    <p>Por receta: {formatNutritionLine(nutrition.total)}</p>
+                    <p>Por ración: {formatNutritionLine(nutrition.perServing)}</p>
+                  </>
+                ) : (
+                  <p>No se puede calcular la nutrición completa porque faltan datos en {nutrition.missingNutritionItemCount} producto{nutrition.missingNutritionItemCount === 1 ? "" : "s"}.</p>
+                )}
+                <p className="muted">Estimación basada en los valores nutricionales guardados en tu inventario.</p>
+              </section>
+            ) : null}
 
             <h3>Ingredientes</h3>
             <ul>
@@ -153,7 +182,8 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
               </ol>
             </details>
           </article>
-        ))}
+          );
+        })}
       </section>
     </main>
   );

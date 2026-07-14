@@ -154,4 +154,60 @@ describe("recipe matching", () => {
     expect(JSON.stringify(inventory)).toBe(beforeInventory);
     expect(sortedInput[0].recipe.title).toBe("B");
   });
+
+  it("returns exact allocation details for one inventory lot", () => {
+    const [match] = matchRecipesToInventory([recipe()], [{ id: "lot-1", name: "pollo", quantity: 200, unit: "g", expires_at: null, nutrition_basis: "per_100g", calories: 165, protein_g: 31, carbs_g: 0, fat_g: 4 }], "2026-07-14");
+
+    expect(match.ingredientMatches[0].allocations).toEqual([{
+      inventoryItemId: "lot-1",
+      inventoryItemName: "pollo",
+      usedQuantity: 100,
+      usedUnit: "g",
+      nutritionBasis: "per_100g",
+      calories: 165,
+      proteinG: 31,
+      carbsG: 0,
+      fatG: 4,
+    }]);
+  });
+
+  it("keeps one exact allocation per lot when several lots cover an ingredient", () => {
+    const [match] = matchRecipesToInventory([recipe({ recipe_ingredients: [ingredient({ required_quantity: 150 })] })], [
+      { id: "older", name: "pollo", quantity: 100, unit: "g", expires_at: "2026-07-15", nutrition_basis: "per_100g", calories: 100, protein_g: 10, carbs_g: 0, fat_g: 1 },
+      { id: "newer", name: "pollo", quantity: 100, unit: "g", expires_at: "2026-07-20", nutrition_basis: "per_100g", calories: 200, protein_g: 20, carbs_g: 0, fat_g: 2 },
+    ], "2026-07-14");
+
+    expect(match.ingredientMatches[0].allocations.map((item) => [item.inventoryItemId, item.usedQuantity])).toEqual([["older", 100], ["newer", 50]]);
+  });
+
+  it("uses expiration order when assigning lots", () => {
+    const [match] = matchRecipesToInventory([recipe()], [
+      { id: "late", name: "pollo", quantity: 100, unit: "g", expires_at: "2026-07-30", nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null },
+      { id: "soon", name: "pollo", quantity: 100, unit: "g", expires_at: "2026-07-15", nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null },
+    ], "2026-07-14");
+
+    expect(match.ingredientMatches[0].allocations[0].inventoryItemId).toBe("soon");
+    expect(match.urgentItemCount).toBe(1);
+  });
+
+  it("stores allocated kg inventory as grams without double conversion", () => {
+    const [match] = matchRecipesToInventory([recipe({ recipe_ingredients: [ingredient({ required_quantity: 1500, required_unit: "g" })] })], [
+      { id: "kg", name: "pollo", quantity: 2, unit: "kg", expires_at: null, nutrition_basis: "per_100g", calories: 100, protein_g: 10, carbs_g: 0, fat_g: 1 },
+    ], "2026-07-14");
+
+    expect(match.ingredientMatches[0].availableQuantity).toBe(1500);
+    expect(match.ingredientMatches[0].allocations[0].usedQuantity).toBe(1500);
+    expect(match.ingredientMatches[0].allocations[0].usedUnit).toBe("g");
+  });
+
+  it("stores allocated l inventory as milliliters without double conversion", () => {
+    const [match] = matchRecipesToInventory([recipe({ recipe_ingredients: [ingredient({ required_quantity: 750, required_unit: "ml" })] })], [
+      { id: "l", name: "pollo", quantity: 1, unit: "l", expires_at: null, nutrition_basis: "per_100ml", calories: 40, protein_g: 1, carbs_g: 9, fat_g: 0 },
+    ], "2026-07-14");
+
+    expect(match.ingredientMatches[0].availableQuantity).toBe(750);
+    expect(match.ingredientMatches[0].allocations[0].usedQuantity).toBe(750);
+    expect(match.ingredientMatches[0].allocations[0].usedUnit).toBe("ml");
+  });
+
 });
