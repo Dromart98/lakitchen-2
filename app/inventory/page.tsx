@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { InventoryConsumeForm } from "@/components/inventory/InventoryConsumeForm";
+import { InventoryNutritionAiControls } from "@/components/inventory/InventoryNutritionAiControls";
 import { BarcodeCatalogControls } from "./BarcodeCatalogControls";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import {
@@ -306,6 +307,19 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
               <input id={INVENTORY_ADD_FORM_FIELD_IDS.fatG} name="fat_g" type="number" min="0" step="any" inputMode="decimal" placeholder="15" />
             </label>
           </fieldset>
+          <InventoryNutritionAiControls
+            fieldIds={{
+              name: INVENTORY_ADD_FORM_FIELD_IDS.name,
+              quantity: INVENTORY_ADD_FORM_FIELD_IDS.quantity,
+              unit: INVENTORY_ADD_FORM_FIELD_IDS.unit,
+              category: INVENTORY_ADD_FORM_FIELD_IDS.category,
+              nutritionBasis: INVENTORY_ADD_FORM_FIELD_IDS.nutritionBasis,
+              calories: INVENTORY_ADD_FORM_FIELD_IDS.calories,
+              proteinG: INVENTORY_ADD_FORM_FIELD_IDS.proteinG,
+              carbsG: INVENTORY_ADD_FORM_FIELD_IDS.carbsG,
+              fatG: INVENTORY_ADD_FORM_FIELD_IDS.fatG,
+            }}
+          />
           <button className="button" type="submit">Añadir producto</button>
         </form>
       </section>
@@ -518,6 +532,19 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                                 <input id={`inventory-fat-g-${item.id}`} name="fat_g" type="number" min="0" step="any" inputMode="decimal" defaultValue={item.fat_g ?? ""} />
                               </label>
                             </fieldset>
+                            <InventoryNutritionAiControls
+                              fieldIds={{
+                                name: `inventory-name-${item.id}`,
+                                quantity: `inventory-quantity-${item.id}`,
+                                unit: `inventory-unit-${item.id}`,
+                                category: `inventory-category-${item.id}`,
+                                nutritionBasis: `inventory-nutrition-basis-${item.id}`,
+                                calories: `inventory-calories-${item.id}`,
+                                proteinG: `inventory-protein-g-${item.id}`,
+                                carbsG: `inventory-carbs-g-${item.id}`,
+                                fatG: `inventory-fat-g-${item.id}`,
+                              }}
+                            />
                             <button className="button" type="submit">Guardar cambios</button>
                           </form>
                         </details>
