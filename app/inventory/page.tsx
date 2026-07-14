@@ -227,6 +227,9 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
       <section className="card form-section">
         <h2>Añadir producto</h2>
         <p className="muted">Registra productos en tu despensa, nevera o congelador.</p>
+        <Link className="logout-link" href="/inventory/barcodes">
+          Gestionar productos recordados
+        </Link>
         {inventoryErrorMessage ? <p className="auth-message error" role="alert">{inventoryErrorMessage}</p> : null}
         {inventorySuccessMessage ? <p className="auth-message success" role="status">{inventorySuccessMessage}</p> : null}
         <form action={addInventoryItemAction} className="meal-log-form">
