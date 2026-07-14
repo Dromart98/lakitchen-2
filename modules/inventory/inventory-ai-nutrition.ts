@@ -127,10 +127,13 @@ function normalizePrimaryInventoryProductName(name: string) {
     "loncha de",
     "lonchas de",
     "cuna de",
+    "filete de",
+    "filetes de",
     "paquete de",
     "pack de",
     "bandeja de",
     "pieza de",
+    "piezas de",
     "porcion de",
     "bloque de",
     "tarrina de",
@@ -245,13 +248,28 @@ export function detectInventoryCheeseVariant(
 }
 
 function detectDefaultRawInventoryFood(name: string) {
-  const normalizedName = normalizeForFoodStateDetection(name);
+  const normalizedName = normalizePrimaryInventoryProductName(name);
   const excluded = ["leche", "yogur", "pan", "salsa", "mayonesa", "pizza", "tortilla", "croquetas", "ensalada", "comida casera", "plato preparado", "atun", "pasta fresca", "pasta con", "pasta de"];
   if (excluded.some((phrase) => containsFoodStatePhrase(normalizedName, phrase))) return null;
+  if (isCompoundInventoryDishName(normalizedName)) return null;
 
-  const rawFoods = ["pechuga de pollo", "pollo", "pechuga de pavo", "pavo", "ternera", "carne picada", "cerdo", "solomillo", "merluza", "salmon", "tilapia", "bacalao", "pescado", "gambas", "langostinos", "pasta", "macarrones", "espaguetis", "arroz", "quinoa", "cuscus", "avena", "lentejas", "garbanzos", "alubias", "brocoli", "espinacas", "calabacin", "zanahoria", "pimiento", "cebolla", "papas", "patatas", "huevos"];
-  const matched = rawFoods.find((phrase) => containsFoodStatePhrase(normalizedName, phrase));
+  const rawFoods = ["pechuga de pollo", "pechuga de pavo", "carne de ternera", "carne picada", "pollo", "pavo", "ternera", "cerdo", "solomillo", "solomillos", "merluza", "salmón", "salmon", "tilapia", "bacalao", "pescado", "gambas", "langostinos", "pasta", "macarrones", "espaguetis", "arroz", "quinoa", "cuscús", "cuscus", "avena", "lentejas", "garbanzos", "alubias", "brócoli", "brocoli", "espinacas", "calabacín", "calabacin", "zanahoria", "pimiento", "cebolla", "papa", "papas", "patata", "patatas", "huevo", "huevos"];
+  const matched = rawFoods.find((phrase) => isPrimaryDefaultRawFood(normalizedName, phrase));
   return matched ? "Alimento sin cocinar" : null;
+}
+
+function isCompoundInventoryDishName(normalizedPrimaryName: string) {
+  const compoundPatterns = ["con", "relleno de", "rellena de", "guiso de", "sopa de", "crema de", "pure de", "bocadillo de", "hamburguesa de", "wrap de", "empanada de"];
+  return compoundPatterns.some((phrase) => containsFoodStatePhrase(normalizedPrimaryName, phrase));
+}
+
+function isPrimaryDefaultRawFood(
+  normalizedPrimaryName: string,
+  foodName: string,
+) {
+  const normalizedFoodName = normalizeForFoodStateDetection(foodName);
+  return normalizedPrimaryName === normalizedFoodName
+    || normalizedPrimaryName.startsWith(`${normalizedFoodName} `);
 }
 
 export function getInventoryNutritionFoodStateExpectation(

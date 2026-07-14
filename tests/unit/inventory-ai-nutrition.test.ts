@@ -108,6 +108,27 @@ describe("food state expectations", () => {
     expect(getInventoryNutritionFoodStateExpectation(name)?.state).toBe(state);
   });
 
+  it.each([
+    "Pechuga de pollo",
+    "Pechuga de pollo sin piel",
+    "Pollo troceado",
+    "Carne de ternera",
+    "Carne picada",
+    "Pasta integral",
+    "Arroz basmati",
+    "Lentejas secas",
+    "Tilapia",
+    "Filetes de tilapia",
+    "Brócoli congelado",
+    "Bolsa de espinacas",
+    "Huevos L",
+  ])("infers raw default only for the primary simple food in %s", (name) => {
+    expect(getInventoryNutritionFoodStateExpectation(name)).toEqual({
+      state: "raw",
+      source: "default",
+      normalizedHint: "Alimento sin cocinar",
+    });
+  });
 
   it.each(["Pizza de jamón", "Bocadillo de jamón", "Croquetas de jamón", "Tortilla con jamón", "Pasta con jamón", "Ensalada con jamón"])("does not detect ham as the primary product for %s", (name) => {
     expect(detectInventoryHamVariant(name)).toBeNull();
@@ -140,6 +161,16 @@ describe("food state expectations", () => {
     "Croquetas de queso",
     "Hamburguesa con cheddar",
     "Pizza de mozzarella",
+    "Hamburguesa de pollo",
+    "Bocadillo de pollo",
+    "Wrap de pollo",
+    "Arroz con pollo",
+    "Pollo con arroz",
+    "Lentejas con chorizo",
+    "Puré de papas",
+    "Crema de calabacín",
+    "Sopa de verduras con arroz",
+    "Empanada de pollo",
   ])("does not infer a default state for %s", (name) => {
     expect(getInventoryNutritionFoodStateExpectation(name)).toBeNull();
   });
@@ -224,6 +255,41 @@ describe("validateInventoryNutritionAiOutput", () => {
 
     expect(result.status).toBe(expectedStatus);
     if (expectedStatus === "invalid") expect(result).toEqual({ status: "invalid", reason: "food-state" });
+  });
+
+  it("accepts default raw Pechuga de pollo with raw output", () => {
+    const input: InventoryNutritionAiInput = { ...validInput, name: "Pechuga de pollo" };
+    expect(validateInventoryNutritionAiOutput(input, {
+      ...validOutput,
+      food_state: "raw",
+      normalized_food_name: "Pechuga de pollo",
+    }).status).toBe("success");
+  });
+
+  it("rejects default raw Pechuga de pollo with cooked output", () => {
+    const input: InventoryNutritionAiInput = { ...validInput, name: "Pechuga de pollo" };
+    expect(validateInventoryNutritionAiOutput(input, {
+      ...validOutput,
+      food_state: "cooked",
+      normalized_food_name: "Pechuga de pollo",
+    })).toEqual({ status: "invalid", reason: "food-state" });
+  });
+
+  it.each(["Hamburguesa de pollo", "Arroz con pollo"])("keeps needs_clarification valid for composite dish %s", (name) => {
+    const input: InventoryNutritionAiInput = { ...validInput, name };
+    expect(validateInventoryNutritionAiOutput(input, {
+      status: "needs_clarification",
+      nutrition_basis: null,
+      calories: null,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
+      confidence: "low",
+      food_state: "unknown",
+      normalized_food_name: "",
+      assumptions: "",
+      clarification: "Describe el plato.",
+    })).toEqual({ status: "needs-clarification", message: "Describe el plato." });
   });
 
   it.each(["", " ", "a", "a".repeat(121)])("rejects estimated output with invalid normalized food name %#", (normalizedFoodName) => {
@@ -443,6 +509,8 @@ describe("base values are not multiplied by quantity", () => {
     ["Queso", "Producto procesado asumido por defecto: Queso genérico"],
     ["Queso curado", "Producto procesado identificado: Queso curado"],
     ["Pechuga de pollo", "Estado asumido por defecto por la aplicación: raw"],
+    ["Hamburguesa de pollo", "Estado o variante del alimento: no determinado"],
+    ["Arroz con pollo", "Estado o variante del alimento: no determinado"],
     ["Atún", "Estado o variante del alimento: no determinado"],
   ] as const)("adds food expectation context for %s", (name, expectedText) => {
     expect(buildInventoryNutritionAiInputText({ ...validInput, name })).toContain(expectedText);
