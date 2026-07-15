@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { generateRecipesWithOpenAi } from "@/lib/openai/recipe-generation";
 import {
   parseRecipeAiRequest,
+  RECIPE_AI_JSON_SCHEMA,
   validateRecipeAiProviderOutput,
   type RecipeAiInventoryItem,
   type RecipeAiRequest,
@@ -26,6 +27,21 @@ const validRecipe = {
   steps: ["Cuece el arroz hasta que quede tierno.", "Cocina el pollo y mézclalo con el arroz."],
 };
 
+
+const forbiddenSchemaKeywords = ["allOf", "if", "then", "else", "not", "dependentRequired", "dependentSchemas"] as const;
+
+function walkSchema(value: unknown, visit: (node: Record<string, unknown>) => void) {
+  if (typeof value !== "object" || value === null) return;
+  if (Array.isArray(value)) {
+    value.forEach((item) => walkSchema(item, visit));
+    return;
+  }
+
+  const record = value as Record<string, unknown>;
+  visit(record);
+  Object.values(record).forEach((child) => walkSchema(child, visit));
+}
+
 function completed(body: unknown) {
   return { status: "completed", output_text: JSON.stringify(body) };
 }
@@ -33,6 +49,35 @@ function completed(body: unknown) {
 function response(status: number, body: unknown) {
   return Promise.resolve({ ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) } as Response);
 }
+
+describe("RECIPE_AI_JSON_SCHEMA", () => {
+  it("uses a strict root object without unsupported root composition", () => {
+    expect(RECIPE_AI_JSON_SCHEMA.type).toBe("object");
+    expect("anyOf" in RECIPE_AI_JSON_SCHEMA).toBe(false);
+    expect(RECIPE_AI_JSON_SCHEMA.required).toEqual(["status", "recipes", "message"]);
+  });
+
+  it("does not contain unsupported composition keywords at any level", () => {
+    walkSchema(RECIPE_AI_JSON_SCHEMA, (node) => {
+      for (const keyword of forbiddenSchemaKeywords) {
+        expect(node).not.toHaveProperty(keyword);
+      }
+    });
+  });
+
+  it("marks every object as closed and requires every declared property", () => {
+    walkSchema(RECIPE_AI_JSON_SCHEMA, (node) => {
+      if (node.type !== "object") return;
+      expect(node.additionalProperties).toBe(false);
+      const properties = node.properties as Record<string, unknown>;
+      expect(new Set(node.required as string[])).toEqual(new Set(Object.keys(properties)));
+    });
+  });
+
+  it("allows message to be a string or null", () => {
+    expect(RECIPE_AI_JSON_SCHEMA.properties.message.type).toEqual(["string", "null"]);
+  });
+});
 
 describe("parseRecipeAiRequest", () => {
   it("accepts valid selector values", () => {
@@ -60,7 +105,7 @@ describe("parseRecipeAiRequest", () => {
 
 describe("validateRecipeAiProviderOutput", () => {
   it("accepts a valid response", () => {
-    expect(validateRecipeAiProviderOutput(request, inventory, { status: "success", recipes: [validRecipe] })).toEqual({ status: "success", recipes: [validRecipe] });
+    expect(validateRecipeAiProviderOutput(request, inventory, { status: "success", recipes: [validRecipe], message: null })).toEqual({ status: "success", recipes: [validRecipe] });
   });
 
   it("rejects missing IDs", () => {
@@ -114,19 +159,49 @@ describe("validateRecipeAiProviderOutput", () => {
   });
 
   it("handles needs-clarification", () => {
-    expect(validateRecipeAiProviderOutput(request, inventory, { status: "needs-clarification", message: "Necesito más productos." })).toEqual({ status: "needs-clarification", message: "Necesito más productos." });
+    expect(validateRecipeAiProviderOutput(request, inventory, { status: "needs-clarification", recipes: [], message: "Necesito más productos." })).toEqual({ status: "needs-clarification", message: "Necesito más productos." });
+  });
+
+  it("rejects success without recipes", () => {
+    expect(validateRecipeAiProviderOutput(request, inventory, { status: "success", recipes: [], message: null })).toMatchObject({ status: "error" });
+  });
+
+  it("rejects success with a message", () => {
+    expect(validateRecipeAiProviderOutput(request, inventory, { status: "success", recipes: [validRecipe], message: "No debería aparecer." })).toMatchObject({ status: "error" });
+  });
+
+  it("rejects needs-clarification with recipes", () => {
+    expect(validateRecipeAiProviderOutput(request, inventory, { status: "needs-clarification", recipes: [validRecipe], message: "Necesito más datos." })).toMatchObject({ status: "error" });
+  });
+
+  it("rejects needs-clarification with a null message", () => {
+    expect(validateRecipeAiProviderOutput(request, inventory, { status: "needs-clarification", recipes: [], message: null })).toMatchObject({ status: "error" });
+  });
+
+  it("rejects error responses with recipes", () => {
+    expect(validateRecipeAiProviderOutput(request, inventory, { status: "error", recipes: [validRecipe], message: null })).toMatchObject({ status: "error", code: "invalid-ai-response" });
+  });
+
+  it("rejects duplicate inventory item IDs inside one recipe", () => {
+    const recipe = { ...validRecipe, ingredients: [validRecipe.ingredients[0], { ...validRecipe.ingredients[0], quantity: 100 }] };
+    expect(validateRecipeAiProviderOutput(request, inventory, { status: "success", recipes: [recipe], message: null })).toMatchObject({ status: "error", code: "invalid-ai-response" });
+  });
+
+  it("rejects repeated quantities that would exceed stock through duplicate IDs", () => {
+    const recipe = { ...validRecipe, ingredients: [{ ...validRecipe.ingredients[1], quantity: 200 }, { ...validRecipe.ingredients[1], quantity: 200 }] };
+    expect(validateRecipeAiProviderOutput(request, inventory, { status: "success", recipes: [recipe], message: null })).toMatchObject({ status: "error", code: "invalid-ai-response" });
   });
 
   it("does not mutate inventory data", () => {
     const before = structuredClone(inventory);
-    validateRecipeAiProviderOutput(request, inventory, { status: "success", recipes: [validRecipe] });
+    validateRecipeAiProviderOutput(request, inventory, { status: "success", recipes: [validRecipe], message: null });
     expect(inventory).toEqual(before);
   });
 });
 
 describe("generateRecipesWithOpenAi", () => {
   it("uses fetch and accepts a valid response", async () => {
-    const fetchImpl = vi.fn(() => response(200, completed({ status: "success", recipes: [validRecipe] })));
+    const fetchImpl = vi.fn(() => response(200, completed({ status: "success", recipes: [validRecipe], message: null })));
     await expect(generateRecipesWithOpenAi(request, inventory, { apiKey: "key", fetchImpl })).resolves.toMatchObject({ status: "success" });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const firstCall = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];

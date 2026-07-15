@@ -85,41 +85,59 @@ export function parseRecipeAiRequest(input: unknown): RecipeAiRequest | null {
   return result.success ? result.data : null;
 }
 
-export const recipeAiProviderResponseSchema = z.discriminatedUnion("status", [
-  z.object({
-    status: z.literal("success"),
-    recipes: z.array(z.object({
-      title: z.string().trim().min(1).max(90),
-      description: z.string().trim().min(1).max(240),
-      estimated_minutes: z.number().int().min(1).max(60),
-      servings: z.number().int().min(1).max(4),
-      ingredients: z.array(z.object({
-        inventory_item_id: z.string().trim().min(1).max(100),
-        name: z.string().trim().min(1).max(120),
-        quantity: z.number().positive().finite(),
-        unit: z.string().trim().min(1).max(16),
-      }).strict()).min(1).max(20),
-      steps: z.array(z.string().trim().min(8).max(280)).min(2).max(12),
-    }).strict()).min(1).max(3),
-  }).strict(),
-  z.object({
-    status: z.literal("needs-clarification"),
-    message: z.string().trim().min(1).max(240),
-  }).strict(),
-  z.object({
-    status: z.literal("error"),
-  }).strict(),
-]);
+const recipeAiProviderRecipeSchema = z.object({
+  title: z.string().trim().min(1).max(90),
+  description: z.string().trim().min(1).max(240),
+  estimated_minutes: z.number().int().min(1).max(60),
+  servings: z.number().int().min(1).max(4),
+  ingredients: z.array(z.object({
+    inventory_item_id: z.string().trim().min(1).max(100),
+    name: z.string().trim().min(1).max(120),
+    quantity: z.number().positive().finite(),
+    unit: z.string().trim().min(1).max(16),
+  }).strict()).min(1).max(20),
+  steps: z.array(z.string().trim().min(8).max(280)).min(2).max(12),
+}).strict();
+
+export const recipeAiProviderResponseSchema = z.object({
+  status: z.enum(["success", "needs-clarification", "error"]),
+  recipes: z.array(recipeAiProviderRecipeSchema).max(3),
+  message: z.string().trim().min(1).max(240).nullable(),
+}).strict().superRefine((value, context) => {
+  if (value.status === "success") {
+    if (value.recipes.length === 0) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["recipes"], message: "Success responses require recipes." });
+    }
+    if (value.message !== null) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["message"], message: "Success responses require a null message." });
+    }
+  }
+
+  if (value.status === "needs-clarification") {
+    if (value.recipes.length !== 0) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["recipes"], message: "Clarification responses cannot include recipes." });
+    }
+    if (value.message === null) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["message"], message: "Clarification responses require a message." });
+    }
+  }
+
+  if (value.status === "error") {
+    if (value.recipes.length !== 0) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["recipes"], message: "Error responses cannot include recipes." });
+    }
+  }
+});
 
 export const RECIPE_AI_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["status"],
+  required: ["status", "recipes", "message"],
   properties: {
     status: { type: "string", enum: ["success", "needs-clarification", "error"] },
     recipes: {
       type: "array",
-      minItems: 1,
+      minItems: 0,
       maxItems: 3,
       items: {
         type: "object",
@@ -150,12 +168,8 @@ export const RECIPE_AI_JSON_SCHEMA = {
         },
       },
     },
-    message: { type: "string", minLength: 1, maxLength: 240 },
+    message: { type: ["string", "null"], minLength: 1, maxLength: 240 },
   },
-  allOf: [
-    { if: { properties: { status: { const: "success" } } }, then: { required: ["recipes"] } },
-    { if: { properties: { status: { const: "needs-clarification" } } }, then: { required: ["message"] } },
-  ],
 } as const;
 
 export function buildRecipeAiInputText(request: RecipeAiRequest, inventoryItems: RecipeAiInventoryItem[]): string {
@@ -194,7 +208,7 @@ export function validateRecipeAiProviderOutput(
   const parsed = recipeAiProviderResponseSchema.safeParse(output);
   if (!parsed.success) return { status: "error", code: "invalid-ai-response" };
   if (parsed.data.status === "error") return { status: "error", code: "invalid-ai-response" };
-  if (parsed.data.status === "needs-clarification") return parsed.data;
+  if (parsed.data.status === "needs-clarification") return { status: "needs-clarification", message: parsed.data.message! };
 
   if (parsed.data.recipes.length > request.suggestion_count) return { status: "error", code: "invalid-ai-response" };
 
@@ -208,7 +222,12 @@ export function validateRecipeAiProviderOutput(
     if (recipe.estimated_minutes > request.max_minutes) return { status: "error", code: "invalid-ai-response" };
     if (recipe.servings !== request.servings) return { status: "error", code: "invalid-ai-response" };
 
+    const ingredientIds = new Set<string>();
+
     for (const ingredient of recipe.ingredients) {
+      if (ingredientIds.has(ingredient.inventory_item_id)) return { status: "error", code: "invalid-ai-response" };
+      ingredientIds.add(ingredient.inventory_item_id);
+
       const inventoryItem = inventoryById.get(ingredient.inventory_item_id);
       if (!inventoryItem) return { status: "error", code: "invalid-ai-response" };
       if (ingredient.name !== inventoryItem.name) return { status: "error", code: "invalid-ai-response" };
