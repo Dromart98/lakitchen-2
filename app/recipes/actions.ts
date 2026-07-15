@@ -232,7 +232,9 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
     const result = await generateRecipesWithOpenAi(request, inventoryItems, {
       apiKey,
       model: process.env.OPENAI_RECIPE_MODEL,
-      urgentInventoryItemIds,
+      expirationContext: request.priority_mode === "expiration"
+        ? { todayKey, urgentInventoryItemIds }
+        : undefined,
     });
 
     if (result.status !== "success") return result;
