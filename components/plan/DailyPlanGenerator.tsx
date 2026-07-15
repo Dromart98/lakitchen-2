@@ -26,6 +26,11 @@ const fitLabels: Record<DailyPlanFit, string> = {
   far: "Se aleja de tu objetivo",
 };
 
+type GeneratedSettings = {
+  priority_mode: DailyPlanPriorityMode;
+  max_minutes_per_meal: 15 | 30 | 45 | 60;
+};
+
 function formatNumber(value: number) {
   return new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 }).format(value);
 }
@@ -44,6 +49,7 @@ export function DailyPlanGenerator() {
   const [priorityMode, setPriorityMode] = useState<DailyPlanPriorityMode>("balanced");
   const [maxMinutes, setMaxMinutes] = useState<15 | 30 | 45 | 60>(30);
   const [result, setResult] = useState<DailyPlanActionResult | null>(null);
+  const [generatedSettings, setGeneratedSettings] = useState<GeneratedSettings | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -52,21 +58,26 @@ export function DailyPlanGenerator() {
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isBusy) return;
+    const settings: GeneratedSettings = {
+      priority_mode: priorityMode,
+      max_minutes_per_meal: maxMinutes,
+    };
     setResult(null);
+    setGeneratedSettings(null);
     setSaveMessage(null);
     startTransition(async () => {
-      const nextResult = await generateDailyPlanAction({ priority_mode: priorityMode, max_minutes_per_meal: maxMinutes });
+      const nextResult = await generateDailyPlanAction(settings);
       setResult(nextResult);
+      setGeneratedSettings(nextResult.status === "success" ? settings : null);
     });
   }
 
   async function handleSave(plan: Extract<DailyPlanActionResult, { status: "success" }>) {
-    if (isBusy) return;
+    if (isBusy || !generatedSettings) return;
     setIsSaving(true);
     setSaveMessage(null);
     const saved = await saveDailyPlanAction({
-      priority_mode: priorityMode,
-      max_minutes_per_meal: maxMinutes,
+      ...generatedSettings,
       plan,
     });
     setIsSaving(false);
@@ -123,7 +134,7 @@ export function DailyPlanGenerator() {
               <MacroLine label="Objetivo diario" value={result.target} />
               <MacroLine label="Total generado" value={result.total} />
               <MacroLine label="Diferencia" value={result.difference} />
-              <button className="button" type="button" disabled={isBusy} onClick={() => handleSave(result)}>
+              <button className="button" type="button" disabled={isBusy || !generatedSettings} onClick={() => handleSave(result)}>
                 {isSaving ? "Guardando…" : "Guardar plan"}
               </button>
               <p className="muted">Guardar crea una copia del plan. No descuenta inventario ni registra comidas.</p>
