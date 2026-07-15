@@ -2,12 +2,12 @@ import { createHash } from "node:crypto";
 
 import { getInventoryExpirationDayDifference } from "@/modules/inventory/inventory-expiration";
 import { RECIPE_AI_PRIORITY_MODES, type RecipeAiPriorityMode, type RecipeAiSuggestion } from "@/modules/recipes/recipe-ai-generation";
+import { RECIPE_MAX_INGREDIENTS } from "@/modules/recipes/recipe-limits";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TOP_LEVEL_KEYS = ["priority_mode", "recipe"];
 const RECIPE_KEYS = ["title", "description", "estimated_minutes", "servings", "ingredients", "steps"];
 const INGREDIENT_KEYS = ["inventory_item_id", "name", "quantity", "unit"];
-const MAX_INGREDIENTS = 20;
 
 export type SaveGeneratedRecipeInput = {
   priority_mode: RecipeAiPriorityMode;
@@ -85,7 +85,7 @@ export function parseSaveGeneratedRecipeInput(input: unknown): SaveGeneratedReci
   if (!isNonEmptyString(recipe.title, 90) || !isNonEmptyString(recipe.description, 240)) return null;
   if (typeof recipe.estimated_minutes !== "number" || !Number.isInteger(recipe.estimated_minutes) || recipe.estimated_minutes < 1 || recipe.estimated_minutes > 60) return null;
   if (typeof recipe.servings !== "number" || !Number.isInteger(recipe.servings) || recipe.servings < 1 || recipe.servings > 4) return null;
-  if (!Array.isArray(recipe.ingredients) || recipe.ingredients.length < 1 || recipe.ingredients.length > MAX_INGREDIENTS) return null;
+  if (!Array.isArray(recipe.ingredients) || recipe.ingredients.length < 1 || recipe.ingredients.length > RECIPE_MAX_INGREDIENTS) return null;
   if (!Array.isArray(recipe.steps) || recipe.steps.length < 2 || recipe.steps.length > 12) return null;
   if (!recipe.steps.every((step) => isNonEmptyString(step, 280))) return null;
 
@@ -172,7 +172,7 @@ export function toSavedAiRecipe(row: unknown): SavedAiRecipe | null {
     if (!isPlainObject(ingredient)) return null;
     if (!UUID_PATTERN.test(String(ingredient.id ?? "")) || !UUID_PATTERN.test(String(ingredient.recipe_id ?? "")) || !UUID_PATTERN.test(String(ingredient.user_id ?? "")) || !UUID_PATTERN.test(String(ingredient.inventory_item_id ?? ""))) return null;
     if (!isNonEmptyString(ingredient.name, 120) || !isNonEmptyString(ingredient.unit, 16) || !isValidPositiveNumber(ingredient.quantity)) return null;
-    if (typeof ingredient.sort_order !== "number" || !Number.isInteger(ingredient.sort_order) || ingredient.sort_order < 0 || ingredient.sort_order > 19) return null;
+    if (typeof ingredient.sort_order !== "number" || !Number.isInteger(ingredient.sort_order) || ingredient.sort_order < 0 || ingredient.sort_order >= RECIPE_MAX_INGREDIENTS) return null;
     if (typeof ingredient.created_at !== "string") return null;
     return ingredient as SavedAiRecipeIngredient;
   });

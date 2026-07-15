@@ -59,6 +59,18 @@ describe("parseSaveGeneratedRecipeInput", () => {
   it("rejects invalid steps", () => {
     expect(parseSaveGeneratedRecipeInput({ ...validInput, recipe: { ...validInput.recipe, steps: [""] } })).toBeNull();
   });
+
+  it("accepts exactly twenty ingredients and rejects twenty-one", () => {
+    const ingredients = Array.from({ length: 21 }, (_, index) => ({
+      inventory_item_id: `${String(index + 1).padStart(8, "0")}-1111-4111-8111-${String(index + 1).padStart(12, "0")}`,
+      name: `Producto ${index + 1}`,
+      quantity: 1,
+      unit: "ud",
+    }));
+
+    expect(parseSaveGeneratedRecipeInput({ ...validInput, recipe: { ...validInput.recipe, ingredients: ingredients.slice(0, 20) } })?.recipe.ingredients).toHaveLength(20);
+    expect(parseSaveGeneratedRecipeInput({ ...validInput, recipe: { ...validInput.recipe, ingredients } })).toBeNull();
+  });
 });
 
 describe("saved AI recipe canonical fingerprint", () => {

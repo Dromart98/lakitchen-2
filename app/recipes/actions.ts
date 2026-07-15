@@ -24,7 +24,9 @@ import {
   parseSaveGeneratedRecipeInput,
   validateSavedAiRecipeInventory,
   type SaveGeneratedRecipeResult,
+  toSavedAiRecipe,
   type SavedAiRecipeInventoryItem,
+  type SavedAiRecipeRow,
 } from "@/modules/recipes/saved-ai-recipes";
 import {
   mapRecipeAiCookRpcError,
@@ -42,6 +44,14 @@ import {
   type RecipeTemplate,
 } from "@/modules/recipes/recipe-matching";
 import { estimateRecipeNutrition } from "@/modules/recipes/recipe-nutrition";
+import {
+  buildSavedAiRecipeCookPlan,
+  mapSavedAiRecipeCookRpcError,
+  parseCookSavedAiRecipeInput,
+  validateSavedAiRecipeCookInventory,
+  type SavedAiRecipeCookResult,
+  type SavedAiRecipeInventoryItem as SavedAiRecipeCookInventoryItem,
+} from "@/modules/recipes/saved-ai-recipe-consumption";
 import { buildRecipeMealName, scaleRecipeToServings } from "@/modules/recipes/recipe-servings";
 
 const RECIPES_PATH = "/recipes";
@@ -370,6 +380,93 @@ export async function deleteSavedAiRecipeAction(formData: FormData) {
   }
 
   revalidatePath(RECIPES_PATH);
+}
+
+
+type CookSavedAiRecipeSupabaseQueryBuilder = {
+  select(columns: string): CookSavedAiRecipeSupabaseQueryBuilder;
+  eq(column: string, value: string): CookSavedAiRecipeSupabaseQueryBuilder;
+  in(column: string, values: string[]): Promise<unknown>;
+  maybeSingle(): Promise<unknown>;
+};
+
+type CookSavedAiRecipeSupabaseClient = {
+  from(table: string): CookSavedAiRecipeSupabaseQueryBuilder;
+  rpc(functionName: string, parameters: Record<string, unknown>): Promise<unknown>;
+};
+
+export async function cookSavedAiRecipeAndLogMealAction(input: unknown): Promise<SavedAiRecipeCookResult> {
+  const request = parseCookSavedAiRecipeInput(input);
+  if (!request) return { status: "error", code: "invalid-input" };
+
+  const supabase = await createClient();
+  let user: { id: string };
+
+  try {
+    user = await requireAuthenticatedUser(supabase, "saved AI recipe consumption");
+  } catch {
+    return { status: "error", code: "unauthenticated" };
+  }
+
+  const recipeClient = supabase as unknown as CookSavedAiRecipeSupabaseClient;
+  const { data: recipeData, error: recipeError } = await recipeClient
+    .from("user_saved_ai_recipes")
+    .select("id, user_id, title, description, estimated_minutes, servings, steps, source_priority_mode, fingerprint, created_at, user_saved_ai_recipe_ingredients(id, recipe_id, user_id, inventory_item_id, name, quantity, unit, sort_order, created_at)")
+    .eq("id", request.recipe_id)
+    .eq("user_id", user.id)
+    .maybeSingle() as { data: SavedAiRecipeRow | null; error: { message: string } | null };
+
+  if (recipeError) {
+    console.warn("Supabase could not load saved AI recipe for consumption.");
+    return { status: "error", code: "unexpected-error" };
+  }
+
+  if (!recipeData) return { status: "error", code: "recipe-not-found" };
+
+  const recipe = toSavedAiRecipe(recipeData);
+  if (!recipe || recipe.user_id !== user.id || recipe.id !== request.recipe_id) return { status: "error", code: "recipe-corrupt" };
+
+  const inventoryItemIds = recipe.ingredients.map((ingredient) => ingredient.inventory_item_id);
+  if (inventoryItemIds.length === 0 || new Set(inventoryItemIds).size !== inventoryItemIds.length) {
+    return { status: "error", code: "recipe-corrupt" };
+  }
+
+  const { data: inventoryData, error: inventoryError } = await recipeClient
+    .from("inventory_items")
+    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g")
+    .eq("user_id", user.id)
+    .in("id", inventoryItemIds) as { data: SavedAiRecipeCookInventoryItem[] | null; error: { message: string } | null };
+
+  if (inventoryError) {
+    console.warn("Supabase could not load saved AI recipe inventory items for consumption.");
+    return { status: "error", code: "unexpected-error" };
+  }
+
+  const inventoryItems = inventoryData ?? [];
+  const validationError = validateSavedAiRecipeCookInventory(recipe, inventoryItems, getCurrentInventoryExpirationDateKey());
+  if (validationError) return { status: "error", code: validationError };
+
+  const planResult = buildSavedAiRecipeCookPlan(recipe, inventoryItems, request.meal_type);
+  if (!planResult.ok) return { status: "error", code: planResult.code };
+
+  const { error: consumeError } = await recipeClient.rpc("consume_meal_builder_items_and_log_meal", {
+    p_meal_name: planResult.plan.mealName,
+    p_meal_type: planResult.plan.mealType,
+    p_lines: planResult.plan.lines,
+  }) as { data: string | null; error: { code?: string; message: string } | null };
+
+  if (consumeError) {
+    console.warn("Supabase could not consume saved AI recipe items and log a meal.");
+    return { status: "error", code: mapSavedAiRecipeCookRpcError(consumeError) };
+  }
+
+  revalidatePath(RECIPES_PATH);
+  revalidatePath("/inventory");
+  revalidatePath("/dashboard");
+  revalidatePath("/meal-history");
+  revalidatePath("/weekly-summary");
+
+  return { status: "success" };
 }
 
 

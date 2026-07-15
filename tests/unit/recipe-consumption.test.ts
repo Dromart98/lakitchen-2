@@ -4,17 +4,27 @@ import { buildRecipeConsumptionLines, type RecipeConsumptionInventoryItem } from
 import type { RecipeIngredientAllocation } from "@/modules/recipes/recipe-matching";
 
 const ids = [
-  "11111111-1111-4111-8111-111111111111",
-  "22222222-2222-4222-8222-222222222222",
-  "33333333-3333-4333-8333-333333333333",
-  "44444444-4444-4444-8444-444444444444",
-  "55555555-5555-4555-8555-555555555555",
-  "66666666-6666-4666-8666-666666666666",
-  "77777777-7777-4777-8777-777777777777",
-  "88888888-8888-4888-8888-888888888888",
-  "99999999-9999-4999-8999-999999999999",
-  "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-  "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  "00000001-0001-4001-8001-000000000001",
+  "00000002-0002-4002-8002-000000000002",
+  "00000003-0003-4003-8003-000000000003",
+  "00000004-0004-4004-8004-000000000004",
+  "00000005-0005-4005-8005-000000000005",
+  "00000006-0006-4006-8006-000000000006",
+  "00000007-0007-4007-8007-000000000007",
+  "00000008-0008-4008-8008-000000000008",
+  "00000009-0009-4009-8009-000000000009",
+  "0000000a-0010-4010-8010-000000000010",
+  "0000000b-0011-4011-8011-000000000011",
+  "0000000c-0012-4012-8012-000000000012",
+  "0000000d-0013-4013-8013-000000000013",
+  "0000000e-0014-4014-8014-000000000014",
+  "0000000f-0015-4015-8015-000000000015",
+  "00000010-0016-4016-8016-000000000016",
+  "00000011-0017-4017-8017-000000000017",
+  "00000012-0018-4018-8018-000000000018",
+  "00000013-0019-4019-8019-000000000019",
+  "00000014-0020-4020-8020-000000000020",
+  "00000015-0021-4021-8021-000000000021",
 ];
 
 function allocation(overrides: Partial<RecipeIngredientAllocation> = {}): RecipeIngredientAllocation {
@@ -102,7 +112,18 @@ describe("buildRecipeConsumptionLines", () => {
     expect(buildRecipeConsumptionLines([allocation({ usedQuantity: Infinity })], [item()])).toEqual({ ok: false, code: "invalid-quantity" });
   });
 
-  it("rejects more than ten unique products", () => {
+
+
+  it("builds twenty unique lines in stable order", () => {
+    const reversedIds = ids.slice(0, 20).reverse();
+    const allocations = reversedIds.map((id, index) => allocation({ inventoryItemId: id, usedQuantity: index + 1 }));
+    const inventory = reversedIds.map((id) => item({ id }));
+    const result = buildRecipeConsumptionLines(allocations, inventory);
+
+    expect(result).toEqual({ ok: true, lines: ids.slice(0, 20).map((id, index) => ({ item_id: id, consumed_quantity: 20 - index })) });
+  });
+
+  it("rejects more than twenty unique products", () => {
     const allocations = ids.map((id) => allocation({ inventoryItemId: id }));
     const inventory = ids.map((id) => item({ id }));
 

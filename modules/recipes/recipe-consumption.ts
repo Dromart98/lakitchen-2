@@ -1,4 +1,5 @@
 import type { RecipeIngredientAllocation } from "@/modules/recipes/recipe-matching";
+import { RECIPE_MAX_INGREDIENTS } from "@/modules/recipes/recipe-limits";
 
 export type RecipeConsumptionLine = {
   item_id: string;
@@ -22,7 +23,6 @@ export type RecipeConsumptionResult =
         | "too-many-items";
     };
 
-const MAX_UNIQUE_ITEMS = 10;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type BaseUnit = RecipeIngredientAllocation["usedUnit"];
@@ -85,7 +85,7 @@ export function buildRecipeConsumptionLines(
 
     quantitiesByItemId.set(itemId, summedQuantity);
 
-    if (quantitiesByItemId.size > MAX_UNIQUE_ITEMS) return { ok: false, code: "too-many-items" };
+    if (quantitiesByItemId.size > RECIPE_MAX_INGREDIENTS) return { ok: false, code: "too-many-items" };
   }
 
   const lines = [...quantitiesByItemId]

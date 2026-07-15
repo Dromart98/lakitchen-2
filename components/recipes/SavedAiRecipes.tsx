@@ -1,4 +1,5 @@
 import { deleteSavedAiRecipeAction } from "@/app/recipes/actions";
+import { SavedAiRecipeCookForm } from "@/components/recipes/SavedAiRecipeCookForm";
 import type { SavedAiRecipe } from "@/modules/recipes/saved-ai-recipes";
 
 function formatQuantity(quantity: number): string {
@@ -31,7 +32,8 @@ export function SavedAiRecipes({ recipes }: { recipes: SavedAiRecipe[] }) {
           <ol>
             {recipe.steps.map((step) => <li key={step}>{step}</li>)}
           </ol>
-          <form action={deleteSavedAiRecipeAction}>
+          <SavedAiRecipeCookForm recipeId={recipe.id} />
+          <form action={deleteSavedAiRecipeAction} style={{ marginTop: 12 }}>
             <input type="hidden" name="recipe_id" value={recipe.id} />
             <button type="submit">Eliminar receta</button>
           </form>

@@ -1,0 +1,1 @@
+export const RECIPE_MAX_INGREDIENTS = 20;
