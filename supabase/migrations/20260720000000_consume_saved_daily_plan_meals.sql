@@ -52,7 +52,7 @@ begin
     raise exception using errcode = '23505', message = 'Saved plan meal already completed';
   end if;
 
-  select count(*), min(value)
+  select count(*), jsonb_agg(value) -> 0
     into v_match_count, v_meal
   from jsonb_array_elements(v_meals) as entries(value)
   where value ->> 'meal_type' = p_meal_type;
