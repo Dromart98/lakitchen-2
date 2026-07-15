@@ -1,13 +1,14 @@
 import { z } from "zod";
 
 import {
-  DAILY_PLAN_MAX_MINUTES,
   DAILY_PLAN_MEAL_TYPES,
   DAILY_PLAN_PRIORITY_MODES,
   type DailyPlanMeal,
   type DailyPlanSuccessResult,
 } from "@/modules/plans/daily-plan-ai";
 import { RECIPE_MAX_INGREDIENTS } from "@/modules/recipes/recipe-limits";
+
+const maxMinutesSchema = z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60)]);
 
 const nutritionSchema = z.object({
   calories: z.number().finite(),
@@ -54,7 +55,7 @@ const successPlanSchema = z.object({
 
 export const saveDailyPlanRequestSchema = z.object({
   priority_mode: z.enum(DAILY_PLAN_PRIORITY_MODES),
-  max_minutes_per_meal: z.union(DAILY_PLAN_MAX_MINUTES.map((value) => z.literal(value)) as [z.ZodLiteral<15>, z.ZodLiteral<30>, z.ZodLiteral<45>, z.ZodLiteral<60>]),
+  max_minutes_per_meal: maxMinutesSchema,
   plan: successPlanSchema,
 }).strict();
 
@@ -76,7 +77,7 @@ const savedDailyPlanRowSchema = z.object({
   id: z.string().uuid(),
   plan_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   priority_mode: z.enum(DAILY_PLAN_PRIORITY_MODES),
-  max_minutes_per_meal: z.union(DAILY_PLAN_MAX_MINUTES.map((value) => z.literal(value)) as [z.ZodLiteral<15>, z.ZodLiteral<30>, z.ZodLiteral<45>, z.ZodLiteral<60>]),
+  max_minutes_per_meal: maxMinutesSchema,
   target: nutritionSchema,
   total: nutritionSchema,
   difference: nutritionSchema,
