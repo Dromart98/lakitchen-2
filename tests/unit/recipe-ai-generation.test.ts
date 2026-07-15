@@ -10,7 +10,7 @@ import {
   type RecipeAiRequest,
 } from "@/modules/recipes/recipe-ai-generation";
 
-const request: RecipeAiRequest = { max_minutes: 30, servings: 2, suggestion_count: 2 };
+const request: RecipeAiRequest = { max_minutes: 30, servings: 2, suggestion_count: 2, priority_mode: "balanced" };
 const inventory: RecipeAiInventoryItem[] = [
   { id: "item-1", name: "Arroz", quantity: 500, unit: "g", category: "carb", expires_at: "2026-07-20" },
   { id: "item-2", name: "Pollo", quantity: 300, unit: "g", category: "protein", expires_at: null },
@@ -92,6 +92,8 @@ describe("buildRecipeAiInputText", () => {
     }]);
 
     expect(inputText).toContain("Arroz");
+    expect(JSON.parse(inputText).priority_mode).toBe("balanced");
+    expect(JSON.parse(inputText)).toHaveProperty("inventory");
     expect(inputText).not.toContain("nutrition_basis");
     expect(inputText).not.toContain("calories");
     expect(inputText).not.toContain("protein_g");
@@ -102,31 +104,50 @@ describe("buildRecipeAiInputText", () => {
 
 describe("parseRecipeAiRequest", () => {
   it("accepts valid selector values", () => {
-    expect(parseRecipeAiRequest({ max_minutes: "15", servings: "1", suggestion_count: "1" })).toEqual({ max_minutes: 15, servings: 1, suggestion_count: 1 });
-    expect(parseRecipeAiRequest({ max_minutes: "60", servings: "4", suggestion_count: "3" })).toEqual({ max_minutes: 60, servings: 4, suggestion_count: 3 });
+    expect(parseRecipeAiRequest({ max_minutes: "15", servings: "1", suggestion_count: "1", priority_mode: "balanced" })).toEqual({ max_minutes: 15, servings: 1, suggestion_count: 1, priority_mode: "balanced" });
+    expect(parseRecipeAiRequest({ max_minutes: "60", servings: "4", suggestion_count: "3", priority_mode: "expiration" })).toEqual({ max_minutes: 60, servings: 4, suggestion_count: 3, priority_mode: "expiration" });
   });
 
   it.each([
-    { max_minutes: "10", servings: "2", suggestion_count: "1" },
-    { max_minutes: "30", servings: "0", suggestion_count: "1" },
-    { max_minutes: "30", servings: "5", suggestion_count: "1" },
-    { max_minutes: "30", servings: "2", suggestion_count: "4" },
+    { max_minutes: "10", servings: "2", suggestion_count: "1", priority_mode: "balanced" },
+    { max_minutes: "30", servings: "0", suggestion_count: "1", priority_mode: "balanced" },
+    { max_minutes: "30", servings: "5", suggestion_count: "1", priority_mode: "balanced" },
+    { max_minutes: "30", servings: "2", suggestion_count: "4", priority_mode: "balanced" },
   ])("rejects out-of-range values %#", (input) => {
     expect(parseRecipeAiRequest(input)).toBeNull();
   });
 
   it.each(["1.5", "1e2", "NaN", "Infinity", "-1"])("rejects unsafe numeric string %s", (value) => {
-    expect(parseRecipeAiRequest({ max_minutes: "30", servings: value, suggestion_count: "1" })).toBeNull();
+    expect(parseRecipeAiRequest({ max_minutes: "30", servings: value, suggestion_count: "1", priority_mode: "balanced" })).toBeNull();
   });
 
   it("rejects additional properties", () => {
-    expect(parseRecipeAiRequest({ max_minutes: "30", servings: "2", suggestion_count: "1", user_id: "bad" })).toBeNull();
+    expect(parseRecipeAiRequest({ max_minutes: "30", servings: "2", suggestion_count: "1", priority_mode: "balanced", user_id: "bad" })).toBeNull();
   });
+
+  it("rejects missing or unknown priority modes", () => {
+    expect(parseRecipeAiRequest({ max_minutes: "30", servings: "2", suggestion_count: "1" })).toBeNull();
+    expect(parseRecipeAiRequest({ max_minutes: "30", servings: "2", suggestion_count: "1", priority_mode: "urgent" })).toBeNull();
+  });
+
 });
 
 describe("validateRecipeAiProviderOutput", () => {
   it("accepts a valid response", () => {
     expect(validateRecipeAiProviderOutput(request, inventory, { status: "success", recipes: [validRecipe], message: null })).toEqual({ status: "success", recipes: [validRecipe] });
+  });
+
+  it("requires urgency coverage only in expiration mode", () => {
+    const expirationRequest: RecipeAiRequest = { ...request, priority_mode: "expiration" };
+    expect(validateRecipeAiProviderOutput(expirationRequest, inventory, { status: "success", recipes: [validRecipe], message: null }, new Set(["item-1"]))).toEqual({ status: "success", recipes: [validRecipe] });
+    expect(validateRecipeAiProviderOutput(expirationRequest, inventory, { status: "success", recipes: [validRecipe], message: null }, new Set(["missing"]))).toEqual({ status: "error", code: "invalid-ai-response" });
+    expect(validateRecipeAiProviderOutput(request, inventory, { status: "success", recipes: [validRecipe], message: null }, new Set(["missing"]))).toEqual({ status: "success", recipes: [validRecipe] });
+  });
+
+  it("requires a single expiration suggestion to use an urgent product", () => {
+    const expirationRequest: RecipeAiRequest = { max_minutes: 30, servings: 2, suggestion_count: 1, priority_mode: "expiration" };
+    expect(validateRecipeAiProviderOutput(expirationRequest, inventory, { status: "success", recipes: [validRecipe], message: null }, new Set(["item-2"]))).toEqual({ status: "success", recipes: [validRecipe] });
+    expect(validateRecipeAiProviderOutput(expirationRequest, inventory, { status: "success", recipes: [validRecipe], message: null }, new Set(["urgent-missing"]))).toEqual({ status: "error", code: "invalid-ai-response" });
   });
 
   it("rejects missing IDs", () => {

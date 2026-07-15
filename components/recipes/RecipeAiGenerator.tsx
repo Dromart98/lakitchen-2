@@ -56,6 +56,7 @@ export function RecipeAiGenerator() {
         max_minutes: formData.get("max_minutes"),
         servings: formData.get("servings"),
         suggestion_count: formData.get("suggestion_count"),
+        priority_mode: formData.get("priority_mode"),
       });
       setResult(nextResult);
       if (nextResult.status === "success") {
@@ -119,6 +120,13 @@ export function RecipeAiGenerator() {
           <option value="2">2 sugerencias</option>
           <option value="3">3 sugerencias</option>
         </select>
+
+        <label htmlFor="recipe-ai-priority-mode">Prioridad de las recetas</label>
+        <select id="recipe-ai-priority-mode" name="priority_mode" defaultValue="balanced" disabled={isBusy}>
+          <option value="balanced">Recetas equilibradas</option>
+          <option value="expiration">Priorizar productos que caducan</option>
+        </select>
+        <p className="muted">El modo antidesperdicio prioriza productos que caducan en los próximos 7 días.</p>
 
         <button type="submit" disabled={isBusy}>Generar recetas</button>
       </form>

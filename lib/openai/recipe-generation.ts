@@ -15,7 +15,9 @@ const OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
 export const RECIPE_AI_SYSTEM_PROMPT = `Genera sugerencias temporales de recetas en español usando exclusivamente los productos de inventario enviados.
 No inventes ingredientes externos, no cambies unidades y no superes cantidades disponibles.
 Devuelve solo JSON conforme al esquema. Si no puedes proponer recetas seguras, devuelve needs-clarification con un mensaje breve en español.
-No incluyas macros, no afirmes que se ha guardado nada y no incluyas HTML.`;
+No incluyas macros, no afirmes que se ha guardado nada y no incluyas HTML.
+Si priority_mode es balanced, mantén el comportamiento normal sin exigir productos próximos a caducar.
+Si priority_mode es expiration, prioriza productos que caducan dentro de los próximos 7 días: cada propuesta debe usar únicamente inventario real, al menos una receta devuelta debe incluir un producto próximo a caducar, si solo se pide una sugerencia esa receta debe incluir un producto próximo a caducar, no inventes ingredientes externos, no cambies nombres ni unidades, no excedas cantidades disponibles y no generes macros.`;
 
 type OpenAiResponseObject = {
   status?: unknown;
@@ -68,7 +70,12 @@ export function extractRecipeAiOutputText(responseBody: unknown): ExtractionResu
   return { status: "invalid-ai-response" };
 }
 
-function parseRecipeAiResponse(request: RecipeAiRequest, inventoryItems: RecipeAiInventoryItem[], responseBody: unknown): RecipeAiGenerationResult {
+function parseRecipeAiResponse(
+  request: RecipeAiRequest,
+  inventoryItems: RecipeAiInventoryItem[],
+  responseBody: unknown,
+  urgentInventoryItemIds: ReadonlySet<string> = new Set(),
+): RecipeAiGenerationResult {
   const extracted = extractRecipeAiOutputText(responseBody);
   if (extracted.status !== "success") {
     const code = extracted.status === "provider-error" ? "provider-error" : extracted.status;
@@ -78,7 +85,7 @@ function parseRecipeAiResponse(request: RecipeAiRequest, inventoryItems: RecipeA
 
   try {
     const parsedJson = JSON.parse(extracted.text) as unknown;
-    return validateRecipeAiProviderOutput(request, inventoryItems, parsedJson);
+    return validateRecipeAiProviderOutput(request, inventoryItems, parsedJson, urgentInventoryItemIds);
   } catch {
     console.warn("recipe_ai_response_rejected", { reason: "invalid-json" });
     return { status: "error", code: "invalid-json" };
@@ -92,7 +99,7 @@ function isAbortError(error: unknown) {
 export async function generateRecipesWithOpenAi(
   request: RecipeAiRequest,
   inventoryItems: RecipeAiInventoryItem[],
-  options: { apiKey: string; model?: string; fetchImpl?: typeof fetch },
+  options: { apiKey: string; model?: string; fetchImpl?: typeof fetch; urgentInventoryItemIds?: ReadonlySet<string> },
 ): Promise<RecipeAiGenerationResult> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), RECIPE_AI_TIMEOUT_MS);
@@ -132,7 +139,7 @@ export async function generateRecipesWithOpenAi(
     if (!response.ok) return { status: "error", code: "provider-error" };
 
     const responseBody = await response.json() as unknown;
-    return parseRecipeAiResponse(request, inventoryItems, responseBody);
+    return parseRecipeAiResponse(request, inventoryItems, responseBody, options.urgentInventoryItemIds);
   } catch (error) {
     if (isAbortError(error)) return { status: "error", code: "timeout" };
     return { status: "error", code: "network-error" };

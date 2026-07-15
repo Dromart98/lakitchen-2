@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getInventoryExpirationDayDifference } from "@/modules/inventory/inventory-expiration";
 
 import type { RecipeAiSuggestionWithNutrition } from "@/modules/recipes/recipe-ai-nutrition";
+import { hasRecipeAiUrgencyCoverage } from "@/modules/recipes/recipe-ai-urgency";
 
 export const RECIPE_AI_MAX_INVENTORY_ITEMS = 40;
 export const RECIPE_AI_MODEL_DEFAULT = "gpt-5.6-terra";
@@ -10,10 +11,15 @@ export const RECIPE_AI_TIMEOUT_MS = 25_000;
 export const RECIPE_AI_MAX_OUTPUT_TOKENS = 4_000;
 export const RECIPE_AI_MIN_INVENTORY_ITEMS = 2;
 
+export type RecipeAiPriorityMode = "balanced" | "expiration";
+
+export const RECIPE_AI_PRIORITY_MODES = ["balanced", "expiration"] as const;
+
 export const recipeAiRequestSchema = z.object({
   max_minutes: z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60)]),
   servings: z.number().int().min(1).max(4),
   suggestion_count: z.number().int().min(1).max(3),
+  priority_mode: z.enum(RECIPE_AI_PRIORITY_MODES),
 }).strict();
 
 export type RecipeAiRequest = z.infer<typeof recipeAiRequestSchema>;
@@ -95,12 +101,13 @@ export function parseRecipeAiRequest(input: unknown): RecipeAiRequest | null {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return null;
   const record = input as Record<string, unknown>;
   const keys = Object.keys(record);
-  if (keys.some((key) => !["max_minutes", "servings", "suggestion_count"].includes(key))) return null;
+  if (keys.some((key) => !["max_minutes", "servings", "suggestion_count", "priority_mode"].includes(key))) return null;
 
   const parsed = {
     max_minutes: parseStrictInteger(record.max_minutes),
     servings: parseStrictInteger(record.servings),
     suggestion_count: parseStrictInteger(record.suggestion_count),
+    priority_mode: record.priority_mode,
   };
 
   const result = recipeAiRequestSchema.safeParse(parsed);
@@ -206,6 +213,7 @@ export function buildRecipeAiInputText(request: RecipeAiRequest, inventoryItems:
 
   return JSON.stringify({
     language: "es",
+    priority_mode: request.priority_mode,
     constraints: {
       max_minutes: request.max_minutes,
       servings: request.servings,
@@ -214,7 +222,7 @@ export function buildRecipeAiInputText(request: RecipeAiRequest, inventoryItems:
       keep_inventory_units_exactly: true,
       do_not_store_or_consume_inventory: true,
     },
-    inventory_items: items,
+    inventory: items,
   });
 }
 
@@ -226,6 +234,7 @@ export function validateRecipeAiProviderOutput(
   request: RecipeAiRequest,
   inventoryItems: RecipeAiInventoryItem[],
   output: unknown,
+  urgentInventoryItemIds: ReadonlySet<string> = new Set(),
 ): RecipeAiGenerationResult {
   const parsed = recipeAiProviderResponseSchema.safeParse(output);
   if (!parsed.success) return { status: "error", code: "invalid-ai-response" };
@@ -256,6 +265,16 @@ export function validateRecipeAiProviderOutput(
       if (ingredient.unit !== inventoryItem.unit) return { status: "error", code: "invalid-ai-response" };
       if (!Number.isFinite(ingredient.quantity) || ingredient.quantity <= 0) return { status: "error", code: "invalid-ai-response" };
       if (ingredient.quantity > inventoryItem.quantity) return { status: "error", code: "invalid-ai-response" };
+    }
+  }
+
+  if (request.priority_mode === "expiration" && urgentInventoryItemIds.size > 0) {
+    if (!hasRecipeAiUrgencyCoverage(parsed.data.recipes, urgentInventoryItemIds)) {
+      return { status: "error", code: "invalid-ai-response" };
+    }
+
+    if (request.suggestion_count === 1 && !hasRecipeAiUrgencyCoverage([parsed.data.recipes[0]], urgentInventoryItemIds)) {
+      return { status: "error", code: "invalid-ai-response" };
     }
   }
 

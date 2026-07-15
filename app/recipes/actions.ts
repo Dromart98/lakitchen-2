@@ -18,6 +18,7 @@ import {
   type RecipeAiActionResult,
   type RecipeAiInventoryItem,
 } from "@/modules/recipes/recipe-ai-generation";
+import { getUrgentRecipeAiInventoryItemIds, sortRecipeAiSuggestionsByUrgency } from "@/modules/recipes/recipe-ai-urgency";
 import {
   mapRecipeAiCookRpcError,
   mapRecipeConsumptionError,
@@ -211,9 +212,18 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
     return { status: "error", code: "unexpected-error" };
   }
 
-  const inventoryItems = filterUsableRecipeAiInventoryItems(data ?? [], getCurrentInventoryExpirationDateKey());
+  const todayKey = getCurrentInventoryExpirationDateKey();
+  const inventoryItems = filterUsableRecipeAiInventoryItems(data ?? [], todayKey);
   if (inventoryItems.length === 0) return { status: "error", code: "empty-inventory" };
   if (inventoryItems.length < RECIPE_AI_MIN_INVENTORY_ITEMS) return { status: "error", code: "insufficient-inventory" };
+
+  const urgentInventoryItemIds = request.priority_mode === "expiration"
+    ? getUrgentRecipeAiInventoryItemIds(inventoryItems, todayKey)
+    : new Set<string>();
+
+  if (request.priority_mode === "expiration" && urgentInventoryItemIds.size === 0) {
+    return { status: "needs-clarification", message: "No tienes productos que caduquen en los próximos 7 días." };
+  }
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { status: "error", code: "missing-api-key" };
@@ -222,13 +232,18 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
     const result = await generateRecipesWithOpenAi(request, inventoryItems, {
       apiKey,
       model: process.env.OPENAI_RECIPE_MODEL,
+      urgentInventoryItemIds,
     });
 
     if (result.status !== "success") return result;
 
+    const recipes = request.priority_mode === "expiration"
+      ? sortRecipeAiSuggestionsByUrgency(result.recipes, inventoryItems, todayKey)
+      : result.recipes;
+
     return {
       status: "success",
-      recipes: enrichRecipeAiSuggestionsWithNutrition(result.recipes, inventoryItems),
+      recipes: enrichRecipeAiSuggestionsWithNutrition(recipes, inventoryItems),
     };
   } catch {
     return { status: "error", code: "unexpected-error" };
