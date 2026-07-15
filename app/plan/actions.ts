@@ -15,7 +15,9 @@ import {
 } from "@/modules/plans/daily-plan-ai";
 import {
   buildProviderOutputForSavedPlan,
+  cookSavedDailyPlanMealRequestSchema,
   saveDailyPlanRequestSchema,
+  type CookSavedDailyPlanMealResult,
   type SaveDailyPlanResult,
 } from "@/modules/plans/saved-daily-plans";
 import { createClient } from "@/lib/supabase/server";
@@ -152,6 +154,41 @@ export async function saveDailyPlanAction(input: unknown): Promise<SaveDailyPlan
 
     revalidatePath(PLAN_PATH);
     return { status: "success", code: "saved", planId: data.id };
+  } catch {
+    return { status: "error", code: "unexpected-error" };
+  }
+}
+
+export async function cookSavedDailyPlanMealAction(input: unknown): Promise<CookSavedDailyPlanMealResult> {
+  const request = cookSavedDailyPlanMealRequestSchema.safeParse(input);
+  if (!request.success) return { status: "error", code: "invalid-input" };
+
+  try {
+    const supabase = await createClient();
+    const user = await getAuthenticatedUser(supabase, "saved daily plan meal cooking");
+    if (!user) return { status: "error", code: "unauthenticated" };
+
+    const { data, error } = await (supabase as any).rpc("consume_saved_daily_plan_meal", {
+      p_plan_id: request.data.plan_id,
+      p_meal_type: request.data.meal_type,
+    }) as { data: string | null; error: { code?: string; message: string } | null };
+
+    if (error) {
+      if (error.code === "23505") return { status: "error", code: "already-completed" };
+      if (error.code === "P0002" || error.code === "22003" || error.code === "22023") {
+        return { status: "error", code: "inventory-changed" };
+      }
+      console.warn("Supabase could not consume the saved plan meal.");
+      return { status: "error", code: "unexpected-error" };
+    }
+
+    if (!data || !UUID_PATTERN.test(data)) return { status: "error", code: "unexpected-error" };
+
+    revalidatePath(PLAN_PATH);
+    revalidatePath("/inventory");
+    revalidatePath("/dashboard");
+    revalidatePath("/meal-history");
+    return { status: "success", mealLogId: data };
   } catch {
     return { status: "error", code: "unexpected-error" };
   }
