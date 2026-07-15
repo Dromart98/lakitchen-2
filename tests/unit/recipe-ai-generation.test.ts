@@ -100,6 +100,26 @@ describe("buildRecipeAiInputText", () => {
     expect(inputText).not.toContain("carbs_g");
     expect(inputText).not.toContain("fat_g");
   });
+
+  it("includes deterministic server expiration context only in expiration mode", () => {
+    const urgentIds = new Set(["item-2", "missing", "item-1"]);
+    const before = new Set(urgentIds);
+    const expirationRequest: RecipeAiRequest = { ...request, priority_mode: "expiration" };
+    const parsed = JSON.parse(buildRecipeAiInputText(expirationRequest, inventory, {
+      todayKey: "2026-07-15",
+      urgentInventoryItemIds: urgentIds,
+    }));
+
+    expect(parsed.expiration_context).toEqual({
+      today_key: "2026-07-15",
+      urgent_inventory_item_ids: ["item-1", "item-2"],
+    });
+    expect(urgentIds).toEqual(before);
+    expect(JSON.parse(buildRecipeAiInputText(request, inventory, {
+      todayKey: "2026-07-15",
+      urgentInventoryItemIds: urgentIds,
+    }))).not.toHaveProperty("expiration_context");
+  });
 });
 
 describe("parseRecipeAiRequest", () => {
@@ -123,6 +143,16 @@ describe("parseRecipeAiRequest", () => {
 
   it("rejects additional properties", () => {
     expect(parseRecipeAiRequest({ max_minutes: "30", servings: "2", suggestion_count: "1", priority_mode: "balanced", user_id: "bad" })).toBeNull();
+  });
+
+  it.each(["today_key", "urgent_inventory_item_ids", "expiration_context"])("rejects server-only property %s", (property) => {
+    expect(parseRecipeAiRequest({
+      max_minutes: "30",
+      servings: "2",
+      suggestion_count: "1",
+      priority_mode: "expiration",
+      [property]: property === "today_key" ? "2026-07-15" : [],
+    })).toBeNull();
   });
 
   it("rejects missing or unknown priority modes", () => {
@@ -250,6 +280,26 @@ describe("generateRecipesWithOpenAi", () => {
     const body = JSON.parse(String(firstCall[1].body));
     expect(body.store).toBe(false);
     expect(body.reasoning).toEqual({ effort: "low" });
+  });
+
+  it("sends and validates with the same server expiration context", async () => {
+    const expirationRequest: RecipeAiRequest = { ...request, priority_mode: "expiration" };
+    const urgentInventoryItemIds = new Set(["item-1"]);
+    const fetchImpl = vi.fn(() => response(200, completed({ status: "success", recipes: [validRecipe], message: null })));
+
+    await expect(generateRecipesWithOpenAi(expirationRequest, inventory, {
+      apiKey: "key",
+      fetchImpl,
+      expirationContext: { todayKey: "2026-07-15", urgentInventoryItemIds },
+    })).resolves.toMatchObject({ status: "success" });
+
+    const firstCall = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    const body = JSON.parse(String(firstCall[1].body));
+    const providerInput = JSON.parse(body.input[1].content);
+    expect(providerInput.expiration_context).toEqual({
+      today_key: "2026-07-15",
+      urgent_inventory_item_ids: ["item-1"],
+    });
   });
 
   it("handles incomplete responses", async () => {
