@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { cookRecipeAndLogMealAction } from "@/app/recipes/actions";
+import { RecipeAiGenerator } from "@/components/recipes/RecipeAiGenerator";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
@@ -145,6 +146,8 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
           ))}
         </nav>
       </section>
+
+      <RecipeAiGenerator />
 
       {inventoryItems.length === 0 ? (
         <section className="card" style={{ marginTop: 16 }}>
