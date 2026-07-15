@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { RecipeAiSuggestionWithNutrition } from "@/modules/recipes/recipe-ai-nutrition";
+
 export const RECIPE_AI_MAX_INVENTORY_ITEMS = 40;
 export const RECIPE_AI_MODEL_DEFAULT = "gpt-5.6-terra";
 export const RECIPE_AI_TIMEOUT_MS = 25_000;
@@ -21,6 +23,11 @@ export type RecipeAiInventoryItem = {
   unit: string;
   category: string | null;
   expires_at: string | null;
+  nutrition_basis?: "per_100g" | "per_100ml" | "per_unit" | null;
+  calories?: number | null;
+  protein_g?: number | null;
+  carbs_g?: number | null;
+  fat_g?: number | null;
 };
 
 export type RecipeAiIngredient = {
@@ -41,6 +48,11 @@ export type RecipeAiSuggestion = {
 
 export type RecipeAiGenerationResult =
   | { status: "success"; recipes: RecipeAiSuggestion[] }
+  | { status: "needs-clarification"; message: string }
+  | { status: "error"; code: RecipeAiErrorCode };
+
+export type RecipeAiActionResult =
+  | { status: "success"; recipes: RecipeAiSuggestionWithNutrition[] }
   | { status: "needs-clarification"; message: string }
   | { status: "error"; code: RecipeAiErrorCode };
 

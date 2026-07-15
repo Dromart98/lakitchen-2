@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { generateRecipesWithOpenAi } from "@/lib/openai/recipe-generation";
+import { enrichRecipeAiSuggestionsWithNutrition } from "@/modules/recipes/recipe-ai-nutrition";
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
 import { isMealType } from "@/modules/meals/meal-types";
 import { buildRecipeConsumptionLines } from "@/modules/recipes/recipe-consumption";
@@ -13,7 +14,7 @@ import {
   parseRecipeAiRequest,
   RECIPE_AI_MAX_INVENTORY_ITEMS,
   RECIPE_AI_MIN_INVENTORY_ITEMS,
-  type RecipeAiGenerationResult,
+  type RecipeAiActionResult,
   type RecipeAiInventoryItem,
 } from "@/modules/recipes/recipe-ai-generation";
 import {
@@ -172,7 +173,7 @@ type RecipeAiSupabaseClient = {
   from(table: string): RecipeAiSupabaseQueryBuilder;
 };
 
-export async function generateRecipeAiSuggestionsAction(input: unknown): Promise<RecipeAiGenerationResult> {
+export async function generateRecipeAiSuggestionsAction(input: unknown): Promise<RecipeAiActionResult> {
   const request = parseRecipeAiRequest(input);
   if (!request) return { status: "error", code: "invalid-input" };
 
@@ -188,7 +189,7 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
   const recipeClient = supabase as unknown as RecipeAiSupabaseClient;
   const { data, error } = await recipeClient
     .from("inventory_items")
-    .select("id, name, quantity, unit, category, expires_at")
+    .select("id, name, quantity, unit, category, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g")
     .eq("user_id", user.id)
     .gt("quantity", 0)
     .order("expires_at", { ascending: true, nullsFirst: false })
@@ -208,10 +209,17 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
   if (!apiKey) return { status: "error", code: "missing-api-key" };
 
   try {
-    return await generateRecipesWithOpenAi(request, inventoryItems, {
+    const result = await generateRecipesWithOpenAi(request, inventoryItems, {
       apiKey,
       model: process.env.OPENAI_RECIPE_MODEL,
     });
+
+    if (result.status !== "success") return result;
+
+    return {
+      status: "success",
+      recipes: enrichRecipeAiSuggestionsWithNutrition(result.recipes, inventoryItems),
+    };
   } catch {
     return { status: "error", code: "unexpected-error" };
   }
