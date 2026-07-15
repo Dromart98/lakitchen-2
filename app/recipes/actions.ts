@@ -6,17 +6,26 @@ import { redirect } from "next/navigation";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { generateRecipesWithOpenAi } from "@/lib/openai/recipe-generation";
-import { enrichRecipeAiSuggestionsWithNutrition } from "@/modules/recipes/recipe-ai-nutrition";
+import { buildRecipeAiNutritionAllocations, enrichRecipeAiSuggestionsWithNutrition } from "@/modules/recipes/recipe-ai-nutrition";
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
 import { isMealType } from "@/modules/meals/meal-types";
 import { buildRecipeConsumptionLines } from "@/modules/recipes/recipe-consumption";
 import {
+  filterUsableRecipeAiInventoryItems,
   parseRecipeAiRequest,
   RECIPE_AI_MAX_INVENTORY_ITEMS,
   RECIPE_AI_MIN_INVENTORY_ITEMS,
   type RecipeAiActionResult,
   type RecipeAiInventoryItem,
 } from "@/modules/recipes/recipe-ai-generation";
+import {
+  mapRecipeAiCookRpcError,
+  mapRecipeConsumptionError,
+  parseRecipeAiCookRequest,
+  validateRecipeAiCookInventory,
+  type RecipeAiCookInventoryItem,
+  type RecipeAiCookResult,
+} from "@/modules/recipes/recipe-ai-consumption";
 import {
   matchRecipesToInventory,
   normalizeRecipeFilterMode,
@@ -165,6 +174,7 @@ type RecipeAiSupabaseQueryBuilder = {
   select(columns: string): RecipeAiSupabaseQueryBuilder;
   eq(column: string, value: string): RecipeAiSupabaseQueryBuilder;
   gt(column: string, value: number): RecipeAiSupabaseQueryBuilder;
+  in(column: string, values: string[]): Promise<unknown>;
   order(column: string, options?: { ascending?: boolean; nullsFirst?: boolean }): RecipeAiSupabaseQueryBuilder;
   limit(count: number): Promise<unknown>;
 };
@@ -201,7 +211,7 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
     return { status: "error", code: "unexpected-error" };
   }
 
-  const inventoryItems = data ?? [];
+  const inventoryItems = filterUsableRecipeAiInventoryItems(data ?? [], getCurrentInventoryExpirationDateKey());
   if (inventoryItems.length === 0) return { status: "error", code: "empty-inventory" };
   if (inventoryItems.length < RECIPE_AI_MIN_INVENTORY_ITEMS) return { status: "error", code: "insufficient-inventory" };
 
@@ -223,4 +233,82 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
   } catch {
     return { status: "error", code: "unexpected-error" };
   }
+}
+
+
+type RecipeAiCookSupabaseQueryBuilder = {
+  select(columns: string): RecipeAiCookSupabaseQueryBuilder;
+  eq(column: string, value: string): RecipeAiCookSupabaseQueryBuilder;
+  in(column: string, values: string[]): RecipeAiCookSupabaseQueryBuilder;
+  gt(column: string, value: number): Promise<unknown>;
+};
+
+type RecipeAiCookSupabaseClient = {
+  from(table: string): RecipeAiCookSupabaseQueryBuilder;
+  rpc(functionName: string, parameters: Record<string, unknown>): Promise<unknown>;
+};
+
+export async function cookGeneratedRecipeAndLogMealAction(input: unknown): Promise<RecipeAiCookResult> {
+  const request = parseRecipeAiCookRequest(input);
+  if (!request) return { status: "error", code: "invalid-input" };
+
+  const supabase = await createClient();
+  let user: { id: string };
+
+  try {
+    user = await requireAuthenticatedUser(supabase, "AI recipe consumption");
+  } catch {
+    return { status: "error", code: "unauthenticated" };
+  }
+
+  const inventoryItemIds = request.recipe.ingredients.map((ingredient) => ingredient.inventory_item_id);
+  const recipeClient = supabase as unknown as RecipeAiCookSupabaseClient;
+  const { data, error } = await recipeClient
+    .from("inventory_items")
+    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g")
+    .eq("user_id", user.id)
+    .in("id", inventoryItemIds)
+    .gt("quantity", 0) as { data: RecipeAiCookInventoryItem[] | null; error: { message: string } | null };
+
+  if (error) {
+    console.warn("Supabase could not load AI recipe consumption inventory items:", error.message);
+    return { status: "error", code: "unexpected-error" };
+  }
+
+  const inventoryItems = data ?? [];
+  const validationError = validateRecipeAiCookInventory(request.recipe, inventoryItems, getCurrentInventoryExpirationDateKey());
+  if (validationError) return { status: "error", code: validationError };
+
+  const inventoryById = new Map(inventoryItems.map((item) => [item.id, item]));
+  const { allocations, missingItemIds } = buildRecipeAiNutritionAllocations(request.recipe, inventoryById);
+  if (missingItemIds.size > 0 || allocations.length !== request.recipe.ingredients.length) {
+    return { status: "error", code: "recipe-stale" };
+  }
+
+  const nutrition = estimateRecipeNutrition(allocations, request.recipe.servings);
+  if (!nutrition.isComplete || !nutrition.total || !nutrition.perServing) {
+    return { status: "error", code: "incomplete-nutrition" };
+  }
+
+  const consumptionLines = buildRecipeConsumptionLines(allocations, inventoryItems);
+  if (!consumptionLines.ok) return { status: "error", code: mapRecipeConsumptionError(consumptionLines) };
+
+  const { error: consumeError } = await recipeClient.rpc("consume_meal_builder_items_and_log_meal", {
+    p_meal_name: buildRecipeMealName(request.recipe.title, request.recipe.servings),
+    p_meal_type: request.meal_type,
+    p_lines: consumptionLines.lines,
+  }) as { data: string | null; error: { code?: string; message: string } | null };
+
+  if (consumeError) {
+    console.warn("Supabase could not consume AI recipe items and log a meal:", consumeError.message);
+    return { status: "error", code: mapRecipeAiCookRpcError(consumeError) };
+  }
+
+  revalidatePath(RECIPES_PATH);
+  revalidatePath("/inventory");
+  revalidatePath("/dashboard");
+  revalidatePath("/meal-history");
+  revalidatePath("/weekly-summary");
+
+  return { status: "success" };
 }

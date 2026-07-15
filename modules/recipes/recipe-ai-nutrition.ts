@@ -8,7 +8,7 @@ export type RecipeAiNutritionInventoryItem = {
   name: string;
   quantity: number;
   unit: string;
-  category: string | null;
+  category?: string | null;
   expires_at: string | null;
   nutrition_basis?: InventoryNutritionBasis | null;
   calories?: number | null;
@@ -23,7 +23,7 @@ export type RecipeAiSuggestionWithNutrition = RecipeAiSuggestion & {
 
 type BaseUnit = "g" | "ml" | "ud";
 
-function convertRecipeAiQuantityToBase(quantity: number, unit: string): { quantity: number; unit: BaseUnit } | null {
+export function convertRecipeAiQuantityToBase(quantity: number, unit: string): { quantity: number; unit: BaseUnit } | null {
   if (!Number.isFinite(quantity) || quantity <= 0) return null;
 
   if (unit === "g") return { quantity, unit: "g" };
@@ -44,7 +44,7 @@ function buildIncompleteNutritionEstimate(missingNutritionItemCount: number): Re
   };
 }
 
-function buildRecipeAiNutritionAllocations(
+export function buildRecipeAiNutritionAllocations(
   recipe: RecipeAiSuggestion,
   inventoryById: Map<string, RecipeAiNutritionInventoryItem>,
 ): { allocations: RecipeIngredientAllocation[]; missingItemIds: Set<string> } {

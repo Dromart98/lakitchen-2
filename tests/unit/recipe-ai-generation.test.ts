@@ -272,3 +272,17 @@ describe("generateRecipesWithOpenAi", () => {
     expect(clearTimeoutSpy).toHaveBeenCalled();
   });
 });
+
+describe("filterUsableRecipeAiInventoryItems", () => {
+  it("filters expired products before OpenAI without mutating inventory", async () => {
+    const { filterUsableRecipeAiInventoryItems } = await import("@/modules/recipes/recipe-ai-generation");
+    const source = [
+      { id: "expired", expires_at: "2026-07-14" },
+      { id: "today", expires_at: "2026-07-15" },
+      { id: "none", expires_at: null },
+    ];
+    const before = structuredClone(source);
+    expect(filterUsableRecipeAiInventoryItems(source, "2026-07-15").map((item) => item.id)).toEqual(["today", "none"]);
+    expect(source).toEqual(before);
+  });
+});
