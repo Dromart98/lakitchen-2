@@ -12,8 +12,6 @@ import {
 import { INVENTORY_ADD_FORM_FIELD_IDS } from "@/modules/inventory/inventory-form-fields";
 import { createClient } from "@/lib/supabase/server";
 import {
-  calculateAvailableInventoryNutrition,
-  formatInventoryNutritionTotalValue,
   getInventoryNutritionBasisLabel,
   INVENTORY_NUTRITION_BASIS_LABELS,
   NUTRITION_BASES,
@@ -130,33 +128,6 @@ function getInventoryNutritionParts(item: InventoryItemRecord) {
     formatOptionalNutritionValue(item.protein_g, "g proteína"),
     formatOptionalNutritionValue(item.carbs_g, "g carbohidratos"),
     formatOptionalNutritionValue(item.fat_g, "g grasas"),
-  ].filter((part): part is string => Boolean(part));
-}
-
-function formatOptionalNutritionTotalValue(value: number | null, suffix: string) {
-  const formattedValue = formatInventoryNutritionTotalValue(value);
-
-  return formattedValue === null ? null : `${formattedValue} ${suffix}`;
-}
-
-function getAvailableInventoryNutritionParts(item: InventoryItemRecord) {
-  const totals = calculateAvailableInventoryNutrition({
-    nutrition_basis: item.nutrition_basis,
-    quantity: item.quantity,
-    unit: item.unit,
-    calories: item.calories,
-    protein_g: item.protein_g,
-    carbs_g: item.carbs_g,
-    fat_g: item.fat_g,
-  });
-
-  if (!totals) return [];
-
-  return [
-    formatOptionalNutritionTotalValue(totals.calories, "kcal"),
-    formatOptionalNutritionTotalValue(totals.protein_g, "g proteína"),
-    formatOptionalNutritionTotalValue(totals.carbs_g, "g carbohidratos"),
-    formatOptionalNutritionTotalValue(totals.fat_g, "g grasas"),
   ].filter((part): part is string => Boolean(part));
 }
 
@@ -404,8 +375,6 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                   <ul>
                     {group.items.map((item) => {
                       const nutritionParts = getInventoryNutritionParts(item);
-                      const availableNutritionParts = getAvailableInventoryNutritionParts(item);
-                      const showUnavailableAvailableNutritionMessage = nutritionParts.length > 0 && availableNutritionParts.length === 0;
 
                       return (
                       <li key={item.id}>
@@ -424,20 +393,6 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
                             </span>
                             <br />
                             <span className="muted">{nutritionParts.join(" · ")}</span>
-                            {availableNutritionParts.length ? (
-                              <>
-                                <br />
-                                <span className="muted">Total disponible</span>
-                                <br />
-                                <span className="muted">{availableNutritionParts.join(" · ")}</span>
-                              </>
-                            ) : null}
-                            {showUnavailableAvailableNutritionMessage ? (
-                              <>
-                                <br />
-                                <span className="muted">El total nutricional no puede calcularse con la unidad actual.</span>
-                              </>
-                            ) : null}
                           </>
                         ) : null}
                         <form action={deleteInventoryItemAction} className="meal-log-form">
