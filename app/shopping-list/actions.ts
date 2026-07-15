@@ -3,14 +3,27 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { estimateInventoryNutritionWithOpenAi } from "@/lib/openai/inventory-nutrition";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import {
+  buildShoppingListTransferNutritionUpdate,
+  getShoppingListTransferNutritionPlan,
+  type TransferredInventoryNutritionItem,
+} from "@/modules/shopping-list/shopping-list-transfer-nutrition";
 
 type ShoppingListUnit = "ud" | "g" | "kg" | "ml" | "l";
 type InventoryLocation = "pantry" | "fridge" | "freezer";
 
 const shoppingListUnits = ["ud", "g", "kg", "ml", "l"] as const;
 const inventoryLocations = ["pantry", "fridge", "freezer"] as const;
+const shoppingListTransferRevalidationPaths = [
+  "/shopping-list",
+  "/inventory",
+  "/dashboard",
+  "/recipes",
+  "/meal-builder",
+] as const;
 
 function isShoppingListUnit(value: string): value is ShoppingListUnit {
   return shoppingListUnits.includes(value as ShoppingListUnit);
@@ -22,6 +35,12 @@ function isUuid(value: string) {
 
 function isInventoryLocation(value: string): value is InventoryLocation {
   return inventoryLocations.includes(value as InventoryLocation);
+}
+
+function revalidateShoppingListTransferPaths() {
+  for (const path of shoppingListTransferRevalidationPaths) {
+    revalidatePath(path);
+  }
 }
 
 function getOptionalExpirationDate(formData: FormData) {
@@ -175,7 +194,7 @@ export async function transferShoppingListItemToInventoryAction(formData: FormDa
 
   const expiresAt = getOptionalExpirationDate(formData);
   const supabase = await createClient();
-  await requireAuthenticatedUser(supabase, "shopping list item inventory transfer");
+  const user = await requireAuthenticatedUser(supabase, "shopping list item inventory transfer");
 
   const { data, error } = await (supabase as any).rpc("transfer_purchased_shopping_item_to_inventory", {
     p_item_id: id,
@@ -191,13 +210,76 @@ export async function transferShoppingListItemToInventoryAction(formData: FormDa
     redirect("/shopping-list?shoppingListError=transfer-failed");
   }
 
-  if (!data) {
+  if (!data || !isUuid(data)) {
     redirect("/shopping-list?shoppingListError=transfer-unavailable");
   }
 
-  revalidatePath("/shopping-list");
-  revalidatePath("/inventory");
-  redirect("/shopping-list?shoppingListSuccess=item-transferred");
+  const transferredInventoryItemId = data;
+  let shoppingListSuccess = "item-transferred-macros-pending";
+
+  const { data: transferredItem, error: transferredItemError } = await (supabase as any)
+    .from("inventory_items")
+    .select("id, name, quantity, unit, category, nutrition_basis, calories, protein_g, carbs_g, fat_g")
+    .eq("id", transferredInventoryItemId)
+    .eq("user_id", user.id)
+    .maybeSingle() as {
+      data: TransferredInventoryNutritionItem | null;
+      error: { message: string } | null;
+    };
+
+  if (transferredItemError || !transferredItem) {
+    console.warn("Supabase could not load the transferred inventory item for nutrition estimation:", transferredItemError?.message ?? "not-found");
+    revalidateShoppingListTransferPaths();
+    redirect(`/shopping-list?shoppingListSuccess=${shoppingListSuccess}`);
+  }
+
+  const nutritionPlan = getShoppingListTransferNutritionPlan(transferredItem);
+
+  if (nutritionPlan.status === "already-complete") {
+    shoppingListSuccess = "item-transferred-with-nutrition";
+  } else if (nutritionPlan.status === "estimate") {
+    const apiKey = process.env.OPENAI_API_KEY;
+
+    if (apiKey) {
+      const nutritionResult = await estimateInventoryNutritionWithOpenAi(nutritionPlan.input, {
+        apiKey,
+        model: process.env.OPENAI_INVENTORY_NUTRITION_MODEL || undefined,
+      });
+
+      if (nutritionResult.status === "success") {
+        const nutritionUpdate = buildShoppingListTransferNutritionUpdate(nutritionResult.estimate);
+        const { data: updatedNutritionRows, error: updateNutritionError } = await (supabase as any)
+          .from("inventory_items")
+          .update(nutritionUpdate)
+          .eq("id", transferredInventoryItemId)
+          .eq("user_id", user.id)
+          .is("nutrition_basis", null)
+          .is("calories", null)
+          .is("protein_g", null)
+          .is("carbs_g", null)
+          .is("fat_g", null)
+          .select("id") as {
+            data: { id: string }[] | null;
+            error: { message: string } | null;
+          };
+
+        if (updateNutritionError) {
+          console.warn("Supabase could not save automatic nutrition after shopping list transfer:", updateNutritionError.message);
+        } else if (updatedNutritionRows?.length === 1) {
+          shoppingListSuccess = "item-transferred-with-nutrition";
+        } else {
+          console.warn("Automatic nutrition after shopping list transfer was not saved because the transferred item changed concurrently.");
+        }
+      } else {
+        console.warn("Automatic nutrition after shopping list transfer was not completed:", nutritionResult.status);
+      }
+    } else {
+      console.warn("Automatic nutrition after shopping list transfer skipped because OpenAI is not configured.");
+    }
+  }
+
+  revalidateShoppingListTransferPaths();
+  redirect(`/shopping-list?shoppingListSuccess=${shoppingListSuccess}`);
 }
 
 export async function deleteShoppingListItemAction(formData: FormData) {
