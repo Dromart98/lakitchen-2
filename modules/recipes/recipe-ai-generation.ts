@@ -24,6 +24,11 @@ export const recipeAiRequestSchema = z.object({
 
 export type RecipeAiRequest = z.infer<typeof recipeAiRequestSchema>;
 
+export type RecipeAiExpirationContext = {
+  todayKey: string;
+  urgentInventoryItemIds: ReadonlySet<string>;
+};
+
 export type RecipeAiInventoryItem = {
   id: string;
   name: string;
@@ -201,7 +206,11 @@ export const RECIPE_AI_JSON_SCHEMA = {
   },
 } as const;
 
-export function buildRecipeAiInputText(request: RecipeAiRequest, inventoryItems: RecipeAiInventoryItem[]): string {
+export function buildRecipeAiInputText(
+  request: RecipeAiRequest,
+  inventoryItems: RecipeAiInventoryItem[],
+  expirationContext?: RecipeAiExpirationContext,
+): string {
   const items = inventoryItems.slice(0, RECIPE_AI_MAX_INVENTORY_ITEMS).map((item) => ({
     id: item.id,
     name: item.name,
@@ -210,10 +219,22 @@ export function buildRecipeAiInputText(request: RecipeAiRequest, inventoryItems:
     category: item.category,
     expires_at: item.expires_at,
   }));
+  const inventoryItemIds = new Set(items.map((item) => item.id));
+  const expirationPayload = request.priority_mode === "expiration" && expirationContext
+    ? {
+        expiration_context: {
+          today_key: expirationContext.todayKey,
+          urgent_inventory_item_ids: [...expirationContext.urgentInventoryItemIds]
+            .filter((id) => inventoryItemIds.has(id))
+            .sort(),
+        },
+      }
+    : {};
 
   return JSON.stringify({
     language: "es",
     priority_mode: request.priority_mode,
+    ...expirationPayload,
     constraints: {
       max_minutes: request.max_minutes,
       servings: request.servings,

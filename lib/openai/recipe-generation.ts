@@ -5,6 +5,7 @@ import {
   RECIPE_AI_MODEL_DEFAULT,
   RECIPE_AI_TIMEOUT_MS,
   validateRecipeAiProviderOutput,
+  type RecipeAiExpirationContext,
   type RecipeAiGenerationResult,
   type RecipeAiInventoryItem,
   type RecipeAiRequest,
@@ -17,7 +18,7 @@ No inventes ingredientes externos, no cambies unidades y no superes cantidades d
 Devuelve solo JSON conforme al esquema. Si no puedes proponer recetas seguras, devuelve needs-clarification con un mensaje breve en español.
 No incluyas macros, no afirmes que se ha guardado nada y no incluyas HTML.
 Si priority_mode es balanced, mantén el comportamiento normal sin exigir productos próximos a caducar.
-Si priority_mode es expiration, prioriza productos que caducan dentro de los próximos 7 días: cada propuesta debe usar únicamente inventario real, al menos una receta devuelta debe incluir un producto próximo a caducar, si solo se pide una sugerencia esa receta debe incluir un producto próximo a caducar, no inventes ingredientes externos, no cambies nombres ni unidades, no excedas cantidades disponibles y no generes macros.`;
+Si priority_mode es expiration, expiration_context.today_key es la fecha de referencia autoritativa calculada por el servidor y expiration_context.urgent_inventory_item_ids contiene exactamente los productos que el servidor considera urgentes. Prioriza exclusivamente esos IDs como productos próximos a caducar, sin recalcular ni reinterpretar la urgencia con otra fecha. Al menos una receta devuelta debe incluir un ID urgente y, si solo se pide una sugerencia, esa receta debe incluirlo. Usa únicamente el inventario real, mantén nombres y unidades exactos, no excedas cantidades disponibles y no generes macros.`;
 
 type OpenAiResponseObject = {
   status?: unknown;
@@ -99,7 +100,12 @@ function isAbortError(error: unknown) {
 export async function generateRecipesWithOpenAi(
   request: RecipeAiRequest,
   inventoryItems: RecipeAiInventoryItem[],
-  options: { apiKey: string; model?: string; fetchImpl?: typeof fetch; urgentInventoryItemIds?: ReadonlySet<string> },
+  options: {
+    apiKey: string;
+    model?: string;
+    fetchImpl?: typeof fetch;
+    expirationContext?: RecipeAiExpirationContext;
+  },
 ): Promise<RecipeAiGenerationResult> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), RECIPE_AI_TIMEOUT_MS);
@@ -116,7 +122,7 @@ export async function generateRecipesWithOpenAi(
         model: options.model ?? RECIPE_AI_MODEL_DEFAULT,
         input: [
           { role: "system", content: RECIPE_AI_SYSTEM_PROMPT },
-          { role: "user", content: buildRecipeAiInputText(request, inventoryItems) },
+          { role: "user", content: buildRecipeAiInputText(request, inventoryItems, options.expirationContext) },
         ],
         text: {
           format: {
@@ -139,7 +145,12 @@ export async function generateRecipesWithOpenAi(
     if (!response.ok) return { status: "error", code: "provider-error" };
 
     const responseBody = await response.json() as unknown;
-    return parseRecipeAiResponse(request, inventoryItems, responseBody, options.urgentInventoryItemIds);
+    return parseRecipeAiResponse(
+      request,
+      inventoryItems,
+      responseBody,
+      options.expirationContext?.urgentInventoryItemIds,
+    );
   } catch (error) {
     if (isAbortError(error)) return { status: "error", code: "timeout" };
     return { status: "error", code: "network-error" };
