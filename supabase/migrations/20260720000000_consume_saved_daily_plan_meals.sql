@@ -2,13 +2,22 @@ alter table public.user_saved_daily_plans
   add column completed_meals jsonb not null default '{}'::jsonb
   check (jsonb_typeof(completed_meals) = 'object');
 
+create policy "Users can update their saved meal completion"
+  on public.user_saved_daily_plans
+  for update
+  to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
+
+grant update (completed_meals) on table public.user_saved_daily_plans to authenticated;
+
 create or replace function public.consume_saved_daily_plan_meal(
   p_plan_id uuid,
   p_meal_type text
 )
 returns uuid
 language plpgsql
-security definer
+security invoker
 set search_path = ''
 as $$
 declare
