@@ -24,14 +24,12 @@ export default async function PlanPage() {
 
   const { data: savedPlanData, error: savedPlanError } = await (supabase as any)
     .from("user_saved_daily_plans")
-    .select("id, plan_date, priority_mode, max_minutes_per_meal, target, total, difference, fit, meals, created_at")
+    .select("id, plan_date, priority_mode, max_minutes_per_meal, target, total, difference, fit, meals, completed_meals, created_at")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(12) as { data: unknown[] | null; error: { message: string } | null };
 
-  if (savedPlanError) {
-    console.warn("Supabase could not load saved daily plans.");
-  }
+  if (savedPlanError) console.warn("Supabase could not load saved daily plans.");
 
   const savedPlans = (savedPlanError ? [] : savedPlanData ?? []).reduce<SavedDailyPlan[]>((plans, row) => {
     const plan = toSavedDailyPlan(row);

@@ -1,4 +1,5 @@
 import { deleteSavedDailyPlanAction } from "@/app/plan/actions";
+import { CookSavedPlanMealButton } from "@/components/plan/CookSavedPlanMealButton";
 import { MEAL_TYPE_LABELS } from "@/modules/meals/meal-types";
 import type { DailyPlanNutrition } from "@/modules/plans/daily-plan-ai";
 import type { SavedDailyPlan } from "@/modules/plans/saved-daily-plans";
@@ -33,7 +34,7 @@ export function SavedDailyPlans({ plans }: { plans: SavedDailyPlan[] }) {
   return (
     <section className="card" style={{ marginTop: 16 }}>
       <h2>Planes guardados</h2>
-      <p className="muted">Son instantáneas de los planes generados. Guardarlos no descuenta productos ni registra comidas.</p>
+      <p className="muted">Puedes registrar cada comida por separado. Solo entonces se descuentan sus ingredientes del inventario.</p>
 
       {plans.length === 0 ? <p className="muted">Todavía no has guardado ningún plan.</p> : null}
 
@@ -63,6 +64,11 @@ export function SavedDailyPlans({ plans }: { plans: SavedDailyPlan[] }) {
                     <li key={ingredient.inventory_item_id}>{formatNumber(ingredient.quantity)} {ingredient.unit} · {ingredient.name}</li>
                   ))}
                 </ul>
+                <CookSavedPlanMealButton
+                  planId={plan.id}
+                  mealType={meal.meal_type}
+                  completed={Boolean(plan.completed_meals[meal.meal_type])}
+                />
               </section>
             ))}
           </details>

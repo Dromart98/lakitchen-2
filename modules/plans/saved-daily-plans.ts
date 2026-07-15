@@ -65,6 +65,15 @@ export type SaveDailyPlanResult =
   | { status: "success"; code: "saved" | "already-saved"; planId: string }
   | { status: "error"; code: "invalid-input" | "unauthenticated" | "profile-required" | "inventory-changed" | "save-failed" | "unexpected-error" };
 
+export const cookSavedDailyPlanMealRequestSchema = z.object({
+  plan_id: z.string().uuid(),
+  meal_type: z.enum(DAILY_PLAN_MEAL_TYPES),
+}).strict();
+
+export type CookSavedDailyPlanMealResult =
+  | { status: "success"; mealLogId: string }
+  | { status: "error"; code: "invalid-input" | "unauthenticated" | "already-completed" | "inventory-changed" | "unexpected-error" };
+
 export function buildProviderOutputForSavedPlan(request: SaveDailyPlanRequest) {
   return {
     status: "success" as const,
@@ -72,6 +81,18 @@ export function buildProviderOutputForSavedPlan(request: SaveDailyPlanRequest) {
     meals: request.plan.meals.map(({ nutrition: _nutrition, ...meal }) => meal as DailyPlanMeal),
   };
 }
+
+const mealCompletionSchema = z.object({
+  meal_log_id: z.string().uuid(),
+  completed_at: z.string().min(1),
+}).strict();
+
+const completedMealsSchema = z.object({
+  breakfast: mealCompletionSchema.optional(),
+  lunch: mealCompletionSchema.optional(),
+  snack: mealCompletionSchema.optional(),
+  dinner: mealCompletionSchema.optional(),
+}).strict();
 
 const savedDailyPlanRowSchema = z.object({
   id: z.string().uuid(),
@@ -83,6 +104,7 @@ const savedDailyPlanRowSchema = z.object({
   difference: nutritionSchema,
   fit: z.enum(["close", "acceptable", "far"]),
   meals: z.array(mealSchema).length(4),
+  completed_meals: completedMealsSchema,
   created_at: z.string().min(1),
 }).strict();
 

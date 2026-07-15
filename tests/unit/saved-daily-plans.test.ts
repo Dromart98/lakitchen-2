@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildProviderOutputForSavedPlan,
+  cookSavedDailyPlanMealRequestSchema,
   saveDailyPlanRequestSchema,
   toSavedDailyPlan,
 } from "@/modules/plans/saved-daily-plans";
@@ -62,7 +63,14 @@ describe("saved daily plans", () => {
     expect(saveDailyPlanRequestSchema.safeParse(value).success).toBe(false);
   });
 
-  it("parses a valid saved plan row and rejects malformed snapshots", () => {
+  it("accepts only a saved plan id and a valid meal type for consumption", () => {
+    const input = { plan_id: "11111111-1111-4111-8111-111111111111", meal_type: "lunch" };
+    expect(cookSavedDailyPlanMealRequestSchema.safeParse(input).success).toBe(true);
+    expect(cookSavedDailyPlanMealRequestSchema.safeParse({ ...input, user_id: "forbidden" }).success).toBe(false);
+    expect(cookSavedDailyPlanMealRequestSchema.safeParse({ ...input, meal_type: "other" }).success).toBe(false);
+  });
+
+  it("parses completion snapshots and rejects unknown completion keys", () => {
     const value = request();
     const row = {
       id: "11111111-1111-4111-8111-111111111111",
@@ -74,10 +82,17 @@ describe("saved daily plans", () => {
       difference: value.plan.difference,
       fit: value.plan.fit,
       meals: value.plan.meals,
+      completed_meals: {
+        breakfast: {
+          meal_log_id: "22222222-2222-4222-8222-222222222222",
+          completed_at: "2026-07-15T18:00:00.000Z",
+        },
+      },
       created_at: "2026-07-15T18:00:00.000Z",
     };
 
-    expect(toSavedDailyPlan(row)?.id).toBe(row.id);
+    expect(toSavedDailyPlan(row)?.completed_meals.breakfast?.meal_log_id).toBe("22222222-2222-4222-8222-222222222222");
     expect(toSavedDailyPlan({ ...row, meals: row.meals.slice(0, 3) })).toBeNull();
+    expect(toSavedDailyPlan({ ...row, completed_meals: { other: row.completed_meals.breakfast } })).toBeNull();
   });
 });
