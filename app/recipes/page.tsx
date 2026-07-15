@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { cookRecipeAndLogMealAction } from "@/app/recipes/actions";
 import { RecipeAiGenerator } from "@/components/recipes/RecipeAiGenerator";
+import { SavedAiRecipes } from "@/components/recipes/SavedAiRecipes";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
@@ -17,6 +18,7 @@ import {
 } from "@/modules/recipes/recipe-matching";
 import type { RecipeNutritionEstimate } from "@/modules/recipes/recipe-nutrition";
 import { buildRecipeMatchWithServingOptions, filterRecipeMatchesWithServingOptions, getMaxUrgentItemCountForCookableServings } from "@/modules/recipes/recipe-servings";
+import { toSavedAiRecipe, type SavedAiRecipe } from "@/modules/recipes/saved-ai-recipes";
 
 export const dynamic = "force-dynamic";
 
@@ -110,6 +112,12 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
     .eq("user_id", user.id)
     .gt("quantity", 0) as { data: RecipeInventoryItem[] | null; error: { message: string } | null };
 
+  const { data: savedRecipeData, error: savedRecipeError } = await (supabase as any)
+    .from("user_saved_ai_recipes")
+    .select("id, user_id, title, description, estimated_minutes, servings, steps, source_priority_mode, fingerprint, created_at, user_saved_ai_recipe_ingredients(id, recipe_id, user_id, inventory_item_id, name, quantity, unit, sort_order, created_at)")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false }) as { data: unknown[] | null; error: { message: string } | null };
+
   const { data: recipeData, error: recipeError } = await (supabase as any)
     .from("recipe_templates")
     .select("id, slug, title, description, prep_minutes, servings, instructions, recipe_ingredients(id, recipe_id, display_name, match_terms, required_quantity, required_unit, is_required, sort_order)")
@@ -122,6 +130,20 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
   if (recipeError) {
     console.warn("Supabase could not load recipe catalog:", recipeError.message);
   }
+
+  if (savedRecipeError) {
+    console.warn("Supabase could not load saved AI recipes:", savedRecipeError.message);
+  }
+
+  const savedRecipes = (savedRecipeError ? [] : savedRecipeData ?? []).reduce<SavedAiRecipe[]>((validRecipes, row) => {
+    const recipe = toSavedAiRecipe(row);
+    if (!recipe) {
+      console.warn("Supabase returned an invalid saved AI recipe row.");
+      return validRecipes;
+    }
+    validRecipes.push(recipe);
+    return validRecipes;
+  }, []);
 
   const inventoryItems = inventoryError ? [] : inventoryData ?? [];
   const recipes = (recipeError ? [] : recipeData ?? []).map(toRecipeTemplate).filter((recipe): recipe is RecipeTemplate => Boolean(recipe));
@@ -148,6 +170,8 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
       </section>
 
       <RecipeAiGenerator />
+
+      <SavedAiRecipes recipes={savedRecipes} />
 
       {inventoryItems.length === 0 ? (
         <section className="card" style={{ marginTop: 16 }}>

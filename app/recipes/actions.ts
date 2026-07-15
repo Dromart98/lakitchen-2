@@ -20,6 +20,13 @@ import {
 } from "@/modules/recipes/recipe-ai-generation";
 import { getUrgentRecipeAiInventoryItemIds, sortRecipeAiSuggestionsByUrgency } from "@/modules/recipes/recipe-ai-urgency";
 import {
+  createSavedAiRecipeFingerprint,
+  parseSaveGeneratedRecipeInput,
+  validateSavedAiRecipeInventory,
+  type SaveGeneratedRecipeResult,
+  type SavedAiRecipeInventoryItem,
+} from "@/modules/recipes/saved-ai-recipes";
+import {
   mapRecipeAiCookRpcError,
   mapRecipeConsumptionError,
   parseRecipeAiCookRequest,
@@ -250,6 +257,119 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
   } catch {
     return { status: "error", code: "unexpected-error" };
   }
+}
+
+
+type SaveGeneratedRecipeSupabaseQueryBuilder = {
+  select(columns: string): SaveGeneratedRecipeSupabaseQueryBuilder;
+  eq(column: string, value: string): SaveGeneratedRecipeSupabaseQueryBuilder;
+  in(column: string, values: string[]): SaveGeneratedRecipeSupabaseQueryBuilder;
+  gt(column: string, value: number): Promise<unknown>;
+  maybeSingle(): Promise<unknown>;
+  delete(): SaveGeneratedRecipeSupabaseQueryBuilder;
+};
+
+type SaveGeneratedRecipeSupabaseClient = {
+  from(table: string): SaveGeneratedRecipeSupabaseQueryBuilder;
+  rpc(functionName: string, parameters: Record<string, unknown>): Promise<unknown>;
+};
+
+export async function saveGeneratedRecipeAction(input: unknown): Promise<SaveGeneratedRecipeResult> {
+  const request = parseSaveGeneratedRecipeInput(input);
+  if (!request) return { status: "error", code: "invalid-input" };
+
+  const supabase = await createClient();
+  let user: { id: string };
+
+  try {
+    user = await requireAuthenticatedUser(supabase, "AI recipe saving");
+  } catch {
+    return { status: "error", code: "unauthenticated" };
+  }
+
+  const inventoryItemIds = request.recipe.ingredients.map((ingredient) => ingredient.inventory_item_id);
+  if (new Set(inventoryItemIds).size !== inventoryItemIds.length) return { status: "error", code: "invalid-input" };
+
+  const recipeClient = supabase as unknown as SaveGeneratedRecipeSupabaseClient;
+  const { data, error } = await recipeClient
+    .from("inventory_items")
+    .select("id, name, quantity, unit, expires_at")
+    .eq("user_id", user.id)
+    .in("id", inventoryItemIds)
+    .gt("quantity", 0) as { data: SavedAiRecipeInventoryItem[] | null; error: { message: string } | null };
+
+  if (error) {
+    console.warn("Supabase could not load AI recipe saving inventory items:", error.message);
+    return { status: "error", code: "unexpected-error" };
+  }
+
+  const validationError = validateSavedAiRecipeInventory(request.recipe, data ?? [], getCurrentInventoryExpirationDateKey());
+  if (validationError) return { status: "error", code: validationError };
+
+  const fingerprint = createSavedAiRecipeFingerprint(request.recipe);
+
+  const { data: existingData, error: existingError } = await recipeClient
+    .from("user_saved_ai_recipes")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("fingerprint", fingerprint)
+    .maybeSingle() as { data: { id: string } | null; error: { message: string } | null };
+
+  if (existingError) {
+    console.warn("Supabase could not check saved AI recipe duplicate:", existingError.message);
+    return { status: "error", code: "save-failed" };
+  }
+
+  if (existingData?.id) return { status: "success", code: "already-saved", recipeId: existingData.id };
+
+  const { data: recipeId, error: saveError } = await recipeClient.rpc("save_user_ai_recipe", {
+    p_title: request.recipe.title,
+    p_description: request.recipe.description,
+    p_estimated_minutes: request.recipe.estimated_minutes,
+    p_servings: request.recipe.servings,
+    p_steps: request.recipe.steps,
+    p_source_priority_mode: request.priority_mode,
+    p_fingerprint: fingerprint,
+    p_ingredients: request.recipe.ingredients,
+  }) as { data: string | null; error: { message: string } | null };
+
+  if (saveError || !recipeId) {
+    console.warn("Supabase could not save AI recipe.");
+    return { status: "error", code: "save-failed" };
+  }
+
+  revalidatePath(RECIPES_PATH);
+  return { status: "success", code: "saved", recipeId };
+}
+
+export async function deleteSavedAiRecipeAction(formData: FormData) {
+  const recipeId = String(formData.get("recipe_id") ?? "").trim();
+  if (!UUID_PATTERN.test(recipeId)) return;
+
+  const supabase = await createClient();
+  let user: { id: string };
+
+  try {
+    user = await requireAuthenticatedUser(supabase, "saved AI recipe deletion");
+  } catch {
+    return;
+  }
+
+  const recipeClient = supabase as unknown as SaveGeneratedRecipeSupabaseClient;
+  const deleteResult = await recipeClient
+    .from("user_saved_ai_recipes")
+    .delete()
+    .eq("id", recipeId)
+    .eq("user_id", user.id)
+    .select("id") as unknown as { data: { id: string }[] | null; error: { message: string } | null };
+  const { error } = deleteResult;
+
+  if (error) {
+    console.warn("Supabase could not delete saved AI recipe.");
+    return;
+  }
+
+  revalidatePath(RECIPES_PATH);
 }
 
 

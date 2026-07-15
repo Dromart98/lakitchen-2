@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
-import { cookGeneratedRecipeAndLogMealAction, generateRecipeAiSuggestionsAction } from "@/app/recipes/actions";
+import { cookGeneratedRecipeAndLogMealAction, generateRecipeAiSuggestionsAction, saveGeneratedRecipeAction } from "@/app/recipes/actions";
 import { MEAL_TYPE_LABELS, MEAL_TYPES, type MealType } from "@/modules/meals/meal-types";
 import type { RecipeAiActionResult } from "@/modules/recipes/recipe-ai-generation";
 
@@ -42,27 +43,59 @@ function getErrorMessage(result: Extract<RecipeAiActionResult, { status: "error"
 }
 
 export function RecipeAiGenerator() {
+  const router = useRouter();
   const [result, setResult] = useState<RecipeAiActionResult | null>(null);
   const [isPending, startTransition] = useTransition();
   const [cookingRecipeTitle, setCookingRecipeTitle] = useState<string | null>(null);
   const [selectedMealTypes, setSelectedMealTypes] = useState<Record<string, MealType>>({});
-  const isBusy = isPending || cookingRecipeTitle !== null;
+  const [lastPriorityMode, setLastPriorityMode] = useState<"balanced" | "expiration">("balanced");
+  const [savingRecipeTitle, setSavingRecipeTitle] = useState<string | null>(null);
+  const [saveMessages, setSaveMessages] = useState<Record<string, string>>({});
+  const isBusy = isPending || cookingRecipeTitle !== null || savingRecipeTitle !== null;
 
   function handleSubmit(formData: FormData) {
     setResult(null);
     setCookingRecipeTitle(null);
+    setSavingRecipeTitle(null);
+    setSaveMessages({});
     startTransition(async () => {
+      const priorityMode = formData.get("priority_mode") === "expiration" ? "expiration" : "balanced";
+      setLastPriorityMode(priorityMode);
       const nextResult = await generateRecipeAiSuggestionsAction({
         max_minutes: formData.get("max_minutes"),
         servings: formData.get("servings"),
         suggestion_count: formData.get("suggestion_count"),
-        priority_mode: formData.get("priority_mode"),
+        priority_mode: priorityMode,
       });
       setResult(nextResult);
       if (nextResult.status === "success") {
         setSelectedMealTypes(Object.fromEntries(nextResult.recipes.map((recipe) => [recipe.title, "lunch" as MealType])));
       }
     });
+  }
+
+  async function handleSave(recipe: Extract<RecipeAiActionResult, { status: "success" }>["recipes"][number]) {
+    if (savingRecipeTitle !== null || isPending) return;
+
+    setSavingRecipeTitle(recipe.title);
+    const { nutrition: _nutrition, ...recipePayload } = recipe;
+    const saveResult = await saveGeneratedRecipeAction({
+      priority_mode: lastPriorityMode,
+      recipe: recipePayload,
+    });
+
+    setSavingRecipeTitle(null);
+
+    if (saveResult.status === "success") {
+      setSaveMessages((current) => ({
+        ...current,
+        [recipe.title]: saveResult.code === "already-saved" ? "Ya estaba guardada" : "Receta guardada",
+      }));
+      router.refresh();
+      return;
+    }
+
+    setSaveMessages((current) => ({ ...current, [recipe.title]: "No se pudo guardar la receta." }));
   }
 
   async function handleCook(recipe: Extract<RecipeAiActionResult, { status: "success" }>["recipes"][number]) {
@@ -96,7 +129,7 @@ export function RecipeAiGenerator() {
   return (
     <section className="card" style={{ marginTop: 16 }}>
       <h2>Generar recetas con IA</h2>
-      <p className="muted">Crea sugerencias temporales usando únicamente productos disponibles en tu inventario. No se guardan ni descuentan cantidades.</p>
+      <p className="muted">Crea sugerencias temporales usando únicamente productos disponibles en tu inventario. Las recetas generadas son temporales hasta que pulses “Guardar receta”. Cocinarlas seguirá descontando los ingredientes del inventario.</p>
       <form action={handleSubmit}>
         <label htmlFor="recipe-ai-max-minutes">Tiempo máximo</label>
         <select id="recipe-ai-max-minutes" name="max_minutes" defaultValue="30" disabled={isBusy}>
@@ -133,13 +166,14 @@ export function RecipeAiGenerator() {
 
       {isPending ? <p role="status">Generando sugerencias…</p> : null}
       {cookingRecipeTitle ? <p role="status">Cocinando y registrando…</p> : null}
+      {savingRecipeTitle ? <p role="status">Guardando…</p> : null}
 
       {result?.status === "error" ? <p role="alert">{getErrorMessage(result)}</p> : null}
       {result?.status === "needs-clarification" ? <p role="status">{result.message}</p> : null}
 
       {result?.status === "success" ? (
         <div>
-          <p className="muted">Sugerencias generadas por IA. Revísalas antes de cocinar; todavía no se pueden guardar ni descontar del inventario.</p>
+          <p className="muted">Las recetas generadas son temporales hasta que pulses “Guardar receta”. Cocinarlas seguirá descontando los ingredientes del inventario.</p>
           {result.recipes.map((recipe) => (
             <article className="card" key={recipe.title} style={{ marginTop: 16 }}>
               <p className="muted">Sugerencia generada por IA</p>
@@ -180,6 +214,14 @@ export function RecipeAiGenerator() {
                   <option key={mealType} value={mealType}>{MEAL_TYPE_LABELS[mealType]}</option>
                 ))}
               </select>
+              <p role="status">{saveMessages[recipe.title] ?? ""}</p>
+              <button
+                type="button"
+                disabled={isBusy}
+                onClick={() => { void handleSave(recipe); }}
+              >
+                {savingRecipeTitle === recipe.title ? "Guardando…" : "Guardar receta"}
+              </button>
               <button
                 type="button"
                 disabled={isBusy || !recipe.nutrition.isComplete || !recipe.nutrition.total || !recipe.nutrition.perServing}
