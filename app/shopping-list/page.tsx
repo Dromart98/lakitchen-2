@@ -49,6 +49,8 @@ const shoppingListSuccessMessages: Record<string, string> = {
   "item-deleted": "Producto eliminado correctamente.",
   "item-updated": "Producto actualizado correctamente.",
   "item-transferred": "Producto añadido al inventario correctamente.",
+  "item-transferred-with-nutrition": "Producto añadido al inventario con los macros calculados automáticamente.",
+  "item-transferred-macros-pending": "Producto añadido al inventario. No se pudieron completar los macros automáticamente; puedes revisarlos desde el inventario.",
 };
 
 function ShoppingListGroup({ items, title }: { items: ShoppingListItemRow[]; title: string }) {
@@ -90,7 +92,8 @@ function ShoppingListGroup({ items, title }: { items: ShoppingListItemRow[]; tit
                       <span>Fecha de caducidad opcional</span>
                       <input id={`shopping-list-transfer-expires-at-${item.id}`} name="expires_at" type="date" />
                     </label>
-                    <button className="button" type="submit">Añadir al inventario</button>
+                    <p className="muted">Lakitchenapp intentará completar los macros automáticamente. Si no puede, el producto se añadirá igualmente.</p>
+                    <button className="button" type="submit">Añadir al inventario y calcular macros</button>
                   </form>
                 </details>
               ) : null}
