@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { getInventoryExpirationDayDifference } from "@/modules/inventory/inventory-expiration";
+
 import type { RecipeAiSuggestionWithNutrition } from "@/modules/recipes/recipe-ai-nutrition";
 
 export const RECIPE_AI_MAX_INVENTORY_ITEMS = 40;
@@ -45,6 +47,14 @@ export type RecipeAiSuggestion = {
   ingredients: RecipeAiIngredient[];
   steps: string[];
 };
+
+
+export function filterUsableRecipeAiInventoryItems<T extends { expires_at: string | null }>(items: T[], todayKey: string): T[] {
+  return items.filter((item) => {
+    if (!item.expires_at) return true;
+    return getInventoryExpirationDayDifference(item.expires_at, todayKey) >= 0;
+  });
+}
 
 export type RecipeAiGenerationResult =
   | { status: "success"; recipes: RecipeAiSuggestion[] }
