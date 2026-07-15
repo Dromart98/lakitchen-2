@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { generateRecipesWithOpenAi } from "@/lib/openai/recipe-generation";
 import {
+  buildRecipeAiInputText,
   parseRecipeAiRequest,
   RECIPE_AI_JSON_SCHEMA,
   validateRecipeAiProviderOutput,
@@ -76,6 +77,26 @@ describe("RECIPE_AI_JSON_SCHEMA", () => {
 
   it("allows message to be a string or null", () => {
     expect(RECIPE_AI_JSON_SCHEMA.properties.message.type).toEqual(["string", "null"]);
+  });
+});
+
+describe("buildRecipeAiInputText", () => {
+  it("does not include nutrition fields in the provider input text", () => {
+    const inputText = buildRecipeAiInputText(request, [{
+      ...inventory[0],
+      nutrition_basis: "per_100g",
+      calories: 350,
+      protein_g: 7,
+      carbs_g: 77,
+      fat_g: 1.2,
+    }]);
+
+    expect(inputText).toContain("Arroz");
+    expect(inputText).not.toContain("nutrition_basis");
+    expect(inputText).not.toContain("calories");
+    expect(inputText).not.toContain("protein_g");
+    expect(inputText).not.toContain("carbs_g");
+    expect(inputText).not.toContain("fat_g");
   });
 });
 

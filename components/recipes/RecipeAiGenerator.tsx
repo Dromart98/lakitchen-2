@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 
 import { generateRecipeAiSuggestionsAction } from "@/app/recipes/actions";
-import type { RecipeAiGenerationResult } from "@/modules/recipes/recipe-ai-generation";
+import type { RecipeAiActionResult } from "@/modules/recipes/recipe-ai-generation";
 
 const errorMessages: Record<string, string> = {
   unauthenticated: "Inicia sesión para generar recetas con tu inventario.",
@@ -23,12 +23,25 @@ const errorMessages: Record<string, string> = {
   "unexpected-error": "No se pudo generar recetas en este momento.",
 };
 
-function getErrorMessage(result: Extract<RecipeAiGenerationResult, { status: "error" }>) {
+
+function formatNutritionValue(value: number): string {
+  return new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 }).format(value);
+}
+
+function formatNutritionLine(values: NonNullable<Extract<RecipeAiActionResult, { status: "success" }>["recipes"][number]["nutrition"]["total"]>): string {
+  return `${formatNutritionValue(values.calories)} kcal · ${formatNutritionValue(values.proteinG)} g proteínas · ${formatNutritionValue(values.carbsG)} g carbohidratos · ${formatNutritionValue(values.fatG)} g grasas`;
+}
+
+function getMissingNutritionMessage(count: number): string {
+  return `No se puede calcular la nutrición completa porque faltan datos nutricionales de ${count} producto${count === 1 ? "" : "s"}.`;
+}
+
+function getErrorMessage(result: Extract<RecipeAiActionResult, { status: "error" }>) {
   return errorMessages[result.code] ?? errorMessages["unexpected-error"];
 }
 
 export function RecipeAiGenerator() {
-  const [result, setResult] = useState<RecipeAiGenerationResult | null>(null);
+  const [result, setResult] = useState<RecipeAiActionResult | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(formData: FormData) {
@@ -100,6 +113,17 @@ export function RecipeAiGenerator() {
               <ol>
                 {recipe.steps.map((step) => <li key={step}>{step}</li>)}
               </ol>
+              <section>
+                <h4>Información nutricional estimada</h4>
+                {recipe.nutrition.isComplete && recipe.nutrition.total && recipe.nutrition.perServing ? (
+                  <>
+                    <p>Total de la receta: {formatNutritionLine(recipe.nutrition.total)}</p>
+                    <p>Por ración: {formatNutritionLine(recipe.nutrition.perServing)}</p>
+                  </>
+                ) : (
+                  <p className="muted">{getMissingNutritionMessage(recipe.nutrition.missingNutritionItemCount)}</p>
+                )}
+              </section>
             </article>
           ))}
         </div>
