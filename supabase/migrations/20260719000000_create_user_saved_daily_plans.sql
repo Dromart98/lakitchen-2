@@ -38,4 +38,5 @@ create policy "Users can delete their saved daily plans"
   using ((select auth.uid()) = user_id);
 
 revoke all on table public.user_saved_daily_plans from anon;
+revoke update on table public.user_saved_daily_plans from authenticated;
 grant select, insert, delete on table public.user_saved_daily_plans to authenticated;
