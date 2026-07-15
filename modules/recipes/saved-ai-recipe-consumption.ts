@@ -4,6 +4,7 @@ import { buildRecipeAiNutritionAllocations, type RecipeAiNutritionInventoryItem 
 import { buildRecipeConsumptionLines, type RecipeConsumptionLine } from "@/modules/recipes/recipe-consumption";
 import type { RecipeAiSuggestion } from "@/modules/recipes/recipe-ai-generation";
 import { estimateRecipeNutrition } from "@/modules/recipes/recipe-nutrition";
+import { RECIPE_MAX_INGREDIENTS } from "@/modules/recipes/recipe-limits";
 import type { SavedAiRecipe } from "@/modules/recipes/saved-ai-recipes";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -19,6 +20,7 @@ export type SavedAiRecipeCookErrorCode =
   | "expired-item"
   | "nutrition-unavailable"
   | "incompatible-unit"
+  | "too-many-items"
   | "consumption-conflict"
   | "unexpected-error";
 
@@ -77,6 +79,7 @@ export function validateSavedAiRecipeCookInventory(
   todayKey: string,
 ): SavedAiRecipeCookErrorCode | null {
   if (!recipe.ingredients.length) return "recipe-corrupt";
+  if (recipe.ingredients.length > RECIPE_MAX_INGREDIENTS) return "too-many-items";
   const recipeItemIds = recipe.ingredients.map((ingredient) => ingredient.inventory_item_id);
   if (new Set(recipeItemIds).size !== recipeItemIds.length) return "recipe-corrupt";
   const inventoryById = new Map(inventoryItems.map((item) => [item.id, item]));
@@ -102,6 +105,7 @@ export function buildSavedAiRecipeCookPlan(
 ): { ok: true; plan: SavedAiRecipeCookPlan } | { ok: false; code: SavedAiRecipeCookErrorCode } {
   const recipeSuggestion = toRecipeAiSuggestion(recipe);
   if (!recipeSuggestion) return { ok: false, code: "recipe-corrupt" };
+  if (recipe.ingredients.length > RECIPE_MAX_INGREDIENTS) return { ok: false, code: "too-many-items" };
 
   const inventoryById = new Map(inventoryItems.map((item) => [item.id, item]));
   const { allocations, missingItemIds } = buildRecipeAiNutritionAllocations(recipeSuggestion, inventoryById);
@@ -115,6 +119,7 @@ export function buildSavedAiRecipeCookPlan(
     if (consumptionLines.code === "incompatible-unit") return { ok: false, code: "incompatible-unit" };
     if (consumptionLines.code === "missing-item") return { ok: false, code: "recipe-stale" };
     if (consumptionLines.code === "invalid-quantity" || consumptionLines.code === "empty") return { ok: false, code: "recipe-corrupt" };
+    if (consumptionLines.code === "too-many-items") return { ok: false, code: "too-many-items" };
     return { ok: false, code: "unexpected-error" };
   }
 

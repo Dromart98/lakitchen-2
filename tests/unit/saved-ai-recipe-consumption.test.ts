@@ -42,6 +42,37 @@ function inventory(overrides: Partial<SavedAiRecipeInventoryItem>[] = []): Saved
   return base.map((item, index) => ({ ...item, ...(overrides[index] ?? {}) }));
 }
 
+function manyIngredientFixture(count: number): { recipe: SavedAiRecipe; inventory: SavedAiRecipeInventoryItem[] } {
+  const ingredients = Array.from({ length: count }, (_, index) => {
+    const id = `${String(index + 1).padStart(8, "0")}-1111-4111-8111-${String(index + 1).padStart(12, "0")}`;
+    return {
+      id: `${String(index + 1).padStart(8, "0")}-2222-4222-8222-${String(index + 1).padStart(12, "0")}`,
+      recipe_id: recipeId,
+      user_id: userId,
+      inventory_item_id: id,
+      name: `Producto ${index + 1}`,
+      quantity: 1,
+      unit: "ud",
+      sort_order: index,
+      created_at: "2026-07-15T00:00:00.000Z",
+    };
+  });
+  const inventoryItems = ingredients.map((ingredient) => ({
+    id: ingredient.inventory_item_id,
+    name: ingredient.name,
+    quantity: 2,
+    unit: "ud",
+    expires_at: "2026-07-20",
+    nutrition_basis: "per_unit" as const,
+    calories: 10,
+    protein_g: 1,
+    carbs_g: 1,
+    fat_g: 1,
+  }));
+
+  return { recipe: recipe({ ingredients }), inventory: inventoryItems };
+}
+
 describe("parseCookSavedAiRecipeInput", () => {
   it("accepts the exact public payload", () => {
     expect(parseCookSavedAiRecipeInput({ recipe_id: recipeId, meal_type: "lunch" })).toEqual({ recipe_id: recipeId, meal_type: "lunch" });
@@ -83,12 +114,31 @@ describe("saved AI recipe cook validation", () => {
   it("accepts a valid inventory snapshot", () => {
     expect(validateSavedAiRecipeCookInventory(recipe(), inventory(), "2026-07-15")).toBeNull();
   });
+
+  it("rejects corrupt recipes with more than twenty ingredients", () => {
+    const fixture = manyIngredientFixture(21);
+    expect(validateSavedAiRecipeCookInventory(fixture.recipe, fixture.inventory, "2026-07-15")).toBe("too-many-items");
+  });
 });
 
 describe("buildSavedAiRecipeCookPlan", () => {
   it("builds consumption lines for kg to g and l to ml conversions", () => {
     const result = buildSavedAiRecipeCookPlan(recipe(), inventory(), "dinner");
     expect(result).toMatchObject({ ok: true, plan: { mealType: "dinner", lines: [{ item_id: itemA, consumed_quantity: 0.2 }, { item_id: itemB, consumed_quantity: 0.5 }] } });
+  });
+
+  it("builds a complete plan for twenty ingredients", () => {
+    const fixture = manyIngredientFixture(20);
+    const result = buildSavedAiRecipeCookPlan(fixture.recipe, fixture.inventory, "lunch");
+
+    expect(result).toMatchObject({ ok: true, plan: { lines: expect.arrayContaining([{ item_id: fixture.inventory[0].id, consumed_quantity: 1 }]) } });
+    expect(result.ok && result.plan.lines).toHaveLength(20);
+  });
+
+  it("maps twenty-one ingredients to too-many-items instead of unexpected-error", () => {
+    const fixture = manyIngredientFixture(21);
+
+    expect(buildSavedAiRecipeCookPlan(fixture.recipe, fixture.inventory, "lunch")).toEqual({ ok: false, code: "too-many-items" });
   });
 
   it("supports compatible unit counts", () => {

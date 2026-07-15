@@ -2,6 +2,7 @@ import { getInventoryExpirationDayDifference } from "@/modules/inventory/invento
 import { isMealType, type MealType } from "@/modules/meals/meal-types";
 import type { RecipeConsumptionResult } from "@/modules/recipes/recipe-consumption";
 import type { RecipeAiSuggestion } from "@/modules/recipes/recipe-ai-generation";
+import { RECIPE_MAX_INGREDIENTS } from "@/modules/recipes/recipe-limits";
 
 export type RecipeAiCookErrorCode =
   | "unauthenticated"
@@ -28,7 +29,6 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 const TOP_LEVEL_KEYS = ["meal_type", "recipe"];
 const RECIPE_KEYS = ["title", "description", "estimated_minutes", "servings", "ingredients", "steps"];
 const INGREDIENT_KEYS = ["inventory_item_id", "name", "quantity", "unit"];
-export const RECIPE_AI_COOK_MAX_UNIQUE_ITEMS = 10;
 
 function hasExactKeys(record: Record<string, unknown>, keys: string[]): boolean {
   return Object.keys(record).length === keys.length && Object.keys(record).every((key) => keys.includes(key));
@@ -50,7 +50,7 @@ export function parseRecipeAiCookRequest(input: unknown): RecipeAiCookRequest | 
   if (!isNonEmptyString(recipe.title, 90) || !isNonEmptyString(recipe.description, 240)) return null;
   if (typeof recipe.estimated_minutes !== "number" || !Number.isInteger(recipe.estimated_minutes) || recipe.estimated_minutes < 1 || recipe.estimated_minutes > 60) return null;
   if (typeof recipe.servings !== "number" || !Number.isInteger(recipe.servings) || recipe.servings < 1 || recipe.servings > 4) return null;
-  if (!Array.isArray(recipe.ingredients) || recipe.ingredients.length < 1 || recipe.ingredients.length > RECIPE_AI_COOK_MAX_UNIQUE_ITEMS) return null;
+  if (!Array.isArray(recipe.ingredients) || recipe.ingredients.length < 1 || recipe.ingredients.length > RECIPE_MAX_INGREDIENTS) return null;
   if (!Array.isArray(recipe.steps) || recipe.steps.length < 2 || recipe.steps.length > 12) return null;
   if (!recipe.steps.every((step) => isNonEmptyString(step, 280))) return null;
 

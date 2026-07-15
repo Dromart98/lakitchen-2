@@ -54,9 +54,19 @@ describe("parseRecipeAiCookRequest", () => {
     { ...request, recipe: { ...recipe, ingredients: [{ ...recipe.ingredients[0], quantity: Infinity }] } },
     { ...request, recipe: { ...recipe, ingredients: [{ ...recipe.ingredients[0], quantity: NaN }] } },
     { ...request, recipe: { ...recipe, ingredients: [{ ...recipe.ingredients[0] }, { ...recipe.ingredients[0] }] } },
-    { ...request, recipe: { ...recipe, ingredients: Array.from({ length: 11 }, (_, index) => ({ ...recipe.ingredients[0], inventory_item_id: `123e4567-e89b-42d3-a456-4266141740${String(index).padStart(2, "0")}` })) } },
+    { ...request, recipe: { ...recipe, ingredients: Array.from({ length: 21 }, (_, index) => ({ ...recipe.ingredients[0], inventory_item_id: `123e4567-e89b-42d3-a456-4266141740${String(index).padStart(2, "0")}` })) } },
   ])("rejects unsafe payload %#", (payload) => {
     expect(parseRecipeAiCookRequest(payload)).toBeNull();
+  });
+
+  it("accepts exactly twenty unique ingredients", () => {
+    const ingredients = Array.from({ length: 20 }, (_, index) => ({
+      ...recipe.ingredients[0],
+      inventory_item_id: `123e4567-e89b-42d3-a456-4266141740${String(index).padStart(2, "0")}`,
+      name: `Producto ${index}`,
+    }));
+
+    expect(parseRecipeAiCookRequest({ ...request, recipe: { ...recipe, ingredients } })?.recipe.ingredients).toHaveLength(20);
   });
 });
 

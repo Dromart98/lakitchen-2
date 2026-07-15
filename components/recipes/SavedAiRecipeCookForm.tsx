@@ -17,6 +17,7 @@ const ERROR_MESSAGES: Record<SavedAiRecipeCookErrorCode, string> = {
   "expired-item": "Uno de los productos está caducado.",
   "nutrition-unavailable": "Falta información nutricional para registrar esta comida.",
   "incompatible-unit": "No se pudo cocinar la receta.",
+  "too-many-items": "Esta receta supera el máximo de 20 ingredientes permitido.",
   "consumption-conflict": "No se pudo cocinar la receta.",
   "unexpected-error": "No se pudo cocinar la receta.",
 };

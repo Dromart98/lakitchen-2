@@ -4,6 +4,7 @@ import { getInventoryExpirationDayDifference } from "@/modules/inventory/invento
 
 import type { RecipeAiSuggestionWithNutrition } from "@/modules/recipes/recipe-ai-nutrition";
 import { hasRecipeAiUrgencyCoverage } from "@/modules/recipes/recipe-ai-urgency";
+import { RECIPE_MAX_INGREDIENTS } from "@/modules/recipes/recipe-limits";
 
 export const RECIPE_AI_MAX_INVENTORY_ITEMS = 40;
 export const RECIPE_AI_MODEL_DEFAULT = "gpt-5.6-terra";
@@ -129,7 +130,7 @@ const recipeAiProviderRecipeSchema = z.object({
     name: z.string().trim().min(1).max(120),
     quantity: z.number().positive().finite(),
     unit: z.string().trim().min(1).max(16),
-  }).strict()).min(1).max(20),
+  }).strict()).min(1).max(RECIPE_MAX_INGREDIENTS),
   steps: z.array(z.string().trim().min(8).max(280)).min(2).max(12),
 }).strict();
 
@@ -185,7 +186,7 @@ export const RECIPE_AI_JSON_SCHEMA = {
           ingredients: {
             type: "array",
             minItems: 1,
-            maxItems: 20,
+            maxItems: RECIPE_MAX_INGREDIENTS,
             items: {
               type: "object",
               additionalProperties: false,

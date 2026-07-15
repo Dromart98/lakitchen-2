@@ -78,6 +78,11 @@ describe("RECIPE_AI_JSON_SCHEMA", () => {
   it("allows message to be a string or null", () => {
     expect(RECIPE_AI_JSON_SCHEMA.properties.message.type).toEqual(["string", "null"]);
   });
+
+  it("declares the shared ingredient maximum in the JSON Schema", () => {
+    const recipeItems = RECIPE_AI_JSON_SCHEMA.properties.recipes.items;
+    expect(recipeItems.properties.ingredients.maxItems).toBe(20);
+  });
 });
 
 describe("buildRecipeAiInputText", () => {
@@ -165,6 +170,25 @@ describe("parseRecipeAiRequest", () => {
 describe("validateRecipeAiProviderOutput", () => {
   it("accepts a valid response", () => {
     expect(validateRecipeAiProviderOutput(request, inventory, { status: "success", recipes: [validRecipe], message: null })).toEqual({ status: "success", recipes: [validRecipe] });
+  });
+
+
+
+  it("accepts exactly twenty ingredients and rejects twenty-one", () => {
+    const manyInventory = Array.from({ length: 21 }, (_, index) => ({
+      id: `item-${index + 1}`,
+      name: `Producto ${index + 1}`,
+      quantity: 100,
+      unit: "g",
+      category: "other",
+      expires_at: null,
+    }));
+    const ingredients = manyInventory.map((item) => ({ inventory_item_id: item.id, name: item.name, quantity: 1, unit: item.unit }));
+    const twentyIngredientRecipe = { ...validRecipe, ingredients: ingredients.slice(0, 20) };
+    const twentyOneIngredientRecipe = { ...validRecipe, ingredients };
+
+    expect(validateRecipeAiProviderOutput(request, manyInventory, { status: "success", recipes: [twentyIngredientRecipe], message: null })).toEqual({ status: "success", recipes: [twentyIngredientRecipe] });
+    expect(validateRecipeAiProviderOutput(request, manyInventory, { status: "success", recipes: [twentyOneIngredientRecipe], message: null })).toEqual({ status: "error", code: "invalid-ai-response" });
   });
 
   it("requires urgency coverage only in expiration mode", () => {
