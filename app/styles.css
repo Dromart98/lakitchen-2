@@ -512,29 +512,15 @@ h3 {
 
 .app-navigation__link.is-active,
 .mobile-bottom-nav__link.is-active {
-  color: var(--brand-foreground);
-  background: var(--brand-soft);
+  color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-soft) 62%, transparent);
 }
 
 .nav-icon {
   width: 18px;
   height: 18px;
-  border-radius: 6px;
-  border: 2px solid currentColor;
   display: inline-block;
-  position: relative;
-}
-
-.nav-icon--home::before,
-.nav-icon--inventory::before,
-.nav-icon--macros::before,
-.nav-icon--plan::before,
-.nav-icon--settings::before {
-  content: "";
-  position: absolute;
-  inset: 4px;
-  border-radius: inherit;
-  background: currentColor;
+  flex: 0 0 auto;
 }
 
 .mobile-bottom-nav {

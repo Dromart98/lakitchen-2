@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { isNavigationItemActive, navigationItems } from "@/components/navigation/navigation-items";
+import { isNavigationItemActive, navigationItems, type NavigationIconName } from "@/components/navigation/navigation-items";
+
+const allowedIcons = new Set<NavigationIconName>(["home", "inventory", "macros", "plan", "settings"]);
 
 describe("app navigation", () => {
   it("exposes the main app destinations", () => {
@@ -10,6 +12,13 @@ describe("app navigation", () => {
       ["Dieta", "/plan"],
       ["Ajustes", "/settings"],
     ]);
+  });
+
+  it("uses a different allowed icon for each section", () => {
+    const icons = navigationItems.map((item) => item.icon);
+
+    expect(icons.every((icon) => allowedIcons.has(icon))).toBe(true);
+    expect(new Set(icons).size).toBe(5);
   });
 
   it("marks direct routes and nested routes as active", () => {

@@ -1,6 +1,7 @@
 import type { Route } from "next";
 
-export type NavigationItem = { label: string; href: Route; icon: string; activePaths?: string[] };
+export type NavigationIconName = "home" | "inventory" | "macros" | "plan" | "settings";
+export type NavigationItem = { label: string; href: Route; icon: NavigationIconName; activePaths?: string[] };
 
 export const navigationItems: NavigationItem[] = [
   { label: "Inicio", href: "/dashboard", icon: "home" },

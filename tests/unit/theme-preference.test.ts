@@ -8,9 +8,17 @@ describe("theme preference", () => {
     expect(normalizeThemePreference("system")).toBe("system");
   });
 
-  it("uses light as the default for absent or invalid preferences", () => {
+  it("resolves absent and invalid preferences to light", () => {
     expect(normalizeThemePreference(null)).toBe("light");
+    expect(normalizeThemePreference(undefined)).toBe("light");
     expect(normalizeThemePreference("sepia")).toBe("light");
+  });
+
+  it("resolves explicit light and dark preferences", () => {
+    expect(resolveThemePreference("light", true)).toBe("light");
+    expect(resolveThemePreference("light", false)).toBe("light");
+    expect(resolveThemePreference("dark", true)).toBe("dark");
+    expect(resolveThemePreference("dark", false)).toBe("dark");
   });
 
   it("resolves system from prefers-color-scheme", () => {

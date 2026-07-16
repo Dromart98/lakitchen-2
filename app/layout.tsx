@@ -21,9 +21,11 @@ const themeScript = `
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" data-theme="light">
-      <body>
+    <html lang="es" data-theme="light" suppressHydrationWarning>
+      <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body>
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

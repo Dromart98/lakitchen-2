@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { normalizeThemePreference, resolveThemePreference, THEME_STORAGE_KEY, type ResolvedTheme, type ThemePreference } from "@/lib/theme/theme-preference";
 
 type ThemeContextValue = {
@@ -22,7 +22,7 @@ function applyTheme(theme: ResolvedTheme) {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [preference, setPreferenceState] = useState<ThemePreference>("light");
   const [prefersDark, setPrefersDark] = useState(false);
-  const initialized = useRef(false);
+  const [initialized, setInitialized] = useState(false);
 
   const resolvedTheme = resolveThemePreference(preference, prefersDark);
 
@@ -34,7 +34,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setPrefersDark(systemPrefersDark);
     setPreferenceState(storedPreference);
     applyTheme(resolveThemePreference(storedPreference, systemPrefersDark));
-    initialized.current = true;
+    setInitialized(true);
 
     const handleChange = (event: MediaQueryListEvent) => {
       setPrefersDark(event.matches);
@@ -45,16 +45,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!initialized.current) return;
+    if (!initialized) return;
     applyTheme(resolvedTheme);
-  }, [resolvedTheme]);
+  }, [initialized, resolvedTheme]);
 
   const setPreference = useCallback((nextPreference: ThemePreference) => {
     const normalizedPreference = normalizeThemePreference(nextPreference);
-    const nextResolvedTheme = resolveThemePreference(normalizedPreference, getPrefersDark());
+    const systemPrefersDark = getPrefersDark();
+    const nextResolvedTheme = resolveThemePreference(normalizedPreference, systemPrefersDark);
 
     window.localStorage.setItem(THEME_STORAGE_KEY, normalizedPreference);
-    setPrefersDark(getPrefersDark());
+    setPrefersDark(systemPrefersDark);
     setPreferenceState(normalizedPreference);
     applyTheme(nextResolvedTheme);
   }, []);
