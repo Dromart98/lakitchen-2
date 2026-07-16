@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 
+import { LaKitchenLogo } from "@/components/brand/LaKitchenLogo";
 import { createClient } from "@/lib/supabase/client";
 
 type AuthState = {
@@ -60,7 +61,7 @@ export function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="card auth-form">
       <div>
-        <p className="pill">Lakitchenapp V2</p>
+        <LaKitchenLogo className="auth-brand" variant="horizontal" theme="light" title="LaKitchen" />
         <h1>Accede a tu cocina</h1>
         <p className="muted">Inicia sesión o crea una cuenta con email y contraseña.</p>
       </div>

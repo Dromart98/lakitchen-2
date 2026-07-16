@@ -1,4 +1,6 @@
 import Link from "next/link";
+
+import { LaKitchenLogo } from "@/components/brand/LaKitchenLogo";
 import { ExpiringList } from "@/components/inventory/ExpiringList";
 import { MacroProgress } from "@/components/nutrition/MacroProgress";
 import { getInventoryExpirationAlertItems } from "@/modules/inventory/inventory-expiration";
@@ -128,7 +130,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   return (
     <main className="shell">
       <div className="topbar">
-        <h1>Lakitchen</h1>
+        <LaKitchenLogo variant="horizontal" theme="light" title="LaKitchen" />
         <form action="/auth/signout" method="post">
           <button className="logout-link" type="submit">Cerrar sesión</button>
         </form>
