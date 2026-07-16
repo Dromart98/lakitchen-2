@@ -278,17 +278,17 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
           placeholder="4006381333931"
         />
       </label>
-      <div>
+      <div className="inventory-barcode-actions">
         <button className="button" type="button" onClick={searchBarcode} disabled={isPending}>
           {isPending ? "Buscando..." : "Buscar producto"}
         </button>
-        <button className="button nav-button" type="button" onClick={startScanner} disabled={isScanning} style={{ marginLeft: 8 }}>
+        <button className="button nav-button" type="button" onClick={startScanner} disabled={isScanning}>
           Escanear código
         </button>
       </div>
       {isScanning ? (
-        <div>
-          <video ref={videoRef} playsInline muted style={{ width: "100%", maxHeight: 240, background: "#111", borderRadius: 12 }} />
+        <div className="inventory-scanner">
+          <video className="inventory-scanner__video" ref={videoRef} playsInline muted />
           <button className="button nav-button" type="button" onClick={stopScanner}>
             Cerrar escáner
           </button>
