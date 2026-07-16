@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AppShell } from "@/components/layout/AppShell";
 
 import { InventoryConsumeForm } from "@/components/inventory/InventoryConsumeForm";
 import { InventoryNutritionAiControls } from "@/components/inventory/InventoryNutritionAiControls";
@@ -186,7 +187,7 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
     : null;
 
   return (
-    <main className="shell">
+    <AppShell>
       <div className="topbar">
         <div>
           <span className="pill">Inventario</span>
@@ -515,6 +516,6 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
           </section>
         </>
       )}
-    </main>
+    </AppShell>
   );
 }

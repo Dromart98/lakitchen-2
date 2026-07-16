@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 type LaKitchenLogoVariant = "horizontal" | "mark";
 type LaKitchenLogoTheme = "light" | "dark" | "monochrome";
 
@@ -20,7 +22,8 @@ export function LaKitchenLogo({
   className,
   title = "LaKitchen",
 }: LaKitchenLogoProps) {
-  const labelledBy = `${variant}-${theme}-lakitchen-logo-title`;
+  const id = useId();
+  const labelledBy = `${id}-${variant}-${theme}-lakitchen-logo-title`;
   const classes = ["lakitchen-logo", `lakitchen-logo--${variant}`, THEME_CLASS[theme], className]
     .filter(Boolean)
     .join(" ");

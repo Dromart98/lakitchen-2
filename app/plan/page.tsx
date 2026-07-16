@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AppShell } from "@/components/layout/AppShell";
 
 import { DailyPlanGenerator } from "@/components/plan/DailyPlanGenerator";
 import { SavedDailyPlans } from "@/components/plan/SavedDailyPlans";
@@ -38,11 +39,8 @@ export default async function PlanPage() {
   }, []);
 
   return (
-    <main className="shell">
-      <div className="topbar">
-        <h1>Generar plan</h1>
-        <Link className="logout-link" href="/dashboard">Volver</Link>
-      </div>
+    <AppShell>
+      <h1>Generar plan</h1>
       <p className="muted">Crea un plan para hoy usando tus objetivos nutricionales y los productos que ya tienes.</p>
 
       {error ? <p className="auth-message error" role="alert">No se pudo cargar tu perfil nutricional. Inténtalo de nuevo.</p> : null}
@@ -59,6 +57,6 @@ export default async function PlanPage() {
       )}
 
       <SavedDailyPlans plans={savedPlans} />
-    </main>
+    </AppShell>
   );
 }
