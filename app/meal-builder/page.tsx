@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AppShell } from "@/components/layout/AppShell";
 
 import { InventoryMealBuilder } from "@/components/meals/InventoryMealBuilder";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
@@ -122,7 +123,7 @@ export default async function MealBuilderPage({ searchParams }: MealBuilderPageP
   }
 
   return (
-    <main className="shell">
+    <AppShell>
       <div className="topbar">
         <div>
           <p className="pill">Previsualización</p>
@@ -178,6 +179,6 @@ export default async function MealBuilderPage({ searchParams }: MealBuilderPageP
         initialRows={repeatMealDraft?.availableLines}
         unavailableItems={repeatMealDraft?.unavailableItems}
       />
-    </main>
+    </AppShell>
   );
 }

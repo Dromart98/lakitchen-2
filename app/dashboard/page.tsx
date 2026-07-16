@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { AppShell } from "@/components/layout/AppShell";
 
-import { LaKitchenLogo } from "@/components/brand/LaKitchenLogo";
 import { ExpiringList } from "@/components/inventory/ExpiringList";
 import { MacroProgress } from "@/components/nutrition/MacroProgress";
 import { getInventoryExpirationAlertItems } from "@/modules/inventory/inventory-expiration";
@@ -128,14 +128,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   const expiring = getInventoryExpirationAlertItems(inventoryItems, today);
 
   return (
-    <main className="shell">
-      <div className="topbar">
-        <LaKitchenLogo variant="horizontal" theme="light" title="LaKitchen" />
-        <form action="/auth/signout" method="post">
-          <button className="logout-link" type="submit">Cerrar sesión</button>
-        </form>
-      </div>
-
+    <AppShell>
       <p className="muted">Dashboard mobile-first para macros, inventario y recetas.</p>
 
       <div className="dashboard-actions">
@@ -285,6 +278,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
           ) : null}
         </div>
       </section>
-    </main>
+    </AppShell>
   );
 }
