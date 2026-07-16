@@ -129,58 +129,58 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
 
   return (
     <AppShell>
-      <p className="muted">Dashboard mobile-first para macros, inventario y recetas.</p>
+      <header className="dashboard-hero">
+        <span className="pill dashboard-hero__eyebrow">Resumen de hoy</span>
+        <h1>Hoy en tu cocina</h1>
+        <p className="muted dashboard-hero__copy">
+          Revisa de un vistazo tus macros, las comidas registradas y los productos que conviene usar pronto.
+        </p>
+      </header>
 
-      <div className="dashboard-actions">
-        <Link className="button nav-button" href="/nutrition-profile">
-          Configurar perfil nutricional
-        </Link>
-        <Link className="button nav-button" href="/inventory">
-          Inventario
-        </Link>
-        <Link className="button nav-button" href="/meal-builder">
-          Componer comida
-        </Link>
-        <Link className="button nav-button" href="/plan">
-          Generar plan
-        </Link>
-        <a className="button nav-button" href="/shopping-list">
-          Lista de la compra
-        </a>
-        <Link className="button nav-button" href="/meal-history">
-          Historial de comidas
-        </Link>
-        <Link className="button nav-button" href="/weekly-summary">
-          Resumen semanal
-        </Link>
+      <div className="dashboard-alerts">
+        {error ? (
+          <p className="auth-message error" role="alert">
+            No se pudo cargar tu perfil nutricional. Inténtalo de nuevo.
+          </p>
+        ) : null}
+
+        {inventoryError ? (
+          <p className="auth-message error" role="alert">
+            No se pudo cargar tu inventario. Inténtalo de nuevo.
+          </p>
+        ) : null}
       </div>
 
-      {error ? (
-        <p className="auth-message error" role="alert">
-          No se pudo cargar tu perfil nutricional. Inténtalo de nuevo.
-        </p>
-      ) : null}
-
-      {inventoryError ? (
-        <p className="auth-message error" role="alert">
-          No se pudo cargar tu inventario. Inténtalo de nuevo.
-        </p>
-      ) : null}
-
       {goal && remaining ? (
-        <section className="grid cards">
-          <MacroProgress consumed={consumedToday} goal={goal} />
-          <div className="card">
-            <h2>Restante</h2>
-            <p>{remaining.calories} kcal</p>
-            <p className="muted">
-              P {remaining.proteinG}g · C {remaining.carbsG}g · G {remaining.fatG}g
-            </p>
+        <section className="dashboard-nutrition" aria-labelledby="nutrition-summary-title">
+          <div className="dashboard-nutrition__progress">
+            <MacroProgress consumed={consumedToday} goal={goal} />
+          </div>
+          <div className="card dashboard-remaining-card">
+            <span className="pill">Queda para hoy</span>
+            <h2 id="nutrition-summary-title">Energía disponible</h2>
+            <p className="dashboard-remaining-card__value">{remaining.calories} kcal</p>
+            <p className="muted dashboard-remaining-card__hint">Calorías restantes según tu objetivo diario.</p>
+            <div className="dashboard-macro-chips" aria-label="Macronutrientes restantes">
+              <div className="dashboard-macro-chip">
+                <span>Proteína</span>
+                <strong>{remaining.proteinG} g</strong>
+              </div>
+              <div className="dashboard-macro-chip">
+                <span>Carbohidratos</span>
+                <strong>{remaining.carbsG} g</strong>
+              </div>
+              <div className="dashboard-macro-chip">
+                <span>Grasas</span>
+                <strong>{remaining.fatG} g</strong>
+              </div>
+            </div>
           </div>
         </section>
       ) : (
-        <section className="card">
-          <h2>Configura tu perfil nutricional</h2>
+        <section className="card dashboard-profile-card" aria-labelledby="nutrition-profile-title">
+          <span className="pill">Objetivos diarios</span>
+          <h2 id="nutrition-profile-title">Configura tu perfil nutricional</h2>
           <p className="muted">
             Aún no hay objetivos diarios guardados para tu usuario. Completa tu perfil para ver calorías,
             proteína, carbohidratos y grasas personalizados.
@@ -191,91 +191,128 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
         </section>
       )}
 
-      <section className="grid cards" style={{ marginTop: 16 }}>
-        <div className="card">
-          <h2>Registro manual rápido</h2>
-          <p className="muted">Añade una comida consumida hoy para sumar sus macros al dashboard.</p>
-          {mealErrorMessage ? <p className="auth-message error" role="alert">{mealErrorMessage}</p> : null}
-          {mealSuccessMessage ? <p className="auth-message success">{mealSuccessMessage}</p> : null}
-          <form action={addMealLogAction} className="meal-log-form">
-            <label className="field" htmlFor="meal-name">
-              <span>Nombre</span>
-              <input id="meal-name" name="name" type="text" required placeholder="Pollo con arroz" />
-            </label>
-            <label className="field" htmlFor="meal-type">
-              <span>Tipo de comida</span>
-              <select id="meal-type" name="meal_type" required defaultValue="">
-                <option value="" disabled>Selecciona un tipo</option>
-                {MEAL_TYPES.map((mealType) => (
-                  <option key={mealType} value={mealType}>{MEAL_TYPE_LABELS[mealType]}</option>
-                ))}
-              </select>
-            </label>
-            <label className="field" htmlFor="meal-calories">
-              <span>Calorías</span>
-              <input id="meal-calories" name="calories" type="number" min="0" step="1" required defaultValue="0" />
-            </label>
-            <label className="field" htmlFor="meal-protein">
-              <span>Proteína (g)</span>
-              <input id="meal-protein" name="protein_g" type="number" min="0" step="1" required defaultValue="0" />
-            </label>
-            <label className="field" htmlFor="meal-carbs">
-              <span>Carbohidratos (g)</span>
-              <input id="meal-carbs" name="carbs_g" type="number" min="0" step="1" required defaultValue="0" />
-            </label>
-            <label className="field" htmlFor="meal-fat">
-              <span>Grasas (g)</span>
-              <input id="meal-fat" name="fat_g" type="number" min="0" step="1" required defaultValue="0" />
-            </label>
-            <button className="button" type="submit">Registrar comida</button>
-          </form>
+      <section className="card dashboard-quick-actions" aria-labelledby="quick-actions-title">
+        <div>
+          <h2 id="quick-actions-title">Siguiente paso útil</h2>
+          <p className="muted">Acciones rápidas para completar tu día sin repetir la navegación principal.</p>
         </div>
-
-        <div className="card">
-          <h2>Comidas registradas hoy</h2>
-          {mealsToday.length ? (
-            <div>
-              {groupedMeals.map((group) => (
-                <section key={group.mealType} style={{ marginTop: 12 }}>
-                  <h3>{group.label}</h3>
-                  <ul>
-                    {group.meals.map((meal) => (
-                      <li key={meal.id}>
-                        <strong>{meal.name}</strong> · {meal.calories} kcal · P {meal.protein_g}g · C {meal.carbs_g}g · G {meal.fat_g}g
-                        <Link className="button" href={`/dashboard/meals/${meal.id}/edit`} style={{ marginLeft: 8 }}>Editar</Link>
-                        <form action={deleteMealLogAction} style={{ display: "inline", marginLeft: 8 }}>
-                          <input type="hidden" name="id" value={meal.id} />
-                          <button className="button" type="submit">Eliminar</button>
-                        </form>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
-            </div>
-          ) : (
-            <p className="muted">Aún no has registrado comidas hoy.</p>
-          )}
+        <div className="dashboard-quick-actions__links">
+          <a className="button dashboard-action-button dashboard-action-button--primary" href="#registro-rapido">
+            Registrar comida
+          </a>
+          <Link className="button dashboard-action-button" href="/meal-builder">
+            Componer comida
+          </Link>
+          <Link className="button dashboard-action-button" href="/recipes?mode=all">
+            Ver recetas
+          </Link>
+          <Link className="button dashboard-action-button" href="/plan">
+            Generar plan
+          </Link>
         </div>
       </section>
 
-      <section className="grid cards" style={{ marginTop: 16 }}>
+      <section className="card dashboard-meals-card" aria-labelledby="today-meals-title">
+        <div className="dashboard-section-heading">
+          <div>
+            <h2 id="today-meals-title">Comidas registradas hoy</h2>
+            <p className="muted">Desayuno, comida, merienda y cena separados para leer el día con calma.</p>
+          </div>
+        </div>
+        {mealsToday.length ? (
+          <div className="dashboard-meal-groups">
+            {groupedMeals.map((group) => (
+              <section key={group.mealType} className="dashboard-meal-group" aria-labelledby={`meal-group-${group.mealType}`}>
+                <h3 id={`meal-group-${group.mealType}`}>{group.label}</h3>
+                <ul className="dashboard-meal-list">
+                  {group.meals.map((meal) => (
+                    <li className="dashboard-meal-item" key={meal.id}>
+                      <div className="dashboard-meal-item__content">
+                        <strong>{meal.name}</strong>
+                        <span className="dashboard-meal-item__calories">{meal.calories} kcal</span>
+                        <span className="muted dashboard-meal-item__macros">
+                          Proteína {meal.protein_g} g · Carbohidratos {meal.carbs_g} g · Grasas {meal.fat_g} g
+                        </span>
+                      </div>
+                      <div className="dashboard-meal-item__actions">
+                        <Link className="button dashboard-meal-action" href={`/dashboard/meals/${meal.id}/edit`}>Editar</Link>
+                        <form action={deleteMealLogAction} className="dashboard-delete-form">
+                          <input type="hidden" name="id" value={meal.id} />
+                          <button className="button dashboard-meal-action dashboard-meal-action--danger" type="submit">
+                            Eliminar comida
+                          </button>
+                        </form>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <p className="muted dashboard-empty-state">Aún no has registrado comidas hoy.</p>
+        )}
+      </section>
+
+      <section className="card dashboard-manual-log" id="registro-rapido" aria-labelledby="quick-log-title">
+        <h2 id="quick-log-title">Registro manual rápido</h2>
+        <p className="muted">Añade una comida consumida hoy para sumar sus macros al dashboard.</p>
+        {mealErrorMessage ? <p className="auth-message error" role="alert">{mealErrorMessage}</p> : null}
+        {mealSuccessMessage ? <p className="auth-message success">{mealSuccessMessage}</p> : null}
+        <form action={addMealLogAction} className="meal-log-form dashboard-meal-log-form">
+          <label className="field" htmlFor="meal-name">
+            <span>Nombre</span>
+            <input id="meal-name" name="name" type="text" required placeholder="Pollo con arroz" />
+          </label>
+          <label className="field" htmlFor="meal-type">
+            <span>Tipo de comida</span>
+            <select id="meal-type" name="meal_type" required defaultValue="">
+              <option value="" disabled>Selecciona un tipo</option>
+              {MEAL_TYPES.map((mealType) => (
+                <option key={mealType} value={mealType}>{MEAL_TYPE_LABELS[mealType]}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field" htmlFor="meal-calories">
+            <span>Calorías</span>
+            <input id="meal-calories" name="calories" type="number" min="0" step="1" required defaultValue="0" />
+          </label>
+          <label className="field" htmlFor="meal-protein">
+            <span>Proteína (g)</span>
+            <input id="meal-protein" name="protein_g" type="number" min="0" step="1" required defaultValue="0" />
+          </label>
+          <label className="field" htmlFor="meal-carbs">
+            <span>Carbohidratos (g)</span>
+            <input id="meal-carbs" name="carbs_g" type="number" min="0" step="1" required defaultValue="0" />
+          </label>
+          <label className="field" htmlFor="meal-fat">
+            <span>Grasas (g)</span>
+            <input id="meal-fat" name="fat_g" type="number" min="0" step="1" required defaultValue="0" />
+          </label>
+          <button className="button dashboard-submit-button" type="submit">Registrar comida</button>
+        </form>
+      </section>
+
+      <section className="dashboard-support-grid">
         <ExpiringList items={expiring} todayKey={today} />
-        <div className="card">
+        <div className="card dashboard-recipes-card">
+          <span className="pill">Inspiración</span>
           <h2>Recetas con tu inventario</h2>
           <p className="muted">
             {inventoryItems.length === 0
               ? "Ya puedes consultar recetas del catálogo. Añade productos para saber cuáles puedes preparar ahora."
               : "Ya puedes consultar recetas según tu inventario, el tiempo disponible y los productos próximos a caducar."}
           </p>
-          <Link className="button nav-button" href="/recipes?mode=all">
-            Ver recetas
-          </Link>
-          {inventoryItems.length === 0 ? (
-            <Link className="button nav-button" href="/inventory" style={{ marginLeft: 8 }}>
-              Gestionar inventario
+          <div className="dashboard-recipes-card__actions">
+            <Link className="button nav-button" href="/recipes?mode=all">
+              Ver recetas
             </Link>
-          ) : null}
+            {inventoryItems.length === 0 ? (
+              <Link className="logout-link" href="/inventory">
+                Gestionar inventario
+              </Link>
+            ) : null}
+          </div>
         </div>
       </section>
     </AppShell>

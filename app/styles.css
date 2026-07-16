@@ -570,3 +570,310 @@ h3 {
     display: none;
   }
 }
+
+.dashboard-hero {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.dashboard-hero h1 {
+  margin-bottom: 0;
+  max-width: 760px;
+  color: var(--text);
+}
+
+.dashboard-hero__eyebrow {
+  margin-bottom: 2px;
+}
+
+.dashboard-hero__copy {
+  max-width: 680px;
+  margin-bottom: 0;
+  font-size: 1.02rem;
+}
+
+.dashboard-alerts {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.dashboard-nutrition,
+.dashboard-support-grid {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.dashboard-nutrition {
+  margin-top: 0;
+}
+
+.dashboard-nutrition__progress .card,
+.dashboard-remaining-card,
+.dashboard-profile-card,
+.dashboard-quick-actions,
+.dashboard-meals-card,
+.dashboard-manual-log,
+.dashboard-recipes-card {
+  height: 100%;
+}
+
+.dashboard-remaining-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  background: color-mix(in srgb, var(--brand-soft) 24%, var(--card));
+}
+
+.dashboard-remaining-card__value {
+  margin: 0;
+  color: var(--brand-dark);
+  font-size: clamp(2.4rem, 11vw, 4.5rem);
+  font-weight: 900;
+  letter-spacing: -0.07em;
+  line-height: 0.95;
+}
+
+.dashboard-remaining-card__hint {
+  margin-bottom: 2px;
+}
+
+.dashboard-macro-chips {
+  display: grid;
+  gap: 10px;
+}
+
+.dashboard-macro-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--card) 78%, transparent);
+  padding: 12px 14px;
+}
+
+.dashboard-macro-chip span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.dashboard-macro-chip strong {
+  color: var(--text);
+  font-size: 1.15rem;
+}
+
+.dashboard-quick-actions,
+.dashboard-meals-card,
+.dashboard-manual-log,
+.dashboard-support-grid {
+  margin-top: 18px;
+}
+
+.dashboard-quick-actions {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-quick-actions h2,
+.dashboard-quick-actions p,
+.dashboard-section-heading h2,
+.dashboard-section-heading p,
+.dashboard-manual-log h2,
+.dashboard-recipes-card h2 {
+  margin-bottom: 0;
+}
+
+.dashboard-quick-actions__links,
+.dashboard-recipes-card__actions {
+  display: grid;
+  gap: 10px;
+}
+
+.dashboard-action-button {
+  border: 1px solid var(--border);
+  background: var(--card-soft);
+  color: var(--brand-dark);
+  box-shadow: none;
+}
+
+.dashboard-action-button:hover {
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--brand) 16%, transparent);
+}
+
+.dashboard-action-button--primary {
+  border-color: color-mix(in srgb, var(--brand) 38%, var(--border));
+  background: var(--brand-soft);
+}
+
+.dashboard-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.dashboard-meal-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-meal-group {
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--card-soft);
+  padding: 16px;
+}
+
+.dashboard-meal-group h3 {
+  margin-bottom: 12px;
+  color: var(--brand-dark);
+}
+
+.dashboard-meal-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card .dashboard-meal-list {
+  margin: 0;
+  padding-left: 0;
+}
+
+.dashboard-meal-item {
+  display: grid;
+  gap: 12px;
+  border-radius: 18px;
+  background: var(--card);
+  padding: 14px;
+}
+
+.dashboard-meal-item__content {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dashboard-meal-item__content strong {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.dashboard-meal-item__calories {
+  color: var(--brand-dark);
+  font-weight: 900;
+}
+
+.dashboard-meal-item__macros {
+  font-size: 0.94rem;
+}
+
+.dashboard-meal-item__actions {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-delete-form {
+  display: grid;
+}
+
+.dashboard-meal-action {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  background: var(--card-soft);
+  color: var(--brand-dark);
+  box-shadow: none;
+  padding: 10px 14px;
+}
+
+.dashboard-meal-action--danger {
+  color: var(--brand-accent);
+}
+
+.dashboard-empty-state {
+  margin-bottom: 0;
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  background: var(--card-soft);
+  padding: 18px;
+}
+
+.dashboard-manual-log {
+  scroll-margin-top: 24px;
+}
+
+.dashboard-meal-log-form {
+  margin-top: 16px;
+}
+
+.dashboard-submit-button {
+  width: 100%;
+}
+
+.dashboard-recipes-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.button:focus-visible,
+.logout-link:focus-visible,
+.app-navigation__link:focus-visible,
+.mobile-bottom-nav__link:focus-visible,
+.field input:focus-visible,
+.field select:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+
+@media (min-width: 700px) {
+  .dashboard-nutrition {
+    grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+    align-items: stretch;
+  }
+
+  .dashboard-quick-actions {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    align-items: center;
+  }
+
+  .dashboard-quick-actions__links {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-meal-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .dashboard-meal-item__actions {
+    grid-template-columns: repeat(2, auto);
+  }
+
+  .dashboard-meal-log-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-submit-button {
+    width: auto;
+    justify-self: start;
+  }
+
+  .dashboard-support-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 980px) {
+  .dashboard-meal-log-form {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
