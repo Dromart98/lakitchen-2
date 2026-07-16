@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AppShell } from "@/components/layout/AppShell";
 import { DailyPlanGenerator } from "@/components/plan/DailyPlanGenerator";
 import { SavedDailyPlans } from "@/components/plan/SavedDailyPlans";
 import { buildDailyPlanTarget } from "@/modules/plans/daily-plan-ai";
@@ -38,10 +39,9 @@ export default async function PlanPage() {
   }, []);
 
   return (
-    <main className="shell">
-      <div className="topbar">
+    <AppShell>
+      <div className="section-heading">
         <h1>Generar plan</h1>
-        <Link className="logout-link" href="/dashboard">Volver</Link>
       </div>
       <p className="muted">Crea un plan para hoy usando tus objetivos nutricionales y los productos que ya tienes.</p>
 
@@ -59,6 +59,6 @@ export default async function PlanPage() {
       )}
 
       <SavedDailyPlans plans={savedPlans} />
-    </main>
+    </AppShell>
   );
 }

@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { AppShell } from "@/components/layout/AppShell";
 import { InventoryMealBuilder } from "@/components/meals/InventoryMealBuilder";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -122,23 +121,18 @@ export default async function MealBuilderPage({ searchParams }: MealBuilderPageP
   }
 
   return (
-    <main className="shell">
-      <div className="topbar">
+    <AppShell>
+      <div className="section-heading">
         <div>
           <p className="pill">Previsualización</p>
           <h1>Componer comida</h1>
         </div>
-        <Link className="logout-link" href="/dashboard">Volver al dashboard</Link>
       </div>
 
       <p className="muted">
         Selecciona productos de tu inventario para previsualizar calorías y macros. El inventario solo se descuenta cuando confirmas la comida.
       </p>
 
-      <div className="dashboard-actions">
-        <Link className="button nav-button" href="/dashboard">Dashboard</Link>
-        <Link className="button nav-button" href="/inventory">Inventario</Link>
-      </div>
 
       {mealSuccessMessage ? (
         <p className="auth-message success" role="status">
@@ -178,6 +172,6 @@ export default async function MealBuilderPage({ searchParams }: MealBuilderPageP
         initialRows={repeatMealDraft?.availableLines}
         unavailableItems={repeatMealDraft?.unavailableItems}
       />
-    </main>
+    </AppShell>
   );
 }

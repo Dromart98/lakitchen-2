@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AppShell } from "@/components/layout/AppShell";
 import { InventoryConsumeForm } from "@/components/inventory/InventoryConsumeForm";
 import { InventoryNutritionAiControls } from "@/components/inventory/InventoryNutritionAiControls";
 import { BarcodeCatalogControls } from "./BarcodeCatalogControls";
@@ -186,15 +187,12 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
     : null;
 
   return (
-    <main className="shell">
-      <div className="topbar">
+    <AppShell>
+      <div className="section-heading">
         <div>
           <span className="pill">Inventario</span>
           <h1>Mis productos</h1>
         </div>
-        <Link className="logout-link" href="/dashboard">
-          Volver al dashboard
-        </Link>
       </div>
 
       <section className="card form-section">
@@ -515,6 +513,6 @@ export default async function InventoryPage({ searchParams }: { searchParams?: P
           </section>
         </>
       )}
-    </main>
+    </AppShell>
   );
 }
