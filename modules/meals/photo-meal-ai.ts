@@ -11,6 +11,6 @@ export async function validatePhotoMealFile(value: unknown): Promise<{ ok: true;
   if (value.size <= 0) return { ok: false, code: "invalid-photo" };
   if (value.size > PHOTO_MEAL_MAX_BYTES) return { ok: false, code: "photo-too-large" };
   if (value.type !== "image/jpeg") return { ok: false, code: "unsupported-photo" };
-  if (!hasJpegSignature(new Uint8Array(await value.arrayBuffer()).slice(0, 3))) return { ok: false, code: "invalid-photo" };
+  if (!hasJpegSignature(new Uint8Array(await value.slice(0, 3).arrayBuffer()))) return { ok: false, code: "invalid-photo" };
   return { ok: true, file: value };
 }
