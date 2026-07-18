@@ -264,40 +264,59 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
   }
 
   return (
-    <div className="meal-log-form" aria-live="polite">
-      <label className="field" htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.barcode}>
+    <section className="barcode-lookup" aria-labelledby="barcode-lookup-heading">
+      <div className="barcode-lookup__heading">
         <span>Código de barras</span>
-        <input
-          id={INVENTORY_ADD_FORM_FIELD_IDS.barcode}
-          name="barcode"
-          type="text"
-          inputMode="numeric"
-          autoComplete="off"
-          value={barcode}
-          onChange={(event) => updateBarcode(event.target.value)}
-          placeholder="4006381333931"
-        />
-      </label>
-      <div className="inventory-barcode-actions">
-        <button className="button" type="button" onClick={searchBarcode} disabled={isPending}>
+        <h3 id="barcode-lookup-heading">Busca o escanea el producto</h3>
+        <p>Primero consultaremos tu catálogo personal y, después, Open Food Facts.</p>
+      </div>
+      <div className="barcode-lookup__form-row">
+        <label className="field" htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.barcode}>
+          <span>Código de barras</span>
+          <input
+            id={INVENTORY_ADD_FORM_FIELD_IDS.barcode}
+            name="barcode"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            value={barcode}
+            onChange={(event) => updateBarcode(event.target.value)}
+            placeholder="4006381333931"
+          />
+        </label>
+        <button className="barcode-lookup__search" type="button" onClick={searchBarcode} disabled={isPending}>
           {isPending ? "Buscando..." : "Buscar producto"}
         </button>
-        <button className="button nav-button" type="button" onClick={startScanner} disabled={isScanning}>
+      </div>
+      <div className="barcode-lookup__actions">
+        <button type="button" onClick={startScanner} disabled={isScanning}>
           Escanear código
         </button>
       </div>
       {isScanning ? (
-        <div className="inventory-scanner">
-          <video className="inventory-scanner__video" ref={videoRef} playsInline muted />
-          <button className="button nav-button" type="button" onClick={stopScanner}>
-            Cerrar escáner
-          </button>
+        <div className="barcode-scanner">
+          <p>Enfoca el código dentro del marco y mantén el producto estable.</p>
+          <div className="barcode-scanner__frame">
+            <video className="barcode-scanner__video" ref={videoRef} playsInline muted />
+          </div>
+          <div className="barcode-scanner__actions">
+            <button type="button" onClick={stopScanner}>Cerrar escáner</button>
+          </div>
         </div>
       ) : null}
-      <p className={scannerError ? "auth-message error" : "muted"}>{message}</p>
-      <label>
-        <input name="remember_barcode_product" type="checkbox" /> Recordar este producto para futuros escaneos
+      <p
+        className={`barcode-lookup__status${scannerError ? " barcode-lookup__status--error" : isPending || message.startsWith("Buscando") || message.startsWith("No está") ? " barcode-lookup__status--searching" : message.startsWith("Producto encontrado") ? " barcode-lookup__status--result" : ""}`}
+        aria-live="polite"
+      >
+        {scannerError ? <strong>Error de escaneo: </strong> : null}{message}
+      </p>
+      <label className="barcode-lookup__remember">
+        <input name="remember_barcode_product" type="checkbox" />
+        <span>
+          <strong>Recordar este producto para futuros escaneos</strong>
+          <small>Guardaremos los datos introducidos cuando añadas el producto al inventario.</small>
+        </span>
       </label>
-    </div>
+    </section>
   );
 }
