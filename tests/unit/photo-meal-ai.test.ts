@@ -1,0 +1,3 @@
+import { describe, expect, it } from "vitest";
+import { hasJpegSignature, photoMealContextSchema } from "@/modules/meals/photo-meal-ai";
+describe("photo meal validation", () => { it("validates JPEG bytes and bounded context", () => { expect(hasJpegSignature(new Uint8Array([0xff, 0xd8, 0xff, 0]))).toBe(true); expect(hasJpegSignature(new Uint8Array([0x89, 0x50, 0x4e]))).toBe(false); expect(photoMealContextSchema.safeParse({ context: "" }).success).toBe(true); expect(photoMealContextSchema.safeParse({ context: "pollo" }).success).toBe(true); expect(photoMealContextSchema.safeParse({ context: "x".repeat(501) }).success).toBe(false); expect(photoMealContextSchema.safeParse({ context: "", extra: true }).success).toBe(false); }); });

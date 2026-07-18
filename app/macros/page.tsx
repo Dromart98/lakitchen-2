@@ -91,7 +91,7 @@ export default async function MacrosPage({ searchParams }: { searchParams?: Prom
   })));
   const remaining = goal ? remainingMacros(goal, consumed) : null;
   const params = await searchParams;
-  const initialMode = params?.mealMode === "ingredients" ? "ingredients" : params?.mealMode === "text-ai" ? "text-ai" : "manual";
+  const initialMode = params?.mealMode === "ingredients" ? "ingredients" : params?.mealMode === "text-ai" ? "text-ai" : params?.mealMode === "photo-ai" ? "photo-ai" : "manual";
   const ingredientsMode = initialMode === "ingredients";
   const manualErrorMessage = initialMode === "manual" ? getMessage(params?.mealError, false) : null;
   const manualSuccessMessage = initialMode === "manual" ? getMessage(params?.mealSuccess, true) : null;
