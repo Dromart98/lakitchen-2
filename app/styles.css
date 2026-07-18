@@ -1289,6 +1289,335 @@ h3 {
   }
 }
 
+/* Nutrition profile */
+.nutrition-profile-page,
+.nutrition-profile-form,
+.nutrition-profile-section,
+.nutrition-profile-fields,
+.nutrition-profile-targets,
+.nutrition-profile-step,
+.nutrition-profile-estimate,
+.nutrition-profile-estimate__heading,
+.nutrition-profile-estimate__summary,
+.nutrition-profile-estimate__macros,
+.nutrition-profile-save {
+  min-width: 0;
+}
+
+.nutrition-profile-page {
+  display: grid;
+  gap: 22px;
+  width: min(100%, 900px);
+  margin: 0 auto;
+  padding-bottom: 76px;
+}
+
+.nutrition-profile-header {
+  max-width: 700px;
+  min-width: 0;
+  padding: 8px 2px 0;
+}
+
+.nutrition-profile-eyebrow {
+  width: fit-content;
+  margin: 0 0 12px;
+  color: var(--brand-dark);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.nutrition-profile-header h1 {
+  margin-bottom: 14px;
+}
+
+.nutrition-profile-header > p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.nutrition-profile-errors {
+  margin: -4px 0 0;
+}
+
+.nutrition-profile-form {
+  display: grid;
+  gap: 18px;
+}
+
+.nutrition-profile-section {
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--card);
+  padding: 20px;
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.nutrition-profile-step {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 8px;
+}
+
+.nutrition-profile-step > span {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border-radius: 15px;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  font-weight: 900;
+}
+
+.nutrition-profile-step p {
+  margin: 0 0 2px;
+  color: var(--brand-accent);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.nutrition-profile-step h2 {
+  margin: 0;
+  font-size: clamp(1.35rem, 5vw, 1.75rem);
+}
+
+.nutrition-profile-note,
+.nutrition-profile-targets-heading p,
+.nutrition-profile-estimate__heading p,
+.nutrition-profile-save > p:first-child {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.nutrition-profile-section > .nutrition-profile-note {
+  margin: 0 0 22px;
+}
+
+.nutrition-profile-fields,
+.nutrition-profile-targets {
+  display: grid;
+  gap: 18px;
+}
+
+.nutrition-profile-form .field small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.nutrition-profile-form .field input,
+.nutrition-profile-form .field select {
+  min-height: 48px;
+}
+
+.nutrition-profile-estimate {
+  display: grid;
+  gap: 18px;
+  margin: 22px 0 26px;
+  border: 1px solid color-mix(in srgb, var(--brand) 34%, var(--border));
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--brand-soft) 42%, var(--card));
+  padding: 18px;
+}
+
+.nutrition-profile-estimate__heading {
+  display: grid;
+  gap: 14px;
+}
+
+.nutrition-profile-estimate__heading h3,
+.nutrition-profile-estimate__heading p,
+.nutrition-profile-targets-heading h3,
+.nutrition-profile-targets-heading p {
+  margin-bottom: 0;
+}
+
+.nutrition-profile-estimate__heading p,
+.nutrition-profile-targets-heading p {
+  margin-top: 4px;
+}
+
+.nutrition-profile-estimate__heading .button {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--brand) 45%, var(--border));
+  background: var(--card);
+  color: var(--brand-dark);
+  box-shadow: none;
+}
+
+.nutrition-profile-estimate__summary {
+  display: grid;
+  gap: 14px;
+}
+
+.nutrition-profile-estimate__calories {
+  display: grid;
+  justify-items: start;
+  border-left: 4px solid var(--brand-accent);
+  padding: 4px 0 4px 14px;
+}
+
+.nutrition-profile-estimate__calories span,
+.nutrition-profile-estimate__macros span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.nutrition-profile-estimate__calories strong {
+  color: var(--text);
+  font-size: clamp(2.5rem, 13vw, 4rem);
+  letter-spacing: -0.06em;
+  line-height: 1;
+}
+
+.nutrition-profile-estimate__calories small {
+  margin-top: 4px;
+  color: var(--brand-dark);
+  font-weight: 800;
+}
+
+.nutrition-profile-estimate__macros {
+  display: grid;
+  gap: 8px;
+}
+
+.nutrition-profile-estimate__macros > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  padding: 11px 9px;
+}
+
+.nutrition-profile-estimate__macros span,
+.nutrition-profile-estimate__macros strong {
+  overflow-wrap: anywhere;
+}
+
+.nutrition-profile-estimate__macros strong {
+  font-size: 1rem;
+}
+
+.nutrition-profile-estimate > .nutrition-profile-note {
+  margin: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  font-size: 0.86rem;
+}
+
+.nutrition-profile-empty {
+  margin: 0;
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  background: var(--card-soft);
+  padding: 18px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.nutrition-profile-targets-heading {
+  margin-bottom: 18px;
+}
+
+.nutrition-profile-save {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+
+.nutrition-profile-save > p {
+  margin: 0;
+}
+
+.nutrition-profile-save .button {
+  width: 100%;
+}
+
+.nutrition-profile-form .button:focus-visible,
+.nutrition-profile-form input:focus-visible,
+.nutrition-profile-form select:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+
+@media (min-width: 480px) {
+  .nutrition-profile-estimate__macros {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 640px) {
+  .nutrition-profile-page {
+    gap: 28px;
+  }
+
+  .nutrition-profile-section {
+    padding: 28px;
+  }
+
+  .nutrition-profile-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nutrition-profile-estimate {
+    padding: 22px;
+  }
+
+  .nutrition-profile-estimate__heading {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .nutrition-profile-estimate__heading .button {
+    width: auto;
+  }
+
+  .nutrition-profile-estimate__summary {
+    grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1.3fr);
+    align-items: stretch;
+  }
+
+  .nutrition-profile-estimate__macros > div {
+    align-content: center;
+    padding: 14px 12px;
+  }
+
+  .nutrition-profile-targets {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .nutrition-profile-targets__calories {
+    grid-column: 1 / -1;
+  }
+
+  .nutrition-profile-save .button {
+    width: auto;
+    justify-self: start;
+  }
+}
+
+@media (min-width: 760px) {
+  .nutrition-profile-page {
+    padding-bottom: 32px;
+  }
+}
+
 /* Settings */
 .settings-page {
   display: grid;
