@@ -37,9 +37,9 @@ function formatNumber(value: number) {
 
 function MacroLine({ label, value }: { label: string; value: DailyPlanNutrition }) {
   return (
-    <div>
+    <div className="plan-comparison-row">
       <strong>{label}</strong>
-      <p className="muted">{formatNumber(value.calories)} kcal · P {formatNumber(value.protein_g)}g · C {formatNumber(value.carbs_g)}g · G {formatNumber(value.fat_g)}g</p>
+      <p>{formatNumber(value.calories)} kcal · P {formatNumber(value.protein_g)}g · C {formatNumber(value.carbs_g)}g · G {formatNumber(value.fat_g)}g</p>
     </div>
   );
 }
@@ -95,10 +95,16 @@ export function DailyPlanGenerator() {
   }
 
   return (
-    <section className="grid cards" style={{ marginTop: 16 }}>
-      <div className="card">
-        <h2>Opciones</h2>
-        <form onSubmit={onSubmit} className="meal-log-form">
+    <section className="plan-generator" aria-label="Generador de plan diario">
+      <div className="plan-options" aria-labelledby="plan-options-title">
+        <div className="plan-section-heading">
+          <span className="plan-step">Paso 1</span>
+          <div>
+            <h2 id="plan-options-title">Configura tu día</h2>
+            <p>Elige cómo quieres aprovechar tu inventario y cuánto tiempo dedicar a cada comida.</p>
+          </div>
+        </div>
+        <form onSubmit={onSubmit} className="plan-options__form">
           <label className="field" htmlFor="plan-priority">
             <span>Prioridad</span>
             <select id="plan-priority" value={priorityMode} onChange={(event) => setPriorityMode(event.target.value as DailyPlanPriorityMode)} disabled={isBusy}>
@@ -115,45 +121,73 @@ export function DailyPlanGenerator() {
               <option value={60}>60 minutos</option>
             </select>
           </label>
-          <button className="button" type="submit" disabled={isBusy}>{isPending ? "Generando tu plan…" : "Generar plan"}</button>
+          <button className="button plan-options__submit" type="submit" disabled={isBusy}>{isPending ? "Generando tu plan…" : "Generar plan"}</button>
         </form>
       </div>
 
-      <div className="card">
-        <h2>Vista previa</h2>
-        {isPending ? <p className="muted">Generando tu plan…</p> : null}
-        {isSaving ? <p className="muted">Guardando el plan…</p> : null}
-        {saveMessage ? <p role="status">{saveMessage}</p> : null}
+      <div className="plan-preview" aria-labelledby="plan-preview-title">
+        <div className="plan-section-heading">
+          <span className="plan-step">Paso 2</span>
+          <div>
+            <h2 id="plan-preview-title">Vista previa</h2>
+            <p>Revisa el equilibrio del día y cada receta antes de guardar una copia.</p>
+          </div>
+        </div>
+        <div className="plan-preview__messages">
+          {isPending ? <p className="plan-status" role="status">Generando tu plan…</p> : null}
+          {isSaving ? <p className="plan-status" role="status">Guardando el plan…</p> : null}
+          {saveMessage ? <p className="plan-status" role="status">{saveMessage}</p> : null}
         {result?.status === "error" ? <p className="auth-message error" role="alert">{errorMessages[result.code]}</p> : null}
         {result?.status === "needs-clarification" ? <p className="auth-message error" role="alert">{result.message}</p> : null}
+        </div>
         {result?.status === "success" ? (
-          <div>
-            <section className="card" style={{ marginTop: 12 }}>
-              <h3>Resumen diario</h3>
-              <p><strong>{fitLabels[result.fit]}</strong></p>
-              <MacroLine label="Objetivo diario" value={result.target} />
-              <MacroLine label="Total generado" value={result.total} />
-              <MacroLine label="Diferencia" value={result.difference} />
-              <button className="button" type="button" disabled={isBusy || !generatedSettings} onClick={() => handleSave(result)}>
-                {isSaving ? "Guardando…" : "Guardar plan"}
-              </button>
-              <p className="muted">Guardar crea una copia del plan. No descuenta inventario ni registra comidas.</p>
+          <div className="plan-result">
+            <section className="plan-summary" aria-labelledby="plan-summary-title">
+              <div className="plan-summary__heading">
+                <div>
+                  <span className="plan-summary__fit">{fitLabels[result.fit]}</span>
+                  <h3 id="plan-summary-title">Resumen diario</h3>
+                </div>
+                <div className="plan-summary__calories"><strong>{formatNumber(result.total.calories)}</strong><span>kcal generadas</span></div>
+              </div>
+              <div className="plan-summary__macros">
+                <p><span>Proteínas</span><strong>{formatNumber(result.total.protein_g)} g</strong></p>
+                <p><span>Carbohidratos</span><strong>{formatNumber(result.total.carbs_g)} g</strong></p>
+                <p><span>Grasas</span><strong>{formatNumber(result.total.fat_g)} g</strong></p>
+              </div>
+              <div className="plan-comparisons">
+                <MacroLine label="Objetivo diario" value={result.target} />
+                <MacroLine label="Total generado" value={result.total} />
+                <MacroLine label="Diferencia" value={result.difference} />
+              </div>
+              <div className="plan-save-action">
+                <button className="button" type="button" disabled={isBusy || !generatedSettings} onClick={() => handleSave(result)}>
+                  {isSaving ? "Guardando…" : "Guardar plan"}
+                </button>
+                <p>Guardar crea una copia del plan. No descuenta inventario ni registra comidas.</p>
+              </div>
             </section>
-            {result.meals.map((meal) => (
-              <section className="card" key={meal.meal_type} style={{ marginTop: 12 }}>
-                <h3>{MEAL_TYPE_LABELS[meal.meal_type]} · {meal.title}</h3>
-                <p className="muted">{meal.description}</p>
-                <p><strong>Tiempo:</strong> {meal.estimated_minutes} minutos</p>
-                <MacroLine label="Nutrición calculada" value={meal.nutrition} />
-                <h4>Ingredientes</h4>
-                <ul>{meal.ingredients.map((ingredient) => <li key={ingredient.inventory_item_id}>{formatNumber(ingredient.quantity)} {ingredient.unit} · {ingredient.name}</li>)}</ul>
-                <h4>Pasos</h4>
-                <ol>{meal.steps.map((step, index) => <li key={`${meal.meal_type}-${index}`}>{step}</li>)}</ol>
-              </section>
-            ))}
+            <div className="plan-meals">
+              {result.meals.map((meal) => (
+                <article className="plan-meal" key={meal.meal_type}>
+                  <span className="plan-meal__type">{MEAL_TYPE_LABELS[meal.meal_type]}</span>
+                  <h3>{meal.title}</h3>
+                  <p className="plan-meal__description">{meal.description}</p>
+                  <div className="plan-meal__meta"><span><strong>Tiempo</strong>{meal.estimated_minutes} minutos</span><span><strong>Calorías</strong>{formatNumber(meal.nutrition.calories)} kcal</span></div>
+                  <div className="plan-meal__macros"><span>P {formatNumber(meal.nutrition.protein_g)} g</span><span>C {formatNumber(meal.nutrition.carbs_g)} g</span><span>G {formatNumber(meal.nutrition.fat_g)} g</span></div>
+                  <details className="plan-meal__details">
+                    <summary>Ingredientes y pasos</summary>
+                    <h4>Ingredientes</h4>
+                    <ul>{meal.ingredients.map((ingredient) => <li key={ingredient.inventory_item_id}>{formatNumber(ingredient.quantity)} {ingredient.unit} · {ingredient.name}</li>)}</ul>
+                    <h4>Pasos</h4>
+                    <ol>{meal.steps.map((step, index) => <li key={`${meal.meal_type}-${index}`}>{step}</li>)}</ol>
+                  </details>
+                </article>
+              ))}
+            </div>
           </div>
         ) : null}
-        {!isPending && !result ? <p className="muted">El plan aparecerá aquí. Puedes revisarlo y guardarlo; no consume inventario ni registra comidas.</p> : null}
+        {!isPending && !result ? <div className="plan-preview__empty"><strong>Tu plan aparecerá aquí</strong><p>Elige tus preferencias y genera el día cuando estés listo. Generar o revisar el plan no consume inventario ni registra comidas.</p></div> : null}
       </div>
     </section>
   );

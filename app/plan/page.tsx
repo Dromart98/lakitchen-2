@@ -40,23 +40,34 @@ export default async function PlanPage() {
 
   return (
     <AppShell>
-      <h1>Generar plan</h1>
-      <p className="muted">Crea un plan para hoy usando tus objetivos nutricionales y los productos que ya tienes.</p>
+      <div className="plan-page">
+        <header className="plan-header">
+          <span className="plan-eyebrow">Dieta</span>
+          <h1>Tu plan para hoy</h1>
+          <p>LaKitchen prepara un día completo de comidas a partir de tus objetivos nutricionales y los productos disponibles en tu inventario.</p>
+        </header>
 
-      {error ? <p className="auth-message error" role="alert">No se pudo cargar tu perfil nutricional. Inténtalo de nuevo.</p> : null}
-      {savedPlanError ? <p className="auth-message error" role="alert">No se pudieron cargar tus planes guardados.</p> : null}
+        {(error || savedPlanError) ? (
+          <div className="plan-load-errors">
+            {error ? <p className="auth-message error" role="alert">No se pudo cargar tu perfil nutricional. Inténtalo de nuevo.</p> : null}
+            {savedPlanError ? <p className="auth-message error" role="alert">No se pudieron cargar tus planes guardados.</p> : null}
+          </div>
+        ) : null}
 
-      {!target ? (
-        <section className="card">
-          <h2>Completa tu perfil nutricional</h2>
-          <p className="muted">Necesitas objetivos diarios de calorías, proteína, hidratos y grasas antes de generar un plan. No se llamará a la IA hasta que el perfil esté completo.</p>
-          <Link className="button nav-button" href="/nutrition-profile">Configurar perfil nutricional</Link>
-        </section>
-      ) : (
-        <DailyPlanGenerator />
-      )}
+        {!target ? (
+          <section className="plan-profile-empty" aria-labelledby="plan-profile-title">
+            <span className="plan-eyebrow">Configuración pendiente</span>
+            <h2 id="plan-profile-title">Completa tus objetivos nutricionales</h2>
+            <p>Necesitamos tus objetivos diarios de calorías, proteínas, carbohidratos y grasas para preparar un plan adecuado.</p>
+            <p className="plan-profile-empty__note">No se llamará a la IA hasta que el perfil esté completo.</p>
+            <Link className="button plan-profile-empty__action" href="/nutrition-profile">Configurar perfil nutricional</Link>
+          </section>
+        ) : (
+          <DailyPlanGenerator />
+        )}
 
-      <SavedDailyPlans plans={savedPlans} />
+        <SavedDailyPlans plans={savedPlans} />
+      </div>
     </AppShell>
   );
 }
