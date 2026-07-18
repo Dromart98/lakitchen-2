@@ -127,108 +127,117 @@ export function RecipeAiGenerator() {
   }
 
   return (
-    <section className="card" style={{ marginTop: 16 }}>
-      <h2>Generar recetas con IA</h2>
-      <p className="muted">Crea sugerencias temporales usando únicamente productos disponibles en tu inventario. Las recetas generadas son temporales hasta que pulses “Guardar receta”. Cocinarlas seguirá descontando los ingredientes del inventario.</p>
-      <form action={handleSubmit}>
-        <label htmlFor="recipe-ai-max-minutes">Tiempo máximo</label>
-        <select id="recipe-ai-max-minutes" name="max_minutes" defaultValue="30" disabled={isBusy}>
+    <section className="recipe-ai" aria-labelledby="recipe-ai-title">
+      <div className="recipes-section__heading">
+        <div>
+          <p className="recipes-eyebrow">Asistente IA</p>
+          <h2 id="recipe-ai-title">Genera recetas para hoy</h2>
+          <p>Crea sugerencias temporales usando únicamente productos disponibles en tu inventario. Las recetas generadas son temporales hasta que pulses “Guardar receta”. Cocinarlas seguirá descontando los ingredientes del inventario.</p>
+        </div>
+      </div>
+      <form className="recipe-ai__form" action={handleSubmit}>
+        <div className="recipe-ai__field">
+          <label htmlFor="recipe-ai-max-minutes">Tiempo máximo</label>
+          <select id="recipe-ai-max-minutes" name="max_minutes" defaultValue="30" disabled={isBusy}>
           <option value="15">15 minutos</option>
           <option value="30">30 minutos</option>
           <option value="45">45 minutos</option>
           <option value="60">60 minutos</option>
-        </select>
+          </select>
+        </div>
 
-        <label htmlFor="recipe-ai-servings">Raciones</label>
-        <select id="recipe-ai-servings" name="servings" defaultValue="2" disabled={isBusy}>
+        <div className="recipe-ai__field">
+          <label htmlFor="recipe-ai-servings">Raciones</label>
+          <select id="recipe-ai-servings" name="servings" defaultValue="2" disabled={isBusy}>
           <option value="1">1 ración</option>
           <option value="2">2 raciones</option>
           <option value="3">3 raciones</option>
           <option value="4">4 raciones</option>
-        </select>
+          </select>
+        </div>
 
-        <label htmlFor="recipe-ai-suggestion-count">Número de sugerencias</label>
-        <select id="recipe-ai-suggestion-count" name="suggestion_count" defaultValue="2" disabled={isBusy}>
+        <div className="recipe-ai__field">
+          <label htmlFor="recipe-ai-suggestion-count">Número de sugerencias</label>
+          <select id="recipe-ai-suggestion-count" name="suggestion_count" defaultValue="2" disabled={isBusy}>
           <option value="1">1 sugerencia</option>
           <option value="2">2 sugerencias</option>
           <option value="3">3 sugerencias</option>
-        </select>
+          </select>
+        </div>
 
-        <label htmlFor="recipe-ai-priority-mode">Prioridad de las recetas</label>
-        <select id="recipe-ai-priority-mode" name="priority_mode" defaultValue="balanced" disabled={isBusy}>
+        <div className="recipe-ai__field">
+          <label htmlFor="recipe-ai-priority-mode">Prioridad de las recetas</label>
+          <select id="recipe-ai-priority-mode" name="priority_mode" defaultValue="balanced" disabled={isBusy}>
           <option value="balanced">Recetas equilibradas</option>
           <option value="expiration">Priorizar productos que caducan</option>
-        </select>
-        <p className="muted">El modo antidesperdicio prioriza productos que caducan en los próximos 7 días.</p>
+          </select>
+        </div>
+        <p className="recipe-ai__hint">El modo antidesperdicio prioriza productos que caducan en los próximos 7 días.</p>
 
         <button type="submit" disabled={isBusy}>Generar recetas</button>
       </form>
 
-      {isPending ? <p role="status">Generando sugerencias…</p> : null}
-      {cookingRecipeTitle ? <p role="status">Cocinando y registrando…</p> : null}
-      {savingRecipeTitle ? <p role="status">Guardando…</p> : null}
-
-      {result?.status === "error" ? <p role="alert">{getErrorMessage(result)}</p> : null}
-      {result?.status === "needs-clarification" ? <p role="status">{result.message}</p> : null}
+      <div className="recipe-ai__status">
+        {isPending ? <p role="status">Generando sugerencias…</p> : null}
+        {cookingRecipeTitle ? <p role="status">Cocinando y registrando…</p> : null}
+        {savingRecipeTitle ? <p role="status">Guardando…</p> : null}
+        {result?.status === "error" ? <p className="recipe-ai__error" role="alert">{getErrorMessage(result)}</p> : null}
+        {result?.status === "needs-clarification" ? <p role="status">{result.message}</p> : null}
+      </div>
 
       {result?.status === "success" ? (
-        <div>
-          <p className="muted">Las recetas generadas son temporales hasta que pulses “Guardar receta”. Cocinarlas seguirá descontando los ingredientes del inventario.</p>
+        <div className="recipe-ai__results">
+          <p className="recipe-ai__temporary-note">Las recetas generadas son temporales hasta que pulses “Guardar receta”. Cocinarlas seguirá descontando los ingredientes del inventario.</p>
           {result.recipes.map((recipe) => (
-            <article className="card" key={recipe.title} style={{ marginTop: 16 }}>
-              <p className="muted">Sugerencia generada por IA</p>
+            <article className="recipe-ai__card" key={recipe.title}>
+              <p className="recipes-eyebrow">Sugerencia generada por IA</p>
               <h3>{recipe.title}</h3>
               <p>{recipe.description}</p>
-              <p>{recipe.estimated_minutes} minutos · {recipe.servings} ración{recipe.servings === 1 ? "" : "es"}</p>
-              <h4>Ingredientes</h4>
-              <ul>
-                {recipe.ingredients.map((ingredient) => (
-                  <li key={`${recipe.title}-${ingredient.inventory_item_id}`}>
-                    {ingredient.name}: {ingredient.quantity} {ingredient.unit}
-                  </li>
-                ))}
-              </ul>
-              <h4>Preparación</h4>
-              <ol>
-                {recipe.steps.map((step) => <li key={step}>{step}</li>)}
-              </ol>
-              <section>
+              <p className="recipes-card__meta">{recipe.estimated_minutes} minutos · {recipe.servings} ración{recipe.servings === 1 ? "" : "es"}</p>
+              <details className="recipes-card__details">
+                <summary>Ingredientes</summary>
+                <ul>{recipe.ingredients.map((ingredient) => (
+                  <li key={`${recipe.title}-${ingredient.inventory_item_id}`}>{ingredient.name}: {ingredient.quantity} {ingredient.unit}</li>
+                ))}</ul>
+              </details>
+              <details className="recipes-card__details">
+                <summary>Preparación</summary>
+                <ol>{recipe.steps.map((step) => <li key={step}>{step}</li>)}</ol>
+              </details>
+              <section className="recipes-card__nutrition">
                 <h4>Información nutricional estimada</h4>
                 {recipe.nutrition.isComplete && recipe.nutrition.total && recipe.nutrition.perServing ? (
-                  <>
-                    <p>Total de la receta: {formatNutritionLine(recipe.nutrition.total)}</p>
-                    <p>Por ración: {formatNutritionLine(recipe.nutrition.perServing)}</p>
-                  </>
+                  <div className="recipe-ai__nutrition-grid">
+                    <p><strong>Total de la receta</strong><span>{formatNutritionLine(recipe.nutrition.total)}</span></p>
+                    <p><strong>Por ración</strong><span>{formatNutritionLine(recipe.nutrition.perServing)}</span></p>
+                  </div>
                 ) : (
                   <p className="muted">{getMissingNutritionMessage(recipe.nutrition.missingNutritionItemCount)}</p>
                 )}
               </section>
-              <label htmlFor={`recipe-ai-meal-type-${recipe.title}`}>Tipo de comida</label>
-              <select
-                id={`recipe-ai-meal-type-${recipe.title}`}
-                value={selectedMealTypes[recipe.title] ?? "lunch"}
-                disabled={isBusy}
-                onChange={(event) => setSelectedMealTypes((current) => ({ ...current, [recipe.title]: event.target.value as MealType }))}
-              >
-                {MEAL_TYPES.map((mealType) => (
-                  <option key={mealType} value={mealType}>{MEAL_TYPE_LABELS[mealType]}</option>
-                ))}
-              </select>
-              <p role="status">{saveMessages[recipe.title] ?? ""}</p>
-              <button
+              <div className="recipe-ai__card-controls">
+                <label htmlFor={`recipe-ai-meal-type-${recipe.title}`}>Tipo de comida</label>
+                <select id={`recipe-ai-meal-type-${recipe.title}`} value={selectedMealTypes[recipe.title] ?? "lunch"} disabled={isBusy} onChange={(event) => setSelectedMealTypes((current) => ({ ...current, [recipe.title]: event.target.value as MealType }))}>
+                  {MEAL_TYPES.map((mealType) => <option key={mealType} value={mealType}>{MEAL_TYPE_LABELS[mealType]}</option>)}
+                </select>
+                <p role="status">{saveMessages[recipe.title] ?? ""}</p>
+              </div>
+              <div className="recipes-card__actions">
+                <button
                 type="button"
                 disabled={isBusy}
                 onClick={() => { void handleSave(recipe); }}
               >
                 {savingRecipeTitle === recipe.title ? "Guardando…" : "Guardar receta"}
-              </button>
-              <button
+                </button>
+                <button
                 type="button"
                 disabled={isBusy || !recipe.nutrition.isComplete || !recipe.nutrition.total || !recipe.nutrition.perServing}
                 onClick={() => { void handleCook(recipe); }}
               >
                 {cookingRecipeTitle === recipe.title ? "Cocinando y registrando…" : "Cocinar y registrar"}
-              </button>
+                </button>
+              </div>
             </article>
           ))}
         </div>
