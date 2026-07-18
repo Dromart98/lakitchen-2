@@ -11,13 +11,22 @@ export default async function SettingsPage() {
 
   return (
     <AppShell>
-      <h1>Ajustes</h1>
-      <p className="muted">Configura las preferencias visuales de LaKitchen en este dispositivo.</p>
-      <section className="card settings-card">
-        <h2>Apariencia</h2>
-        <p className="muted">Elige tema claro, oscuro o el tema del sistema. La preferencia se guarda solo en este navegador.</p>
-        <ThemeSelector />
-      </section>
+      <div className="settings-page">
+        <header className="settings-header">
+          <p className="settings-eyebrow">Ajustes</p>
+          <h1>Haz LaKitchen tuya</h1>
+          <p>Adapta la experiencia visual a tu gusto. Tus preferencias se aplican en este dispositivo.</p>
+        </header>
+
+        <section className="settings-appearance" aria-labelledby="appearance-title">
+          <div className="settings-appearance__heading">
+            <p className="settings-appearance__kicker">Tu espacio</p>
+            <h2 id="appearance-title">Apariencia</h2>
+            <p>Elige cómo quieres ver LaKitchen. La preferencia se guarda únicamente en este navegador.</p>
+          </div>
+          <ThemeSelector />
+        </section>
+      </div>
     </AppShell>
   );
 }
