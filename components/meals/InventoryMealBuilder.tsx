@@ -83,18 +83,20 @@ function UnavailableItemsCard({ items }: { items: RepeatedMealBuilderUnavailable
   if (!items.length) return null;
 
   return (
-    <section className="card" style={{ marginTop: 16 }}>
-      <h2>Productos que debes revisar</h2>
-      <ul>
+    <aside className="meal-builder-unavailable" aria-labelledby="unavailable-products-title">
+      <div>
+        <p className="meal-builder-step">Aviso</p>
+        <h2 id="unavailable-products-title">Productos que debes revisar</h2>
+      </div>
+      <ul className="meal-builder-unavailable__list">
         {items.map((item) => (
           <li key={`${item.sourceInventoryItemId}-${item.reason}`}>
             <strong>{item.productName}</strong> — {formatStock(item.consumedQuantity)} {item.unit}
-            <br />
-            <span className="muted">{UNAVAILABLE_REASON_LABELS[item.reason]}</span>
+            <span>{UNAVAILABLE_REASON_LABELS[item.reason]}</span>
           </li>
         ))}
       </ul>
-    </section>
+    </aside>
   );
 }
 
@@ -161,9 +163,11 @@ export function InventoryMealBuilder({
     return (
       <>
         <UnavailableItemsCard items={unavailableItems} />
-        <section className="card">
-          <p className="muted">Añade información nutricional completa a tus productos para poder componer una comida.</p>
-          <Link className="button nav-button" href="/inventory">Volver al inventario</Link>
+        <section className="meal-builder-empty">
+          <p className="meal-builder-step">Inventario no disponible</p>
+          <h2>Aún no hay productos listos para usar</h2>
+          <p>Para construir una comida, tus productos necesitan calorías, proteínas, carbohidratos, grasas y una base nutricional compatibles.</p>
+          <Link href="/inventory">Revisar el inventario</Link>
         </section>
       </>
     );
@@ -173,7 +177,16 @@ export function InventoryMealBuilder({
     <>
       <UnavailableItemsCard items={unavailableItems} />
 
-      <section className="grid cards">
+      <div className="meal-builder-workspace">
+      <section className="meal-builder-products" aria-labelledby="meal-builder-products-title">
+        <div className="meal-builder-section-heading">
+          <div>
+            <p className="meal-builder-step">Paso 1</p>
+            <h2 id="meal-builder-products-title">¿Qué vas a comer?</h2>
+          </div>
+          <p>Selecciona cada producto e indica la cantidad.</p>
+        </div>
+        <div className="meal-builder-products__list">
         {rows.map((row, index) => {
           const item = eligibleItems.find((candidate) => candidate.id === row.itemId) ?? null;
           const quantity = parseQuantity(row.quantity);
@@ -183,9 +196,12 @@ export function InventoryMealBuilder({
             : null;
 
           return (
-            <div className="card" key={row.id}>
-              <h2>Producto {index + 1}</h2>
-              <div className="meal-log-form">
+            <article className="meal-builder-row" key={row.id}>
+              <div className="meal-builder-row__heading">
+                <h3><span>{index + 1}</span> Producto</h3>
+                <button className="meal-builder-remove" type="button" onClick={() => removeRow(row.id)}>Eliminar</button>
+              </div>
+              <div className="meal-builder-row__fields">
                 <label className="field" htmlFor={`meal-builder-product-${row.id}`}>
                   <span>Producto</span>
                   <select
@@ -220,50 +236,51 @@ export function InventoryMealBuilder({
                   />
                 </label>
 
-                <p className="muted">
-                  Unidad: <strong>{item?.unit ?? "—"}</strong>
-                  <br />
-                  Stock disponible: <strong>{item ? `${formatStock(item.quantity)} ${item.unit}` : "—"}</strong>
-                </p>
+                <div className="meal-builder-row__details" aria-live="polite">
+                  <p><span>Unidad</span><strong>{item?.unit ?? "—"}</strong></p>
+                  <p><span>Stock disponible</span><strong>{item ? `${formatStock(item.quantity)} ${item.unit}` : "—"}</strong></p>
+                </div>
 
                 {exceedsStock ? (
-                  <p className="auth-message error" role="alert">La cantidad supera el stock disponible.</p>
+                  <p className="meal-builder-stock-warning" role="alert">La cantidad supera el stock disponible.</p>
                 ) : null}
 
                 {lineNutrition ? (
-                  <p className="muted">
-                    Este producto aporta:<br />
-                    {formatNutrition(lineNutrition.calories)} kcal · {formatNutrition(lineNutrition.protein_g)} g proteína · {formatNutrition(lineNutrition.carbs_g)} g carbohidratos · {formatNutrition(lineNutrition.fat_g)} g grasas
-                  </p>
+                  <div className="meal-builder-line-nutrition">
+                    <span>Aporte de esta línea</span>
+                    <strong>{formatNutrition(lineNutrition.calories)} kcal</strong>
+                    <p>{formatNutrition(lineNutrition.protein_g)} g proteína · {formatNutrition(lineNutrition.carbs_g)} g carbohidratos · {formatNutrition(lineNutrition.fat_g)} g grasas</p>
+                  </div>
                 ) : null}
-
-                <button className="button" type="button" onClick={() => removeRow(row.id)}>
-                  Eliminar producto
-                </button>
               </div>
-            </div>
+            </article>
           );
         })}
-      </section>
+        </div>
 
       {rows.length < MAX_MEAL_BUILDER_ROWS ? (
-        <button className="button nav-button" type="button" onClick={addRow} style={{ marginTop: 16 }}>
-          Añadir producto
+        <button className="meal-builder-add" type="button" onClick={addRow}>
+          Añadir otro producto
         </button>
       ) : null}
+      </section>
 
-      {total ? (
-        <section className="card" style={{ marginTop: 16 }}>
-          <h2>Total de la comida</h2>
-          <p><strong>Calorías:</strong> {formatNutrition(total.calories)} kcal</p>
-          <p><strong>Proteínas:</strong> {formatNutrition(total.protein_g)} g</p>
-          <p><strong>Carbohidratos:</strong> {formatNutrition(total.carbs_g)} g</p>
-          <p><strong>Grasas:</strong> {formatNutrition(total.fat_g)} g</p>
-        </section>
-      ) : null}
+      <section className="meal-builder-summary" aria-labelledby="meal-builder-summary-title">
+        <p className="meal-builder-step">Paso 2</p>
+        <h2 id="meal-builder-summary-title">Total de la comida</h2>
+        {total ? <>
+          <div className="meal-builder-summary__calories"><strong>{formatNutrition(total.calories)}</strong><span>kcal</span></div>
+          <div className="meal-builder-summary__macros">
+            <p><span>Proteínas</span><strong>{formatNutrition(total.protein_g)} g</strong></p>
+            <p><span>Carbohidratos</span><strong>{formatNutrition(total.carbs_g)} g</strong></p>
+            <p><span>Grasas</span><strong>{formatNutrition(total.fat_g)} g</strong></p>
+          </div>
+        </> : <p className="meal-builder-summary__empty">Añade productos y cantidades para ver el total de tu comida.</p>}
+      </section>
 
-      <section className="card" style={{ marginTop: 16 }}>
-        <h2>Registrar comida</h2>
+      <section className="meal-builder-registration" aria-labelledby="meal-builder-registration-title">
+        <p className="meal-builder-step">Paso 3</p>
+        <h2 id="meal-builder-registration-title">Guardar esta comida</h2>
         <form action={consumeMealBuilderAndLogMealAction} className="meal-log-form">
           <label className="field" htmlFor="meal-builder-meal-name">
             <span>Nombre de la comida</span>
@@ -299,15 +316,16 @@ export function InventoryMealBuilder({
 
           <input name="lines" type="hidden" value={JSON.stringify(consumptionPayload ?? [])} />
 
-          <p className="muted">
+          <p className="meal-builder-registration__note">
             Al confirmar, se descontarán todos estos productos del inventario y se registrará una única comida.
           </p>
 
-          <button className="button" disabled={!canSubmitMeal} type="submit">
-            Consumir inventario y registrar comida
+          <button className="button meal-builder-submit" disabled={!canSubmitMeal} type="submit">
+            Registrar comida
           </button>
         </form>
       </section>
+      </div>
     </>
   );
 }

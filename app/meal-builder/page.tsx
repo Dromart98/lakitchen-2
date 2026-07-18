@@ -124,61 +124,38 @@ export default async function MealBuilderPage({ searchParams }: MealBuilderPageP
 
   return (
     <AppShell>
-      <div className="topbar">
-        <div>
-          <p className="pill">Previsualización</p>
-          <h1>Componer comida</h1>
+      <div className="meal-builder-page">
+        <header className="meal-builder-header">
+          <div className="meal-builder-header__copy">
+            <p className="meal-builder-eyebrow">Macros</p>
+            <h1>Construye tu comida</h1>
+            <p>Elige tus alimentos y comprueba sus calorías y macros antes de registrarlos.</p>
+          </div>
+          <nav className="meal-builder-header__links" aria-label="Enlaces de comidas">
+            <Link href="/meal-history">Ver historial</Link>
+            <Link href="/weekly-summary">Resumen semanal</Link>
+          </nav>
+        </header>
+
+        <div className="meal-builder-messages">
+          {mealSuccessMessage ? <p className="auth-message success" role="status">{mealSuccessMessage}</p> : null}
+          {mealErrorMessage ? <p className="auth-message error" role="alert">{mealErrorMessage}</p> : null}
+          {repeatMealMessage ? <p className="auth-message error" role="alert">{repeatMealMessage}</p> : null}
+          {repeatMealLoaded ? (
+            <p className="auth-message success" role="status">Comida anterior cargada. Revisa las cantidades antes de confirmar.</p>
+          ) : null}
+          {error ? <p className="auth-message error" role="alert">No se pudo cargar tu inventario. Inténtalo de nuevo.</p> : null}
         </div>
-        <Link className="logout-link" href="/dashboard">Volver al dashboard</Link>
+
+        <InventoryMealBuilder
+          key={repeatMeal || "new-meal"}
+          items={availableInventoryItems}
+          initialMealName={repeatMealDraft?.mealName}
+          initialMealType={repeatMealDraft?.mealType}
+          initialRows={repeatMealDraft?.availableLines}
+          unavailableItems={repeatMealDraft?.unavailableItems}
+        />
       </div>
-
-      <p className="muted">
-        Selecciona productos de tu inventario para previsualizar calorías y macros. El inventario solo se descuenta cuando confirmas la comida.
-      </p>
-
-      <div className="dashboard-actions">
-        <Link className="button nav-button" href="/dashboard">Dashboard</Link>
-        <Link className="button nav-button" href="/inventory">Inventario</Link>
-      </div>
-
-      {mealSuccessMessage ? (
-        <p className="auth-message success" role="status">
-          {mealSuccessMessage}
-        </p>
-      ) : null}
-
-      {mealErrorMessage ? (
-        <p className="auth-message error" role="alert">
-          {mealErrorMessage}
-        </p>
-      ) : null}
-
-      {repeatMealMessage ? (
-        <p className="auth-message error" role="alert">
-          {repeatMealMessage}
-        </p>
-      ) : null}
-
-      {repeatMealLoaded ? (
-        <p className="auth-message success" role="status">
-          Comida anterior cargada. Revisa las cantidades antes de confirmar.
-        </p>
-      ) : null}
-
-      {error ? (
-        <p className="auth-message error" role="alert">
-          No se pudo cargar tu inventario. Inténtalo de nuevo.
-        </p>
-      ) : null}
-
-      <InventoryMealBuilder
-        key={repeatMeal || "new-meal"}
-        items={availableInventoryItems}
-        initialMealName={repeatMealDraft?.mealName}
-        initialMealType={repeatMealDraft?.mealType}
-        initialRows={repeatMealDraft?.availableLines}
-        unavailableItems={repeatMealDraft?.unavailableItems}
-      />
     </AppShell>
   );
 }
