@@ -23,7 +23,7 @@ export function CookSavedPlanMealButton({ planId, mealType, completed }: {
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  if (completed) return <p><strong>Comida registrada</strong></p>;
+  if (completed) return <p className="saved-plan-action__completed"><strong>Comida registrada</strong></p>;
 
   function handleCook() {
     if (isPending) return;
@@ -40,8 +40,9 @@ export function CookSavedPlanMealButton({ planId, mealType, completed }: {
   }
 
   return (
-    <div>
-      <button className="button" type="button" disabled={isPending} onClick={handleCook}>
+    <div className="saved-plan-action">
+      <p className="saved-plan-action__note">Al registrar esta comida se descontarán sus ingredientes del inventario.</p>
+      <button className="button saved-plan-action__button" type="button" disabled={isPending} onClick={handleCook}>
         {isPending ? "Registrando…" : "Cocinar y registrar"}
       </button>
       {message ? <p className={message.startsWith("Comida registrada") ? "muted" : "auth-message error"} role="status">{message}</p> : null}
