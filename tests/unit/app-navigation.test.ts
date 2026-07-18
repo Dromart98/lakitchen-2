@@ -8,7 +8,7 @@ describe("app navigation", () => {
     expect(navigationItems.map((item) => [item.label, item.href])).toEqual([
       ["Inicio", "/dashboard"],
       ["Inventario", "/inventory"],
-      ["Macros", "/meal-builder"],
+      ["Macros", "/macros"],
       ["Dieta", "/plan"],
       ["Ajustes", "/settings"],
     ]);
@@ -29,10 +29,20 @@ describe("app navigation", () => {
   });
 
   it("marks meal history and weekly summary as macros routes", () => {
-    const macros = navigationItems.find((item) => item.href === "/meal-builder");
+    const macros = navigationItems.find((item) => item.href === "/macros");
     expect(macros).toBeDefined();
+    expect(isNavigationItemActive("/macros", macros!)).toBe(true);
     expect(isNavigationItemActive("/meal-history", macros!)).toBe(true);
     expect(isNavigationItemActive("/weekly-summary", macros!)).toBe(true);
+    expect(isNavigationItemActive("/meal-builder", macros!)).toBe(false);
     expect(isNavigationItemActive("/plan", macros!)).toBe(false);
+  });
+
+  it("marks the meal builder as part of diet", () => {
+    const diet = navigationItems.find((item) => item.href === "/plan");
+    expect(diet).toBeDefined();
+    expect(isNavigationItemActive("/plan", diet!)).toBe(true);
+    expect(isNavigationItemActive("/meal-builder", diet!)).toBe(true);
+    expect(isNavigationItemActive("/macros", diet!)).toBe(false);
   });
 });
