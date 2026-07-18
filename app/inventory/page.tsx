@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { InventoryConsumeForm } from "@/components/inventory/InventoryConsumeForm";
 import { InventoryNutritionAiControls } from "@/components/inventory/InventoryNutritionAiControls";
 import { BarcodeCatalogControls } from "./BarcodeCatalogControls";
+import { InventoryAddCta } from "./InventoryAddCta";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import {
   getInventoryCategoryLabel,
@@ -259,7 +260,7 @@ export default async function InventoryPage({
 
   return (
     <AppShell>
-      <main className="inventory-page">
+      <div className="inventory-page">
         <header className="inventory-header">
           <div className="inventory-header__copy">
             <span className="inventory-eyebrow">Inventario</span>
@@ -269,10 +270,19 @@ export default async function InventoryPage({
               se quede atrás.
             </p>
           </div>
-          <a className="inventory-primary-link" href="#anadir-producto">
-            Añadir producto
-          </a>
+          <InventoryAddCta fieldId={INVENTORY_ADD_FORM_FIELD_IDS.name} />
         </header>
+
+        {inventoryErrorMessage ? (
+          <p className="auth-message error" role="alert">
+            {inventoryErrorMessage}
+          </p>
+        ) : null}
+        {inventorySuccessMessage ? (
+          <p className="auth-message success" role="status">
+            {inventorySuccessMessage}
+          </p>
+        ) : null}
 
         <section
           className="inventory-summary"
@@ -779,11 +789,7 @@ export default async function InventoryPage({
         <details
           className="inventory-add"
           id="anadir-producto"
-          open={
-            items.length === 0 ||
-            Boolean(inventoryErrorMessage) ||
-            Boolean(inventorySuccessMessage)
-          }
+          open={items.length === 0}
         >
           <summary>
             <span>
@@ -800,16 +806,6 @@ export default async function InventoryPage({
                 Gestionar productos recordados
               </Link>
             </div>
-            {inventoryErrorMessage ? (
-              <p className="auth-message error" role="alert">
-                {inventoryErrorMessage}
-              </p>
-            ) : null}
-            {inventorySuccessMessage ? (
-              <p className="auth-message success" role="status">
-                {inventorySuccessMessage}
-              </p>
-            ) : null}
             <form action={addInventoryItemAction} className="meal-log-form">
               <BarcodeCatalogControls
                 lookupAction={lookupBarcodeProductAction}
@@ -1009,7 +1005,7 @@ export default async function InventoryPage({
             </form>
           </div>
         </details>
-      </main>
+      </div>
     </AppShell>
   );
 }
