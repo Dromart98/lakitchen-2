@@ -59,44 +59,52 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card auth-form">
-      <div>
-        <LaKitchenLogo className="auth-brand" variant="horizontal" theme="light" title="LaKitchen" />
-        <h1>Accede a tu cocina</h1>
-        <p className="muted">Inicia sesión o crea una cuenta con email y contraseña.</p>
+    <form onSubmit={handleSubmit} className="auth-form" aria-labelledby="auth-form-title">
+      <div className="auth-form__header">
+        <LaKitchenLogo className="auth-form__logo" variant="horizontal" theme="light" title="LaKitchen" />
+        <p className="auth-form__eyebrow">Acceso seguro</p>
+        <h1 id="auth-form-title">Accede a tu cocina</h1>
+        <p>Inicia sesión o crea una cuenta con email y contraseña.</p>
       </div>
 
-      <label className="field" htmlFor="email">
-        <span>Email</span>
-        <input id="email" name="email" type="email" autoComplete="email" required placeholder="tu@email.com" />
-      </label>
+      <div className="auth-form__fields">
+        <label className="auth-form__field" htmlFor="email">
+          <span>Email</span>
+          <input id="email" name="email" type="email" autoComplete="email" required placeholder="tu@email.com" />
+        </label>
 
-      <label className="field" htmlFor="password">
-        <span>Contraseña</span>
-        <span className="password-input-wrap">
-          <input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required minLength={6} placeholder="Mínimo 6 caracteres" />
-          <button
-            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-            aria-pressed={showPassword}
-            className="password-toggle"
-            type="button"
-            onClick={() => setShowPassword((visible) => !visible)}
-          >
-            {showPassword ? "Ocultar" : "Mostrar"}
+        <label className="auth-form__field" htmlFor="password">
+          <span>Contraseña</span>
+          <span className="auth-password">
+            <input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required minLength={6} placeholder="Mínimo 6 caracteres" />
+            <button
+              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-pressed={showPassword}
+              className="auth-password__toggle"
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+            >
+              {showPassword ? "Ocultar" : "Mostrar"}
+            </button>
+          </span>
+        </label>
+      </div>
+
+      <div className="auth-form__messages" aria-live="polite">
+        {state.error ? <p className="auth-form__message auth-form__message--error" role="alert"><strong>Error</strong>{state.error}</p> : null}
+        {state.message ? <p className="auth-form__message auth-form__message--success" role="status"><strong>Información</strong>{state.message}</p> : null}
+      </div>
+
+      <div>
+        <p className="auth-form__helper">Puedes entrar con una cuenta existente o crear una nueva con los mismos datos.</p>
+        <div className="auth-form__actions">
+          <button className="auth-form__primary" type="submit" name="authMode" value="sign-in" disabled={isPending}>
+            {pendingMode === "sign-in" ? "Procesando..." : "Iniciar sesión"}
           </button>
-        </span>
-      </label>
-
-      {state.error ? <p className="auth-message error" role="alert">{state.error}</p> : null}
-      {state.message ? <p className="auth-message success" role="status">{state.message}</p> : null}
-
-      <div className="auth-actions">
-        <button className="button" type="submit" name="authMode" value="sign-in" disabled={isPending}>
-          {pendingMode === "sign-in" ? "Procesando..." : "Iniciar sesión"}
-        </button>
-        <button className="button secondary" type="submit" name="authMode" value="sign-up" disabled={isPending}>
-          {pendingMode === "sign-up" ? "Procesando..." : "Crear cuenta"}
-        </button>
+          <button className="auth-form__secondary" type="submit" name="authMode" value="sign-up" disabled={isPending}>
+            {pendingMode === "sign-up" ? "Procesando..." : "Crear cuenta"}
+          </button>
+        </div>
       </div>
     </form>
   );
