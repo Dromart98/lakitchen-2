@@ -363,6 +363,10 @@ h3 {
 }
 
 .logout-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
   appearance: none;
   border: 1px solid rgba(22, 163, 74, 0.22);
   border-radius: 999px;
@@ -499,6 +503,41 @@ h3 {
   background-color: var(--card);
   color: var(--text);
   border-color: var(--border);
+}
+
+[data-theme="dark"] .button {
+  color: var(--brand-background);
+}
+
+.expiring-list__item-name {
+  display: block;
+  margin-top: 8px;
+}
+
+.macro-progress__heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  min-width: 0;
+}
+
+.macro-progress__bar {
+  display: block;
+  width: 100%;
+  border: 0;
+  appearance: none;
+}
+
+.macro-progress__bar::-webkit-progress-bar {
+  background: var(--border);
+  border-radius: inherit;
+}
+
+.macro-progress__bar::-webkit-progress-value,
+.macro-progress__bar::-moz-progress-bar {
+  background: linear-gradient(90deg, var(--brand), var(--brand-dark));
+  border-radius: inherit;
 }
 
 .app-shell {

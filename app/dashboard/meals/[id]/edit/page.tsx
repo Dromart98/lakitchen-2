@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { updateMealLogAction } from "@/app/dashboard/actions";
+import { AppShell } from "@/components/layout/AppShell";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isMealLogId } from "@/modules/meals/meal-validation";
@@ -66,7 +67,7 @@ export default async function EditMealLogPage({
   const mealErrorMessage = getMealErrorMessage(resolvedSearchParams?.mealError);
 
   return (
-    <main className="shell">
+    <AppShell>
       <section className="card">
         <h1>Editar comida</h1>
         <p className="muted">Actualiza los datos de esta comida registrada hoy.</p>
@@ -107,6 +108,6 @@ export default async function EditMealLogPage({
           </div>
         </form>
       </section>
-    </main>
+    </AppShell>
   );
 }
