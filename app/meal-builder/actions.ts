@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isMealType } from "@/modules/meals/meal-types";
+import { resolveMealBuilderReturnPath, type MealBuilderReturnPath } from "@/modules/meals/meal-builder";
 
 const MEAL_BUILDER_PATH = "/meal-builder";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
@@ -15,42 +16,43 @@ type MealBuilderPayloadLine = {
   consumed_quantity: unknown;
 };
 
-function redirectWithMealError(errorCode: string): never {
-  redirect(`${MEAL_BUILDER_PATH}?mealError=${errorCode}`);
+function redirectWithMealError(errorCode: string, returnPath: MealBuilderReturnPath): never {
+  const mode = returnPath === "/macros" ? "mealMode=ingredients&" : "";
+  redirect(`${returnPath}?${mode}mealError=${errorCode}`);
 }
 
-function parseMealBuilderLines(rawLines: FormDataEntryValue | null) {
-  if (typeof rawLines !== "string") redirectWithMealError("invalid-lines-json");
+function parseMealBuilderLines(rawLines: FormDataEntryValue | null, returnPath: MealBuilderReturnPath) {
+  if (typeof rawLines !== "string") redirectWithMealError("invalid-lines-json", returnPath);
 
   let parsedLines: unknown;
 
   try {
     parsedLines = JSON.parse(rawLines);
   } catch {
-    redirectWithMealError("invalid-lines-json");
+    redirectWithMealError("invalid-lines-json", returnPath);
   }
 
-  if (!Array.isArray(parsedLines)) redirectWithMealError("invalid-lines-json");
-  if (parsedLines.length < 1) redirectWithMealError("invalid-lines");
-  if (parsedLines.length > 10) redirectWithMealError("too-many-products");
+  if (!Array.isArray(parsedLines)) redirectWithMealError("invalid-lines-json", returnPath);
+  if (parsedLines.length < 1) redirectWithMealError("invalid-lines", returnPath);
+  if (parsedLines.length > 10) redirectWithMealError("too-many-products", returnPath);
 
   const seenItemIds = new Set<string>();
 
   return parsedLines.map((line) => {
-    if (!line || typeof line !== "object" || Array.isArray(line)) redirectWithMealError("invalid-lines-json");
+    if (!line || typeof line !== "object" || Array.isArray(line)) redirectWithMealError("invalid-lines-json", returnPath);
 
     const { item_id: itemId, consumed_quantity: consumedQuantity } = line as MealBuilderPayloadLine;
 
     if (typeof itemId !== "string" || !UUID_PATTERN.test(itemId)) {
-      redirectWithMealError("product-not-found");
+      redirectWithMealError("product-not-found", returnPath);
     }
 
-    if (seenItemIds.has(itemId)) redirectWithMealError("duplicate-product");
+    if (seenItemIds.has(itemId)) redirectWithMealError("duplicate-product", returnPath);
     seenItemIds.add(itemId);
 
     const quantity = Number(consumedQuantity);
 
-    if (!Number.isFinite(quantity) || quantity <= 0) redirectWithMealError("invalid-quantity");
+    if (!Number.isFinite(quantity) || quantity <= 0) redirectWithMealError("invalid-quantity", returnPath);
 
     return {
       item_id: itemId,
@@ -74,13 +76,14 @@ function getSafeMealBuilderError(error: { code?: string; message: string }) {
 }
 
 export async function consumeMealBuilderAndLogMealAction(formData: FormData) {
+  const returnPath = resolveMealBuilderReturnPath(formData.get("return_to"));
   const mealName = String(formData.get("meal_name") ?? "").trim();
   const mealType = String(formData.get("meal_type") ?? "").trim();
 
-  if (!mealName || mealName.length > 120) redirectWithMealError("invalid-name");
-  if (!isMealType(mealType)) redirectWithMealError("invalid-meal-type");
+  if (!mealName || mealName.length > 120) redirectWithMealError("invalid-name", returnPath);
+  if (!isMealType(mealType)) redirectWithMealError("invalid-meal-type", returnPath);
 
-  const lines = parseMealBuilderLines(formData.get("lines"));
+  const lines = parseMealBuilderLines(formData.get("lines"), returnPath);
 
   const supabase = await createClient();
   await requireAuthenticatedUser(supabase, "meal builder consumption");
@@ -93,14 +96,16 @@ export async function consumeMealBuilderAndLogMealAction(formData: FormData) {
 
   if (error) {
     console.warn("Supabase could not consume meal builder items and log a meal:", error.message);
-    redirectWithMealError(getSafeMealBuilderError(error));
+    redirectWithMealError(getSafeMealBuilderError(error), returnPath);
   }
 
   revalidatePath(MEAL_BUILDER_PATH);
+  revalidatePath("/macros");
   revalidatePath("/inventory");
   revalidatePath("/dashboard");
   revalidatePath("/meal-history");
   revalidatePath("/weekly-summary");
 
-  redirect(`${MEAL_BUILDER_PATH}?mealSuccess=meal-consumed-logged`);
+  const mode = returnPath === "/macros" ? "mealMode=ingredients&" : "";
+  redirect(`${returnPath}?${mode}mealSuccess=meal-consumed-logged`);
 }

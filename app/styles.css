@@ -1471,9 +1471,10 @@ h3 {
   text-align: center;
 }
 
-.macros-mode--active {
+.macros-mode[aria-pressed="true"] {
   border-color: var(--brand);
   background: var(--brand-soft);
+  box-shadow: inset 0 -3px 0 var(--brand);
 }
 
 .macros-mode:disabled {
@@ -1484,6 +1485,32 @@ h3 {
 
 .macros-mode small {
   font-size: 0.65rem;
+}
+
+.macros-mode:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.macros-mode-panel {
+  min-width: 0;
+  margin-top: 18px;
+}
+
+.macros-mode-panel[hidden] {
+  display: none;
+}
+
+.macros-mode-panel--ingredients {
+  overflow-wrap: anywhere;
+}
+
+.macros-manual-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  border-left: 3px solid var(--brand-accent);
+  color: var(--muted);
+  padding-left: 12px;
 }
 
 .macros-ingredients-copy {
@@ -1554,6 +1581,10 @@ h3 {
 
   .macros-lower-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .macros-add {
+    grid-column: 1 / -1;
   }
 
   .macros-modes {
@@ -2771,6 +2802,13 @@ h3 {
   border-radius: 22px;
   background: var(--card);
   padding: 18px;
+}
+
+.meal-builder-workspace--embedded .meal-builder-products,
+.meal-builder-workspace--embedded .meal-builder-summary,
+.meal-builder-workspace--embedded .meal-builder-registration,
+.meal-builder-empty--embedded {
+  background: var(--card-soft);
 }
 
 .meal-builder-section-heading {

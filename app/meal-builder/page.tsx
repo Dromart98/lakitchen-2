@@ -6,6 +6,7 @@ import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
   createRepeatedMealBuilderDraft,
+  getMealBuilderMessage,
   type MealBuilderInventoryItem,
   type RepeatedMealBuilderDraft,
   type RepeatedMealBuilderMeal,
@@ -40,29 +41,10 @@ type MealBuilderPageProps = {
   }>;
 };
 
-const MEAL_ERROR_MESSAGES: Record<string, string> = {
-  "invalid-name": "El nombre de la comida es obligatorio y no puede superar 120 caracteres.",
-  "invalid-meal-type": "Selecciona un tipo de comida válido.",
-  "invalid-lines-json": "No se pudo leer la selección de productos. Revisa la comida e inténtalo de nuevo.",
-  "invalid-lines": "Añade al menos un producto válido a la comida.",
-  "too-many-products": "La comida no puede contener más de diez productos.",
-  "duplicate-product": "No puedes registrar el mismo producto más de una vez en la misma comida.",
-  "product-not-found": "Uno de los productos ya no está disponible en tu inventario.",
-  "invalid-quantity": "Revisa las cantidades de los productos.",
-  "quantity-too-high": "Una cantidad supera el stock disponible actual.",
-  "incomplete-nutrition": "Uno de los productos no tiene nutrición completa.",
-  "incompatible-unit": "Uno de los productos tiene una unidad incompatible con su base nutricional.",
-  "consume-failed": "No se pudo registrar la comida. Inténtalo de nuevo.",
-};
-
-const MEAL_SUCCESS_MESSAGES: Record<string, string> = {
-  "meal-consumed-logged": "Comida registrada y productos descontados correctamente.",
-};
-
 export default async function MealBuilderPage({ searchParams }: MealBuilderPageProps) {
   const params = await searchParams;
-  const mealErrorMessage = params?.mealError ? MEAL_ERROR_MESSAGES[params.mealError] : null;
-  const mealSuccessMessage = params?.mealSuccess ? MEAL_SUCCESS_MESSAGES[params.mealSuccess] : null;
+  const mealErrorMessage = getMealBuilderMessage(params?.mealError, false);
+  const mealSuccessMessage = getMealBuilderMessage(params?.mealSuccess, true);
   const repeatMeal = params?.repeatMeal?.trim() ?? "";
 
   const supabase = await createClient();
