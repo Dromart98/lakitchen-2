@@ -51,6 +51,8 @@ export async function addMealLogAction(formData: FormData) {
 
   revalidatePath(DASHBOARD_PATH);
   revalidatePath(MACROS_PATH);
+  revalidatePath("/meal-history");
+  revalidatePath("/weekly-summary");
   redirect(`${destination}?mealSuccess=meal-created`);
 }
 

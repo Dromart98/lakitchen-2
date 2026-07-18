@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isMealLogId, validateMacro, validateMealName, validateMealType } from "@/modules/meals/meal-validation";
+import { isMealLogId, validateMacro, validateMealLogInput, validateMealName, validateMealType } from "@/modules/meals/meal-validation";
 
 describe("meal validation", () => {
   it("accepts a valid UUID meal log id", () => {
@@ -39,8 +39,26 @@ describe("meal validation", () => {
     expect(validateMacro("-1")).toEqual({ error: "invalid-macros" });
   });
 
-  it("rejects decimal macros", () => {
-    expect(validateMacro("1.5")).toEqual({ error: "invalid-macros" });
+  it.each(["245", "245.5", "6.9", "0.4", "0"])("accepts the numeric macro %s", (value) => {
+    expect(validateMacro(value)).toEqual({ value: Number(value) });
+  });
+
+  it.each(["-1", "", "text", "Infinity"])("rejects the invalid macro %s", (value) => {
+    expect(validateMacro(value)).toEqual({ error: "invalid-macros" });
+  });
+
+  it("accepts and normalizes a complete decimal meal form", () => {
+    const formData = new FormData();
+    formData.set("name", "Pollo con arroz");
+    formData.set("meal_type", "lunch");
+    formData.set("calories", "512.54");
+    formData.set("protein_g", "46.9");
+    formData.set("carbs_g", "52.44");
+    formData.set("fat_g", "12.7");
+
+    expect(validateMealLogInput(formData)).toEqual({
+      value: { name: "Pollo con arroz", mealType: "lunch", calories: 512.5, proteinG: 46.9, carbsG: 52.4, fatG: 12.7 },
+    });
   });
 
   it("rejects manipulated meal types", () => {

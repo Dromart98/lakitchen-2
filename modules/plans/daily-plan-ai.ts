@@ -46,6 +46,20 @@ export type DailyPlanInventoryItem = {
   fat_g: number;
 };
 
+export type DailyPlanInventorySourceItem = {
+  id: string; name: string; quantity: number | null; unit: string; expires_at: string | null; category: string | null;
+  nutrition_basis: string | null; calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null;
+};
+
+export type DailyPlanInventoryExclusionReason = "non-positive-quantity" | "expired" | "missing-nutrition-basis" | "incomplete-nutrition" | "incompatible-unit";
+export type DailyPlanInventoryReadiness = {
+  availableCount: number;
+  usable: DailyPlanInventoryItem[];
+  excluded: Array<{ item: DailyPlanInventorySourceItem; reason: DailyPlanInventoryExclusionReason }>;
+  canGenerate: boolean;
+  hasLimitedVariety: boolean;
+};
+
 export type DailyPlanIngredient = {
   inventory_item_id: string;
   name: string;
@@ -202,16 +216,19 @@ export function buildDailyPlanTarget(profile: { target_calories: number | null; 
   return null;
 }
 
-export function buildUsableDailyPlanInventoryItems<T extends { id: string; name: string; quantity: number | null; unit: string; expires_at: string | null; category: string | null; nutrition_basis: string | null; calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null }>(items: T[], todayKey: string): DailyPlanInventoryItem[] {
-  return items
-    .filter((item) => {
-      if (!Number.isFinite(item.quantity) || item.quantity === null || item.quantity <= 0) return false;
-      if (item.expires_at && getInventoryExpirationDayDifference(item.expires_at, todayKey) < 0) return false;
-      if (!isInventoryNutritionBasis(item.nutrition_basis)) return false;
-      if (!hasCompleteInventoryNutritionValues(item)) return false;
-      if (!isCompatibleUnitAndBasis(item.unit, item.nutrition_basis)) return false;
-      return true;
-    })
+export function getDailyPlanInventoryReadiness<T extends DailyPlanInventorySourceItem>(items: T[], todayKey: string): DailyPlanInventoryReadiness {
+  const excluded: DailyPlanInventoryReadiness["excluded"] = [];
+  const eligible = items.filter((item) => {
+    let reason: DailyPlanInventoryExclusionReason | null = null;
+    if (!Number.isFinite(item.quantity) || item.quantity === null || item.quantity <= 0) reason = "non-positive-quantity";
+    else if (item.expires_at && getInventoryExpirationDayDifference(item.expires_at, todayKey) < 0) reason = "expired";
+    else if (!isInventoryNutritionBasis(item.nutrition_basis)) reason = "missing-nutrition-basis";
+    else if (!hasCompleteInventoryNutritionValues(item)) reason = "incomplete-nutrition";
+    else if (!isCompatibleUnitAndBasis(item.unit, item.nutrition_basis)) reason = "incompatible-unit";
+    if (reason) excluded.push({ item, reason });
+    return !reason;
+  });
+  const usable = eligible
     .map((item) => ({
       id: item.id,
       name: item.name,
@@ -233,6 +250,17 @@ export function buildUsableDailyPlanInventoryItems<T extends { id: string; name:
       return byName || a.id.localeCompare(b.id);
     })
     .slice(0, DAILY_PLAN_MAX_INVENTORY_ITEMS);
+  return {
+    availableCount: items.filter((item) => Number.isFinite(item.quantity) && item.quantity !== null && item.quantity > 0).length,
+    usable,
+    excluded,
+    canGenerate: usable.length >= 2,
+    hasLimitedVariety: usable.length >= 2 && usable.length <= 3,
+  };
+}
+
+export function buildUsableDailyPlanInventoryItems<T extends DailyPlanInventorySourceItem>(items: T[], todayKey: string): DailyPlanInventoryItem[] {
+  return getDailyPlanInventoryReadiness(items, todayKey).usable;
 }
 
 export function buildDailyPlanInputText(request: DailyPlanPublicRequest, target: DailyPlanTarget, inventoryItems: DailyPlanInventoryItem[], todayKey: string) {
