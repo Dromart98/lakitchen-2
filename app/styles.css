@@ -1288,3 +1288,358 @@ h3 {
     flex-wrap: nowrap;
   }
 }
+
+/* Meal builder presentation */
+.meal-builder-page {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  padding-bottom: 88px;
+}
+
+.meal-builder-header {
+  display: grid;
+  gap: 18px;
+  padding: 12px 2px 4px;
+}
+
+.meal-builder-header__copy {
+  min-width: 0;
+}
+
+.meal-builder-header h1 {
+  max-width: 760px;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+
+.meal-builder-header__copy > p:last-child,
+.meal-builder-section-heading > p,
+.meal-builder-empty > p,
+.meal-builder-summary__empty {
+  max-width: 640px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.meal-builder-eyebrow,
+.meal-builder-step {
+  margin: 0;
+  color: var(--brand-dark);
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.meal-builder-header__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+.meal-builder-header__links a,
+.meal-builder-empty a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--brand-dark);
+  font-weight: 800;
+  text-underline-offset: 4px;
+}
+
+.meal-builder-messages,
+.meal-builder-workspace,
+.meal-builder-products__list {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.meal-builder-products,
+.meal-builder-summary,
+.meal-builder-registration,
+.meal-builder-unavailable,
+.meal-builder-empty {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--card);
+  padding: 18px;
+}
+
+.meal-builder-section-heading {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.meal-builder-section-heading h2,
+.meal-builder-summary h2,
+.meal-builder-registration h2,
+.meal-builder-unavailable h2,
+.meal-builder-empty h2 {
+  margin: 5px 0 0;
+}
+
+.meal-builder-row {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--card-soft);
+  padding: 14px;
+}
+
+.meal-builder-row__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.meal-builder-row__heading h3 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+}
+
+.meal-builder-row__heading h3 span {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  font-size: 0.85rem;
+}
+
+.meal-builder-row__fields {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.meal-builder-row__details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.meal-builder-row__details p,
+.meal-builder-summary__macros p {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  padding: 10px;
+}
+
+.meal-builder-row__details span,
+.meal-builder-line-nutrition > span,
+.meal-builder-summary__macros span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.meal-builder-row__details strong {
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+}
+
+.meal-builder-remove,
+.meal-builder-add {
+  min-height: 44px;
+  border-radius: 13px;
+  background: transparent;
+  padding: 9px 12px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.meal-builder-remove {
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 55%, var(--border));
+  color: var(--brand-accent);
+}
+
+.meal-builder-add {
+  width: 100%;
+  margin-top: 12px;
+  border: 1px dashed var(--brand-dark);
+  color: var(--brand-dark);
+}
+
+.meal-builder-stock-warning {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 38%, var(--border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--brand-accent) 12%, var(--card));
+  color: var(--text);
+  padding: 11px 12px;
+  font-weight: 800;
+}
+
+.meal-builder-line-nutrition {
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.meal-builder-line-nutrition p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.meal-builder-summary {
+  background: color-mix(in srgb, var(--brand-soft) 30%, var(--card));
+}
+
+.meal-builder-summary__calories {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 22px 0 16px;
+}
+
+.meal-builder-summary__calories strong {
+  font-size: clamp(3rem, 18vw, 5rem);
+  letter-spacing: -0.07em;
+  line-height: 0.85;
+}
+
+.meal-builder-summary__calories span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.meal-builder-summary__macros {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.meal-builder-summary__macros p {
+  padding: 9px 7px;
+}
+
+.meal-builder-summary__macros strong {
+  font-size: clamp(0.84rem, 4vw, 1rem);
+  overflow-wrap: anywhere;
+}
+
+.meal-builder-summary__empty {
+  margin-top: 16px;
+}
+
+.meal-builder-registration .meal-log-form {
+  margin-top: 18px;
+}
+
+.meal-builder-registration__note {
+  margin: 2px 0 0;
+  border-left: 3px solid var(--brand-dark);
+  color: var(--muted);
+  padding-left: 12px;
+  line-height: 1.55;
+}
+
+.meal-builder-submit {
+  width: 100%;
+}
+
+.meal-builder-unavailable {
+  display: grid;
+  gap: 12px;
+  background: var(--card-soft);
+}
+
+.meal-builder-unavailable__list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.meal-builder-unavailable__list li {
+  display: grid;
+  gap: 4px;
+  border-left: 3px solid var(--brand-accent);
+  padding: 5px 0 5px 12px;
+  overflow-wrap: anywhere;
+}
+
+.meal-builder-unavailable__list li span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.meal-builder-empty {
+  display: grid;
+  gap: 12px;
+  border-style: dashed;
+}
+
+.meal-builder-remove:focus-visible,
+.meal-builder-add:focus-visible,
+.meal-builder-header__links a:focus-visible,
+.meal-builder-empty a:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+
+@media (min-width: 700px) {
+  .meal-builder-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+  .meal-builder-header__links {
+    justify-content: flex-end;
+  }
+  .meal-builder-section-heading {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+  .meal-builder-row__fields {
+    grid-template-columns: minmax(220px, 1.4fr) minmax(130px, 0.6fr);
+    align-items: end;
+  }
+  .meal-builder-row__details,
+  .meal-builder-stock-warning,
+  .meal-builder-line-nutrition {
+    grid-column: 1 / -1;
+  }
+  .meal-builder-registration .meal-log-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .meal-builder-registration__note,
+  .meal-builder-submit {
+    grid-column: 1 / -1;
+  }
+  .meal-builder-submit {
+    width: auto;
+    justify-self: start;
+  }
+}
+
+@media (min-width: 980px) {
+  .meal-builder-workspace {
+    grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.75fr);
+    align-items: start;
+  }
+  .meal-builder-products {
+    grid-row: span 2;
+  }
+}
