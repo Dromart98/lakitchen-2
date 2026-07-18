@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AppShell } from "@/components/layout/AppShell";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { repeatMealLogTodayAction } from "./actions";
 import { createClient } from "@/lib/supabase/server";
@@ -113,56 +114,74 @@ export default async function MealHistoryPage({ searchParams }: { searchParams?:
   })).filter((group) => group.meals.length > 0);
 
   return (
-    <main className="shell">
-      <div className="topbar">
-        <h1>Historial de comidas</h1>
-        <Link className="button nav-button" href="/dashboard">Volver al dashboard</Link>
-      </div>
+    <AppShell>
+      <div className="meal-history-page">
+        <header className="meal-history-header">
+          <p className="meal-history-eyebrow">Historial</p>
+          <h1>Tus comidas, día a día</h1>
+          <p>Revisa lo que has registrado, consulta los ingredientes utilizados y vuelve a preparar tus comidas anteriores.</p>
+        </header>
 
-      <section className="card">
-        <h2>{formatSpanishUtcDate(selectedDate)}</h2>
-        {hasInvalidDate ? <p className="auth-message error" role="alert">Selecciona una fecha válida que no sea futura.</p> : null}
-        {mealErrorMessage ? <p className="auth-message error" role="alert">{mealErrorMessage}</p> : null}
-        <form className="meal-log-form" method="get" action="/meal-history">
-          <label className="field" htmlFor="history-date">
-            <span>Fecha</span>
-            <input id="history-date" name="date" type="date" defaultValue={selectedDate} max={today} />
-          </label>
-          <button className="button" type="submit">Consultar</button>
-        </form>
-        <div className="dashboard-actions" style={{ marginTop: 16 }}>
-          <Link className="button nav-button" href={`/meal-history?date=${previousDate}`}>Día anterior</Link>
-          <Link className="button nav-button" href={`/weekly-summary?week=${selectedDate}`}>Resumen semanal</Link>
-          {selectedDate >= today ? (
-            <span className="button nav-button" aria-disabled="true">Día siguiente</span>
-          ) : (
-            <Link className="button nav-button" href={`/meal-history?date=${nextHrefDate}`}>Día siguiente</Link>
-          )}
-        </div>
-      </section>
-
-      {mealLogsError ? (
-        <section className="card" style={{ marginTop: 16 }}>
-          <p className="auth-message error" role="alert">No se pudo cargar el historial de comidas. Inténtalo de nuevo.</p>
-        </section>
-      ) : (
-        <>
-          <section className="grid cards" style={{ marginTop: 16 }}>
-            <div className="card">
-              <h2>Resumen diario</h2>
-              <p>{totals.calories} kcal</p>
-              <p className="muted">P {totals.proteinG}g · C {totals.carbsG}g · G {totals.fatG}g</p>
-              <p className="muted">{getMealCountLabel(meals.length)}</p>
-              {mealItemsError ? <p className="auth-message error" role="alert">No se pudo cargar el desglose de ingredientes.</p> : null}
+        <section className="meal-history-date-panel" aria-labelledby="meal-history-date-heading">
+          <div className="meal-history-date-panel__heading">
+            <p>Fecha seleccionada</p>
+            <h2 id="meal-history-date-heading">{formatSpanishUtcDate(selectedDate)}</h2>
+          </div>
+          <form className="meal-history-date-form" method="get" action="/meal-history">
+            <label className="field" htmlFor="history-date">
+              <span>Fecha</span>
+              <input id="history-date" name="date" type="date" defaultValue={selectedDate} max={today} />
+            </label>
+            <button className="button" type="submit">Consultar</button>
+          </form>
+          <nav className="meal-history-navigation" aria-label="Navegación por fechas">
+            <Link href={`/meal-history?date=${previousDate}`}>Día anterior</Link>
+            <Link href={`/weekly-summary?week=${selectedDate}`}>Resumen semanal</Link>
+            {selectedDate >= today ? (
+              <span className="meal-history-navigation__disabled" aria-disabled="true">Día siguiente · No disponible</span>
+            ) : (
+              <Link href={`/meal-history?date=${nextHrefDate}`}>Día siguiente</Link>
+            )}
+          </nav>
+          {(hasInvalidDate || mealErrorMessage) ? (
+            <div className="meal-history-messages">
+              {hasInvalidDate ? <p className="auth-message error" role="alert">Selecciona una fecha válida que no sea futura.</p> : null}
+              {mealErrorMessage ? <p className="auth-message error" role="alert">{mealErrorMessage}</p> : null}
             </div>
-          </section>
+          ) : null}
+        </section>
 
-          {meals.length ? (
-            <section className="grid cards" style={{ marginTop: 16 }}>
-              {groupedMeals.map((group) => (
-                <div className="card" key={group.mealType}>
-                  <h2>{group.label}</h2>
-                  <ul>
+        {mealLogsError ? (
+          <section className="meal-history-load-error" role="alert">
+            <p className="meal-history-eyebrow">Error de carga</p>
+            <h2>No hemos podido mostrar este día</h2>
+            <p>No se pudo cargar el historial de comidas. Inténtalo de nuevo.</p>
+          </section>
+        ) : (
+          <>
+            <section className="meal-history-summary" aria-labelledby="meal-history-summary-heading">
+              <div className="meal-history-summary__calories">
+                <p className="meal-history-eyebrow">Resumen diario</p>
+                <h2 id="meal-history-summary-heading"><strong>{totals.calories}</strong> kcal</h2>
+                <p>{getMealCountLabel(meals.length)}</p>
+              </div>
+              <div className="meal-history-summary__macros" aria-label="Macronutrientes totales">
+                <div><span>Proteína</span><strong>{totals.proteinG}g</strong></div>
+                <div><span>Carbohidratos</span><strong>{totals.carbsG}g</strong></div>
+                <div><span>Grasas</span><strong>{totals.fatG}g</strong></div>
+              </div>
+              {mealItemsError ? <p className="meal-history-summary__error auth-message error" role="alert">No se pudo cargar el desglose de ingredientes.</p> : null}
+            </section>
+
+            {meals.length ? (
+              <section className="meal-history-groups" aria-label="Comidas registradas por tipo">
+                {groupedMeals.map((group) => (
+                  <section className="meal-history-group" key={group.mealType} aria-labelledby={`meal-history-group-${group.mealType}`}>
+                    <header className="meal-history-group__heading">
+                      <h2 id={`meal-history-group-${group.mealType}`}>{group.label}</h2>
+                      <span>{group.meals.length} {group.meals.length === 1 ? "comida" : "comidas"}</span>
+                    </header>
+                    <div className="meal-history-group__meals">
                     {group.meals.map((meal) => {
                       const mealItems = mealItemsByMealId.get(meal.id) ?? [];
                       const repeatMode = getMealHistoryRepeatMode({
@@ -172,13 +191,19 @@ export default async function MealHistoryPage({ searchParams }: { searchParams?:
                       });
 
                       return (
-                        <li key={meal.id}>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                            <span>
-                              <strong>{meal.name}</strong> · {meal.calories} kcal · P {meal.protein_g}g · C {meal.carbs_g}g · G {meal.fat_g}g
-                            </span>
+                        <article className="meal-history-meal" key={meal.id}>
+                          <div className="meal-history-meal__heading">
+                            <h3>{meal.name}</h3>
+                            <p><strong>{meal.calories}</strong> kcal</p>
+                          </div>
+                          <div className="meal-history-meal__nutrition" aria-label={`Macronutrientes de ${meal.name}`}>
+                            <span>Proteína <strong>{meal.protein_g}g</strong></span>
+                            <span>Carbohidratos <strong>{meal.carbs_g}g</strong></span>
+                            <span>Grasas <strong>{meal.fat_g}g</strong></span>
+                          </div>
+                          {(repeatMode === "composer" || repeatMode === "direct") ? <div className="meal-history-meal__actions">
                             {repeatMode === "composer" ? (
-                              <Link className="button" href={`/meal-builder?repeatMeal=${meal.id}`}>
+                              <Link href={`/meal-builder?repeatMeal=${meal.id}`}>
                                 Repetir en el compositor
                               </Link>
                             ) : null}
@@ -190,44 +215,47 @@ export default async function MealHistoryPage({ searchParams }: { searchParams?:
                                   name="source_date"
                                   value={selectedDate}
                                 />
-                                <button className="button" type="submit">
+                                <button type="submit">
                                   Repetir hoy
                                 </button>
                               </form>
                             ) : null}
-                          </div>
+                          </div> : null}
                           {mealItems.length ? (
-                            <div style={{ marginTop: 8, marginLeft: 12 }}>
-                              <p className="muted" style={{ margin: "0 0 4px" }}><strong>Ingredientes utilizados</strong></p>
-                              <ul style={{ margin: 0, paddingLeft: 16 }}>
+                            <details className="meal-history-ingredients">
+                              <summary>Ver ingredientes utilizados</summary>
+                              <div className="meal-history-ingredients__list">
                                 {sortMealLogItems(mealItems).map((item) => (
-                                  <li key={item.id} className="muted" style={{ marginTop: 4 }}>
-                                    <span>
-                                      <strong>{item.product_name}</strong> — {formatMealLogItemNutritionValue(item.consumed_quantity)} {item.unit}
-                                    </span>
-                                    <br />
-                                    <span>
+                                  <div key={item.id} className="meal-history-ingredient">
+                                    <div>
+                                      <strong>{item.product_name}</strong>
+                                      <span>{formatMealLogItemNutritionValue(item.consumed_quantity)} {item.unit}</span>
+                                    </div>
+                                    <p>
                                       {formatMealLogItemNutritionValue(item.calories)} kcal · P {formatMealLogItemNutritionValue(item.protein_g)} g · C {formatMealLogItemNutritionValue(item.carbs_g)} g · G {formatMealLogItemNutritionValue(item.fat_g)} g
-                                    </span>
-                                  </li>
+                                    </p>
+                                  </div>
                                 ))}
-                              </ul>
-                            </div>
+                              </div>
+                            </details>
                           ) : null}
-                        </li>
+                        </article>
                       );
                     })}
-                  </ul>
-                </div>
-              ))}
-            </section>
-          ) : (
-            <section className="card" style={{ marginTop: 16 }}>
-              <p className="muted">No hay comidas registradas en esta fecha.</p>
-            </section>
-          )}
-        </>
-      )}
-    </main>
+                    </div>
+                  </section>
+                ))}
+              </section>
+            ) : (
+              <section className="meal-history-empty">
+                <p className="meal-history-eyebrow">Sin registros</p>
+                <h2>No hay comidas en esta fecha</h2>
+                <p>No hay comidas registradas en esta fecha. Consulta otro día o registra tus comidas desde Inicio o Macros.</p>
+              </section>
+            )}
+          </>
+        )}
+      </div>
+    </AppShell>
   );
 }
