@@ -11,11 +11,16 @@ const DASHBOARD_PATH = "/dashboard";
 const MACROS_PATH = "/macros";
 
 function getMealReturnPath(formData: FormData) {
-  return formData.get("return_to") === MACROS_PATH ? MACROS_PATH : DASHBOARD_PATH;
+  const base = formData.get("return_to") === MACROS_PATH ? MACROS_PATH : DASHBOARD_PATH;
+  return base === MACROS_PATH && formData.get("meal_mode") === "text-ai" ? `${MACROS_PATH}?mealMode=text-ai` : base;
+}
+
+function withMealParameter(destination: string, parameter: string) {
+  return `${destination}${destination.includes("?") ? "&" : "?"}${parameter}`;
 }
 
 function redirectMealValidationError(error: string, destination = DASHBOARD_PATH): never {
-  redirect(`${destination}?mealError=${error}`);
+  redirect(withMealParameter(destination, `mealError=${error}`));
 }
 
 
@@ -46,14 +51,14 @@ export async function addMealLogAction(formData: FormData) {
 
   if (error) {
     console.warn("Supabase could not save the dashboard meal log:", error.message);
-    redirect(`${destination}?mealError=save-failed`);
+    redirect(withMealParameter(destination, "mealError=save-failed"));
   }
 
   revalidatePath(DASHBOARD_PATH);
   revalidatePath(MACROS_PATH);
   revalidatePath("/meal-history");
   revalidatePath("/weekly-summary");
-  redirect(`${destination}?mealSuccess=meal-created`);
+  redirect(withMealParameter(destination, "mealSuccess=meal-created"));
 }
 
 export async function updateMealLogAction(formData: FormData) {

@@ -3,11 +3,12 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 
 import { addMealLogAction } from "@/app/dashboard/actions";
+import { TextAiMealEstimator } from "@/components/macros/TextAiMealEstimator";
 import { InventoryMealBuilder } from "@/components/meals/InventoryMealBuilder";
 import type { MealBuilderInventoryItem } from "@/modules/meals/meal-builder";
 import { MEAL_TYPE_LABELS, MEAL_TYPES } from "@/modules/meals/meal-types";
 
-type MealMode = "manual" | "ingredients";
+type MealMode = "manual" | "text-ai" | "ingredients";
 
 type MacroMealRecorderProps = {
   items: MealBuilderInventoryItem[];
@@ -30,13 +31,14 @@ export function MacroMealRecorder({
 }: MacroMealRecorderProps) {
   const [mode, setMode] = useState<MealMode>(initialMode);
   const manualTab = useRef<HTMLButtonElement>(null);
+  const textAiTab = useRef<HTMLButtonElement>(null);
   const ingredientsTab = useRef<HTMLButtonElement>(null);
 
   function handleTabKey(event: KeyboardEvent<HTMLButtonElement>, nextMode: MealMode) {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
     setMode(nextMode);
-    (nextMode === "manual" ? manualTab : ingredientsTab).current?.focus();
+    (nextMode === "manual" ? manualTab : nextMode === "text-ai" ? textAiTab : ingredientsTab).current?.focus();
   }
 
   return (
@@ -45,15 +47,15 @@ export function MacroMealRecorder({
       <div className="macros-modes" role="group" aria-label="Modos de registro">
         <button ref={manualTab} id="meal-mode-manual" className="macros-mode" type="button"
           aria-pressed={mode === "manual"} aria-controls="meal-panel-manual"
-          onClick={() => setMode("manual")} onKeyDown={(event) => handleTabKey(event, "ingredients")}>
+          onClick={() => setMode("manual")} onKeyDown={(event) => handleTabKey(event, "text-ai")}>
           Manual
         </button>
-        <button className="macros-mode" type="button" disabled aria-disabled="true">Texto IA <small>Próximamente</small></button>
+        <button ref={textAiTab} id="meal-mode-text-ai" className="macros-mode" type="button" aria-pressed={mode === "text-ai"} aria-controls="meal-panel-text-ai" onClick={() => setMode("text-ai")} onKeyDown={(event) => handleTabKey(event, "ingredients")}>Texto IA</button>
         <button className="macros-mode" type="button" disabled aria-disabled="true">Foto <small>Próximamente</small></button>
         <button ref={ingredientsTab} id="meal-mode-ingredients" className="macros-mode" type="button"
           disabled={inventoryUnavailable} aria-disabled={inventoryUnavailable}
           aria-pressed={mode === "ingredients"} aria-controls="meal-panel-ingredients"
-          onClick={() => setMode("ingredients")} onKeyDown={(event) => handleTabKey(event, "manual")}>
+          onClick={() => setMode("ingredients")} onKeyDown={(event) => handleTabKey(event, "text-ai")}>
           Ingredientes
         </button>
       </div>
@@ -76,6 +78,8 @@ export function MacroMealRecorder({
           <button className="button macros-submit" type="submit">Registrar comida</button>
         </form>
       </div>
+
+      <div id="meal-panel-text-ai" className="macros-mode-panel" role="region" aria-labelledby="meal-mode-text-ai" hidden={mode !== "text-ai"}><TextAiMealEstimator /></div>
 
       <div id="meal-panel-ingredients" className="macros-mode-panel macros-mode-panel--ingredients" role="region" aria-labelledby="meal-mode-ingredients" hidden={mode !== "ingredients"}>
         {ingredientErrorMessage ? <p className="auth-message error" role="alert">{ingredientErrorMessage}</p> : null}
