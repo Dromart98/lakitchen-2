@@ -6,6 +6,35 @@ import {
 } from "@/modules/inventory/inventory-nutrition";
 import { isMealType, type MealType } from "@/modules/meals/meal-types";
 
+export type MealBuilderReturnPath = "/meal-builder" | "/macros";
+
+const MEAL_BUILDER_ERROR_MESSAGES: Record<string, string> = {
+  "invalid-name": "El nombre de la comida es obligatorio y no puede superar 120 caracteres.",
+  "invalid-meal-type": "Selecciona un tipo de comida válido.",
+  "invalid-lines-json": "No se pudo leer la selección de productos. Revisa la comida e inténtalo de nuevo.",
+  "invalid-lines": "Añade al menos un producto válido a la comida.",
+  "too-many-products": "La comida no puede contener más de diez productos.",
+  "duplicate-product": "No puedes registrar el mismo producto más de una vez en la misma comida.",
+  "product-not-found": "Uno de los productos ya no está disponible en tu inventario.",
+  "invalid-quantity": "Revisa las cantidades de los productos.",
+  "quantity-too-high": "Una cantidad supera el stock disponible actual.",
+  "incomplete-nutrition": "Uno de los productos no tiene nutrición completa.",
+  "incompatible-unit": "Uno de los productos tiene una unidad incompatible con su base nutricional.",
+  "consume-failed": "No se pudo registrar la comida. Inténtalo de nuevo.",
+};
+
+export function resolveMealBuilderReturnPath(value: unknown): MealBuilderReturnPath {
+  return value === "/macros" ? "/macros" : "/meal-builder";
+}
+
+export function getMealBuilderMessage(code: string | undefined, success: boolean): string | null {
+  if (success) return code === "meal-consumed-logged"
+    ? "Comida registrada y productos descontados correctamente."
+    : null;
+
+  return code ? MEAL_BUILDER_ERROR_MESSAGES[code] ?? null : null;
+}
+
 export type MealBuilderInventoryItem = {
   id: string;
   name: string;

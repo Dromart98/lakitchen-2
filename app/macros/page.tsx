@@ -1,11 +1,11 @@
 import Link from "next/link";
 
 import { AppShell } from "@/components/layout/AppShell";
-import { addMealLogAction } from "@/app/dashboard/actions";
+import { MacroMealRecorder } from "@/components/macros/MacroMealRecorder";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { remainingMacros, sumMacros } from "@/modules/meals/meal-summary";
-import { MEAL_TYPE_LABELS, MEAL_TYPES } from "@/modules/meals/meal-types";
+import { getMealBuilderMessage, type MealBuilderInventoryItem } from "@/modules/meals/meal-builder";
 import type { MacroTotals } from "@/modules/nutrition/nutrition.types";
 
 export const dynamic = "force-dynamic";
@@ -62,22 +62,28 @@ function MacroRow({ label, consumed, goal, remaining, unit }: { label: string; c
   );
 }
 
-export default async function MacrosPage({ searchParams }: { searchParams?: Promise<{ mealError?: string; mealSuccess?: string }> }) {
+export default async function MacrosPage({ searchParams }: { searchParams?: Promise<{ mealError?: string; mealSuccess?: string; mealMode?: string }> }) {
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "macros page");
   const today = new Date().toISOString().slice(0, 10);
 
-  const [{ data: profile, error: profileError }, { data: meals, error: mealsError }] = await Promise.all([
+  const [{ data: profile, error: profileError }, { data: meals, error: mealsError }, { data: inventoryItems, error: inventoryError }] = await Promise.all([
     (supabase as any).from("user_nutrition_profiles")
       .select("target_calories, target_protein_g, target_carbs_g, target_fat_g")
       .eq("user_id", user.id).maybeSingle() as Promise<{ data: ProfileRow | null; error: { message: string } | null }>,
     (supabase as any).from("daily_meal_logs")
       .select("calories, protein_g, carbs_g, fat_g")
       .eq("user_id", user.id).eq("consumed_on", today) as Promise<{ data: MealRow[] | null; error: { message: string } | null }>,
+    (supabase as any).from("inventory_items")
+      .select("id, name, quantity, unit, nutrition_basis, calories, protein_g, carbs_g, fat_g")
+      .eq("user_id", user.id)
+      .gt("quantity", 0)
+      .order("name", { ascending: true }) as Promise<{ data: MealBuilderInventoryItem[] | null; error: { message: string } | null }>,
   ]);
 
   if (profileError) console.warn("Supabase could not load the macros nutrition profile:", profileError.message);
   if (mealsError) console.warn("Supabase could not load today's macros meal logs:", mealsError.message);
+  if (inventoryError) console.warn("Supabase could not load the macros inventory items:", inventoryError.message);
 
   const goal = profileError ? null : getGoal(profile);
   const consumed = sumMacros((mealsError ? [] : meals ?? []).map((meal) => ({
@@ -85,8 +91,11 @@ export default async function MacrosPage({ searchParams }: { searchParams?: Prom
   })));
   const remaining = goal ? remainingMacros(goal, consumed) : null;
   const params = await searchParams;
-  const errorMessage = getMessage(params?.mealError, false);
-  const successMessage = getMessage(params?.mealSuccess, true);
+  const ingredientsMode = params?.mealMode === "ingredients";
+  const manualErrorMessage = ingredientsMode ? null : getMessage(params?.mealError, false);
+  const manualSuccessMessage = ingredientsMode ? null : getMessage(params?.mealSuccess, true);
+  const ingredientErrorMessage = ingredientsMode ? getMealBuilderMessage(params?.mealError, false) : null;
+  const ingredientSuccessMessage = ingredientsMode ? getMealBuilderMessage(params?.mealSuccess, true) : null;
 
   return (
     <AppShell>
@@ -122,28 +131,15 @@ export default async function MacrosPage({ searchParams }: { searchParams?: Prom
         )}
 
         <div className="macros-lower-grid">
-          <section className="card macros-add" aria-labelledby="macros-add-title">
-            <h2 id="macros-add-title">Añadir comida</h2>
-            <div className="macros-modes" aria-label="Modos de registro">
-              <span className="macros-mode macros-mode--active">Manual</span>
-              <button className="macros-mode" type="button" disabled>Texto IA <small>Próximamente</small></button>
-              <button className="macros-mode" type="button" disabled>Foto <small>Próximamente</small></button>
-              <Link className="macros-mode" href="/meal-builder">Ingredientes</Link>
-            </div>
-            <p className="muted macros-ingredients-copy">Elige productos de tu inventario y calcula la comida antes de registrarla.</p>
-            {errorMessage ? <p className="auth-message error" role="alert">{errorMessage}</p> : null}
-            {successMessage ? <p className="auth-message success" role="status">{successMessage}</p> : null}
-            <form action={addMealLogAction} className="meal-log-form macros-meal-form">
-              <input type="hidden" name="return_to" value="/macros" />
-              <label className="field" htmlFor="macros-meal-name"><span>Nombre</span><input id="macros-meal-name" name="name" type="text" required placeholder="Pollo con arroz" /></label>
-              <label className="field" htmlFor="macros-meal-type"><span>Tipo de comida</span><select id="macros-meal-type" name="meal_type" required defaultValue=""><option value="" disabled>Selecciona un tipo</option>{MEAL_TYPES.map((type) => <option key={type} value={type}>{MEAL_TYPE_LABELS[type]}</option>)}</select></label>
-              <label className="field" htmlFor="macros-calories"><span>Calorías</span><input id="macros-calories" name="calories" type="number" min="0" step="0.1" inputMode="decimal" required defaultValue="0" /></label>
-              <label className="field" htmlFor="macros-protein"><span>Proteína (g)</span><input id="macros-protein" name="protein_g" type="number" min="0" step="0.1" inputMode="decimal" required defaultValue="0" /></label>
-              <label className="field" htmlFor="macros-carbs"><span>Carbohidratos (g)</span><input id="macros-carbs" name="carbs_g" type="number" min="0" step="0.1" inputMode="decimal" required defaultValue="0" /></label>
-              <label className="field" htmlFor="macros-fat"><span>Grasas (g)</span><input id="macros-fat" name="fat_g" type="number" min="0" step="0.1" inputMode="decimal" required defaultValue="0" /></label>
-              <button className="button macros-submit" type="submit">Registrar comida</button>
-            </form>
-          </section>
+          <MacroMealRecorder
+            items={inventoryError ? [] : inventoryItems ?? []}
+            initialMode={ingredientsMode ? "ingredients" : "manual"}
+            inventoryUnavailable={Boolean(inventoryError)}
+            manualErrorMessage={manualErrorMessage}
+            manualSuccessMessage={manualSuccessMessage}
+            ingredientErrorMessage={ingredientErrorMessage}
+            ingredientSuccessMessage={ingredientSuccessMessage}
+          />
 
           <section className="card macros-goals" aria-labelledby="macros-goals-title">
             <h2 id="macros-goals-title">Objetivos diarios</h2>

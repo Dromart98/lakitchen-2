@@ -11,6 +11,7 @@ import {
   formatMealBuilderNutritionValue,
   isMealBuilderInventoryItemEligible,
   type MealBuilderInventoryItem,
+  type MealBuilderReturnPath,
   type RepeatedMealBuilderDraftLine,
   type RepeatedMealBuilderUnavailableItem,
 } from "@/modules/meals/meal-builder";
@@ -35,6 +36,8 @@ type InventoryMealBuilderProps = {
   initialMealType?: MealType | "";
   initialRows?: RepeatedMealBuilderDraftLine[];
   unavailableItems?: RepeatedMealBuilderUnavailableItem[];
+  returnPath?: MealBuilderReturnPath;
+  presentation?: "page" | "embedded";
 };
 
 function createRow(index: number): BuilderRow {
@@ -106,6 +109,8 @@ export function InventoryMealBuilder({
   initialMealType = "",
   initialRows,
   unavailableItems = [],
+  returnPath = "/meal-builder",
+  presentation = "page",
 }: InventoryMealBuilderProps) {
   const eligibleItems = useMemo(() => items.filter(isMealBuilderInventoryItemEligible), [items]);
   const [rows, setRows] = useState<BuilderRow[]>(() => createInitialRows(initialRows));
@@ -163,10 +168,10 @@ export function InventoryMealBuilder({
     return (
       <>
         <UnavailableItemsCard items={unavailableItems} />
-        <section className="meal-builder-empty">
+        <section className={`meal-builder-empty meal-builder-empty--${presentation}`}>
           <p className="meal-builder-step">Inventario no disponible</p>
-          <h2>Aún no hay productos listos para usar</h2>
-          <p>Para construir una comida, tus productos necesitan calorías, proteínas, carbohidratos, grasas y una base nutricional compatibles.</p>
+          <h2>{presentation === "embedded" ? "Aún no hay productos listos para calcular" : "Aún no hay productos listos para usar"}</h2>
+          <p>Para calcular una comida, los productos necesitan nutrición completa, base nutricional, unidad compatible y cantidad positiva.</p>
           <Link href="/inventory">Revisar el inventario</Link>
         </section>
       </>
@@ -177,7 +182,7 @@ export function InventoryMealBuilder({
     <>
       <UnavailableItemsCard items={unavailableItems} />
 
-      <div className="meal-builder-workspace">
+      <div className={`meal-builder-workspace meal-builder-workspace--${presentation}`}>
       <section className="meal-builder-products" aria-labelledby="meal-builder-products-title">
         <div className="meal-builder-section-heading">
           <div>
@@ -315,13 +320,14 @@ export function InventoryMealBuilder({
           </label>
 
           <input name="lines" type="hidden" value={JSON.stringify(consumptionPayload ?? [])} />
+          <input name="return_to" type="hidden" value={returnPath} />
 
           <p className="meal-builder-registration__note">
-            Al confirmar, se descontarán todos estos productos del inventario y se registrará una única comida.
+            Al confirmar, las cantidades seleccionadas se descontarán del inventario y se registrará una única comida.
           </p>
 
           <button className="button meal-builder-submit" disabled={!canSubmitMeal} type="submit">
-            Registrar comida
+            {presentation === "embedded" ? "Registrar comida y descontar inventario" : "Registrar comida"}
           </button>
         </form>
       </section>

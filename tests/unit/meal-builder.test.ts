@@ -7,10 +7,25 @@ import {
   createRepeatedMealBuilderDraft,
   formatMealBuilderNutritionValue,
   isMealBuilderInventoryItemEligible,
+  resolveMealBuilderReturnPath,
   type MealBuilderInventoryItem,
   type MealBuilderLine,
   type RepeatedMealBuilderSnapshot,
 } from "@/modules/meals/meal-builder";
+
+describe("meal builder return path", () => {
+  it.each([
+    [undefined, "/meal-builder"],
+    ["", "/meal-builder"],
+    ["/meal-builder", "/meal-builder"],
+    ["/macros", "/macros"],
+    ["https://example.com", "/meal-builder"],
+    ["//example.com", "/meal-builder"],
+    ["/inventory", "/meal-builder"],
+  ])("resolves %s to %s", (value, expected) => {
+    expect(resolveMealBuilderReturnPath(value)).toBe(expected);
+  });
+});
 
 const pasta: MealBuilderLine = {
   id: "pasta",
