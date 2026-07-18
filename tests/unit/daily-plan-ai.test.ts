@@ -5,6 +5,7 @@ import {
   buildDailyPlanInputText,
   buildDailyPlanTarget,
   buildUsableDailyPlanInventoryItems,
+  getDailyPlanInventoryReadiness,
   DAILY_PLAN_JSON_SCHEMA,
   dailyPlanPublicRequestSchema,
   enrichDailyPlanWithDeterministicNutrition,
@@ -98,6 +99,31 @@ describe("daily plan AI", () => {
     expect(result.map((item) => item.id)).not.toContain("bad");
     expect(result.map((item) => item.id)).not.toContain("missing");
     expect(source.at(-1)?.id).toBe("missing");
+  });
+
+  it("classifies inventory readiness with the generator's exact rules", () => {
+    const base = { quantity: 1, expires_at: null, category: null, calories: 1, protein_g: 1, carbs_g: 1, fat_g: 1 };
+    const items = [
+      { ...base, id: "g", name: "Gramos", unit: "g", nutrition_basis: "per_100g" },
+      { ...base, id: "ml", name: "Mililitros", unit: "ml", nutrition_basis: "per_100ml" },
+      { ...base, id: "unit", name: "Unidad", unit: "ud", nutrition_basis: "per_unit" },
+      { ...base, id: "incomplete", name: "Incompleto", unit: "g", nutrition_basis: "per_100g", fat_g: null },
+      { ...base, id: "basis", name: "Sin base", unit: "g", nutrition_basis: null },
+      { ...base, id: "unit-bad", name: "Unidad incompatible", unit: "ml", nutrition_basis: "per_100g" },
+      { ...base, id: "zero", name: "Agotado", quantity: 0, unit: "g", nutrition_basis: "per_100g" },
+      { ...base, id: "expired", name: "Caducado", expires_at: "2026-07-14", unit: "g", nutrition_basis: "per_100g" },
+    ];
+    const readiness = getDailyPlanInventoryReadiness(items, todayKey);
+    expect(readiness.usable.map(({ id }) => id)).toEqual(["g", "ml", "unit"]);
+    expect(Object.fromEntries(readiness.excluded.map(({ item, reason }) => [item.id, reason]))).toEqual({
+      incomplete: "incomplete-nutrition", basis: "missing-nutrition-basis", "unit-bad": "incompatible-unit", zero: "non-positive-quantity", expired: "expired",
+    });
+    expect(readiness).toMatchObject({ availableCount: 7, canGenerate: true, hasLimitedVariety: true });
+  });
+
+  it("summarizes two usable products and blocks fewer than two", () => {
+    expect(getDailyPlanInventoryReadiness(inventory.slice(0, 2), todayKey)).toMatchObject({ availableCount: 2, canGenerate: true, hasLimitedVariety: true });
+    expect(getDailyPlanInventoryReadiness(inventory.slice(0, 1), todayKey)).toMatchObject({ availableCount: 1, canGenerate: false, hasLimitedVariety: false });
   });
 
   it("validates four ordered meal types and accumulated daily stock", () => {

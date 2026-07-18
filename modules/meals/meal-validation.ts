@@ -13,7 +13,11 @@ export type MealValidationError =
   | "meal-name-required"
   | "meal-name-too-long"
   | "invalid-meal-type"
-  | "invalid-macros";
+  | "invalid-macros"
+  | "invalid-calories"
+  | "invalid-protein"
+  | "invalid-carbs"
+  | "invalid-fat";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_MEAL_NAME_LENGTH = 120;
@@ -55,11 +59,11 @@ export function validateMacro(value: unknown): { value: number } | { error: Meal
 
   const macro = Number(rawValue);
 
-  if (!Number.isFinite(macro) || !Number.isInteger(macro) || macro < 0) {
+  if (!Number.isFinite(macro) || macro < 0) {
     return { error: "invalid-macros" };
   }
 
-  return { value: macro };
+  return { value: Math.round((macro + Number.EPSILON) * 10) / 10 };
 }
 
 export function validateMealLogInput(formData: FormData): { value: MealLogInput } | { error: MealValidationError } {
@@ -70,16 +74,16 @@ export function validateMealLogInput(formData: FormData): { value: MealLogInput 
   if ("error" in mealType) return mealType;
 
   const calories = validateMacro(formData.get("calories"));
-  if ("error" in calories) return calories;
+  if ("error" in calories) return { error: "invalid-calories" };
 
   const proteinG = validateMacro(formData.get("protein_g"));
-  if ("error" in proteinG) return proteinG;
+  if ("error" in proteinG) return { error: "invalid-protein" };
 
   const carbsG = validateMacro(formData.get("carbs_g"));
-  if ("error" in carbsG) return carbsG;
+  if ("error" in carbsG) return { error: "invalid-carbs" };
 
   const fatG = validateMacro(formData.get("fat_g"));
-  if ("error" in fatG) return fatG;
+  if ("error" in fatG) return { error: "invalid-fat" };
 
   return {
     value: {

@@ -7,7 +7,7 @@ import { generateDailyPlanWithOpenAi } from "@/lib/openai/daily-plan-generation"
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
 import {
   buildDailyPlanTarget,
-  buildUsableDailyPlanInventoryItems,
+  getDailyPlanInventoryReadiness,
   dailyPlanPublicRequestSchema,
   enrichDailyPlanWithDeterministicNutrition,
   validateDailyPlanProviderOutput,
@@ -45,12 +45,11 @@ async function loadDailyPlanContext(supabase: any, userId: string) {
     .from("inventory_items")
     .select("id, name, quantity, unit, expires_at, category, nutrition_basis, calories, protein_g, carbs_g, fat_g")
     .eq("user_id", userId)
-    .gt("quantity", 0)
     .order("name", { ascending: true }) as { data: InventoryRow[] | null; error: { message: string } | null };
   if (inventoryError) return { status: "error" as const, code: "unexpected-error" as const };
 
   const todayKey = getCurrentInventoryExpirationDateKey();
-  const inventoryItems = buildUsableDailyPlanInventoryItems(inventoryData ?? [], todayKey);
+  const inventoryItems = getDailyPlanInventoryReadiness(inventoryData ?? [], todayKey).usable;
   if (inventoryItems.length < MIN_PLAN_INVENTORY_ITEMS) return { status: "error" as const, code: "insufficient-inventory" as const };
 
   return { status: "success" as const, target, inventoryItems, todayKey };
@@ -75,9 +74,18 @@ export async function generateDailyPlanAction(input: unknown): Promise<DailyPlan
       apiKey,
       model: process.env.OPENAI_DAILY_PLAN_MODEL,
     });
-    if (generated.status !== "success") return generated;
+    if (generated.status !== "success") {
+      if (context.inventoryItems.length <= 3 && (generated.status === "needs-clarification" || generated.code === "invalid-ai-response")) {
+        return { status: "needs-clarification", message: "No se pudo construir un día completo con los productos utilizables actuales. Completa la nutrición de más productos o añade variedad al inventario." };
+      }
+      return generated;
+    }
 
-    return enrichDailyPlanWithDeterministicNutrition(generated.meals, context.inventoryItems, context.target);
+    const enriched = enrichDailyPlanWithDeterministicNutrition(generated.meals, context.inventoryItems, context.target);
+    if (enriched.status === "error" && enriched.code === "nutrition-unavailable" && context.inventoryItems.length <= 3) {
+      return { status: "needs-clarification", message: "No se pudo construir un día completo con los productos utilizables actuales. Completa la nutrición de más productos o añade variedad al inventario." };
+    }
+    return enriched;
   } catch {
     return { status: "error", code: "unexpected-error" };
   }

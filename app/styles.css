@@ -2652,6 +2652,47 @@ h3 {
   }
 }
 
+.plan-readiness {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.plan-readiness dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.plan-readiness dl div,
+.plan-readiness__excluded li {
+  display: grid;
+  gap: 4px;
+}
+
+.plan-readiness dd {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.plan-readiness__excluded {
+  display: grid;
+  gap: 10px;
+  padding-left: 20px;
+}
+
+.plan-readiness__excluded span {
+  color: var(--muted);
+}
+
+.plan-readiness__warning {
+  padding: 12px 14px;
+  border-left: 4px solid var(--warning, #b7791f);
+  background: color-mix(in srgb, var(--warning, #b7791f) 10%, transparent);
+}
+
 /* Meal builder presentation */
 .meal-builder-page {
   display: grid;

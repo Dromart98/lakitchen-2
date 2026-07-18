@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { generateDailyPlanAction, saveDailyPlanAction } from "@/app/plan/actions";
-import type { DailyPlanActionResult, DailyPlanFit, DailyPlanNutrition, DailyPlanPriorityMode } from "@/modules/plans/daily-plan-ai";
+import type { DailyPlanActionResult, DailyPlanFit, DailyPlanInventoryExclusionReason, DailyPlanInventoryReadiness, DailyPlanNutrition, DailyPlanPriorityMode } from "@/modules/plans/daily-plan-ai";
 import { MEAL_TYPE_LABELS } from "@/modules/meals/meal-types";
 
 const errorMessages: Record<string, string> = {
@@ -44,7 +44,15 @@ function MacroLine({ label, value }: { label: string; value: DailyPlanNutrition 
   );
 }
 
-export function DailyPlanGenerator() {
+const exclusionMessages: Record<DailyPlanInventoryExclusionReason, { reason: string; action: string }> = {
+  "non-positive-quantity": { reason: "no tiene cantidad disponible", action: "Actualiza su cantidad para poder utilizarlo." },
+  expired: { reason: "está caducado", action: "Retíralo o actualiza su fecha de caducidad." },
+  "missing-nutrition-basis": { reason: "falta la base nutricional", action: "Completa su información nutricional." },
+  "incomplete-nutrition": { reason: "falta información nutricional", action: "Completa calorías, proteína, carbohidratos y grasas." },
+  "incompatible-unit": { reason: "la unidad no es compatible con su base nutricional", action: "Corrige la unidad o la base nutricional." },
+};
+
+export function DailyPlanGenerator({ readiness }: { readiness: DailyPlanInventoryReadiness }) {
   const router = useRouter();
   const [priorityMode, setPriorityMode] = useState<DailyPlanPriorityMode>("balanced");
   const [maxMinutes, setMaxMinutes] = useState<15 | 30 | 45 | 60>(30);
@@ -57,7 +65,7 @@ export function DailyPlanGenerator() {
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (isBusy) return;
+    if (isBusy || !readiness.canGenerate) return;
     const settings: GeneratedSettings = {
       priority_mode: priorityMode,
       max_minutes_per_meal: maxMinutes,
@@ -66,9 +74,14 @@ export function DailyPlanGenerator() {
     setGeneratedSettings(null);
     setSaveMessage(null);
     startTransition(async () => {
-      const nextResult = await generateDailyPlanAction(settings);
-      setResult(nextResult);
-      setGeneratedSettings(nextResult.status === "success" ? settings : null);
+      try {
+        const nextResult = await generateDailyPlanAction(settings);
+        setResult(nextResult);
+        setGeneratedSettings(nextResult.status === "success" ? settings : null);
+      } catch {
+        setResult({ status: "error", code: "unexpected-error" });
+        setGeneratedSettings(null);
+      }
     });
   }
 
@@ -96,6 +109,14 @@ export function DailyPlanGenerator() {
 
   return (
     <section className="plan-generator" aria-label="Generador de plan diario">
+      <aside className="plan-readiness" aria-labelledby="plan-readiness-title">
+        <h2 id="plan-readiness-title">Preparación del inventario</h2>
+        <dl><div><dt>Productos disponibles</dt><dd>{readiness.availableCount}</dd></div><div><dt>Productos utilizables</dt><dd>{readiness.usable.length}</dd></div><div><dt>Productos que necesitan revisión</dt><dd>{readiness.excluded.length}</dd></div></dl>
+        {readiness.excluded.length ? <ul className="plan-readiness__excluded">{readiness.excluded.map(({ item, reason }) => <li key={item.id}><strong>{item.name} — {exclusionMessages[reason].reason}</strong><span>{exclusionMessages[reason].action}</span></li>)}</ul> : null}
+        {!readiness.canGenerate ? <p className="auth-message error" role="alert">Necesitas al menos dos productos con cantidad positiva, nutrición completa, unidad compatible y sin caducar. No se llamará a la IA hasta entonces.</p> : null}
+        {readiness.hasLimitedVariety ? <p className="plan-readiness__warning">Tu inventario utilizable tiene poca variedad. Puedes intentar generar el plan, pero quizá no sea posible crear cuatro comidas equilibradas.</p> : null}
+        <a className="button" href="/inventory">Revisar productos del inventario</a>
+      </aside>
       <div className="plan-options" aria-labelledby="plan-options-title">
         <div className="plan-section-heading">
           <span className="plan-step">Paso 1</span>
@@ -121,7 +142,7 @@ export function DailyPlanGenerator() {
               <option value={60}>60 minutos</option>
             </select>
           </label>
-          <button className="button plan-options__submit" type="submit" disabled={isBusy}>{isPending ? "Generando tu plan…" : "Generar plan"}</button>
+          <button className="button plan-options__submit" type="submit" disabled={isBusy || !readiness.canGenerate}>{isPending ? "Generando tu plan…" : "Generar plan"}</button>
         </form>
       </div>
 
