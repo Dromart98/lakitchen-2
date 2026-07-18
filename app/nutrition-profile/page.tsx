@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { NutritionProfileForm, type NutritionProfileFormValues } from "@/components/nutrition-profile/NutritionProfileForm";
+import { AppShell } from "@/components/layout/AppShell";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -52,17 +52,16 @@ export default async function NutritionProfilePage() {
   }
 
   return (
-    <main className="shell">
-      <div className="topbar">
-        <div>
-          <p className="pill">Perfil nutricional</p>
-          <h1>Objetivos diarios</h1>
-        </div>
-        <Link className="logout-link" href="/dashboard">Volver al dashboard</Link>
+    <AppShell>
+      <div className="nutrition-profile-page">
+        <header className="nutrition-profile-header">
+          <p className="nutrition-profile-eyebrow">Perfil nutricional</p>
+          <h1>Define tus objetivos</h1>
+          <p>Utilizamos estos datos para calcular tus objetivos diarios y personalizar tu plan de comidas.</p>
+        </header>
+        {error ? <p className="nutrition-profile-errors auth-message error" role="alert">Supabase no pudo cargar el perfil: {error.message}</p> : null}
+        <NutritionProfileForm initialValues={getInitialValues(profile ?? null)} />
       </div>
-      <p className="muted">Guarda tus datos básicos para estimar calorías, proteína, carbohidratos y grasas. No se registra comida todavía.</p>
-      {error ? <p className="auth-message error" role="alert">Supabase no pudo cargar el perfil: {error.message}</p> : null}
-      <NutritionProfileForm initialValues={getInitialValues(profile ?? null)} />
-    </main>
+    </AppShell>
   );
 }
