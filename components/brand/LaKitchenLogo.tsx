@@ -1,4 +1,4 @@
-import { useId } from "react";
+import React from "react";
 
 type LaKitchenLogoVariant = "horizontal" | "mark";
 type LaKitchenLogoTheme = "light" | "dark" | "monochrome";
@@ -16,44 +16,54 @@ const THEME_CLASS: Record<LaKitchenLogoTheme, string> = {
   monochrome: "lakitchen-logo--monochrome",
 };
 
+function LogoMark() {
+  return (
+    <svg
+      className="lakitchen-logo__symbol"
+      viewBox="0 0 64 64"
+      aria-hidden="true"
+      focusable="false"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <g
+        className="lakitchen-logo__primary"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path strokeWidth="6" d="M22 14v40M22 32h5M27 32l23-20M27 32l23 21" />
+        <path strokeWidth="3.5" d="M16 10v9M22 10v9M28 10v9" />
+        <path
+          className="lakitchen-logo__leaf"
+          fill="currentColor"
+          stroke="none"
+          d="M37.5 21.8c4.8-5.7 10-5.7 13.6-4.1-.2 4.5-3.2 8.4-8.1 8.7-2.5.2-4.5-.8-5.5-2.1l7.1-4.1-7.1 1.6Z"
+        />
+      </g>
+      <circle className="lakitchen-logo__accent" cx="37" cy="41" r="2.6" />
+    </svg>
+  );
+}
+
 export function LaKitchenLogo({
   variant = "horizontal",
   theme = "light",
   className,
   title = "LaKitchen",
 }: LaKitchenLogoProps) {
-  const id = useId();
-  const labelledBy = `${id}-${variant}-${theme}-lakitchen-logo-title`;
   const classes = ["lakitchen-logo", `lakitchen-logo--${variant}`, THEME_CLASS[theme], className]
     .filter(Boolean)
     .join(" ");
 
   return (
-    <svg
-      className={classes}
-      viewBox={variant === "horizontal" ? "0 0 260 64" : "0 0 64 64"}
-      role="img"
-      aria-labelledby={labelledBy}
-      focusable="false"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <title id={labelledBy}>{title}</title>
-      <g className="lakitchen-logo__mark">
-        <path
-          className="lakitchen-logo__primary"
-          d="M18 12a4 4 0 0 1 8 0v6h2.4v-6a1.6 1.6 0 1 1 3.2 0v6H34v-6a4 4 0 0 1 8 0v15.1l7.9-8.3a4.4 4.4 0 0 1 6.3 6.1L42.1 39.3l14.4 15.2a4.4 4.4 0 1 1-6.4 6.1L36.1 45.8 26 56.1V58a4 4 0 0 1-8 0V12Zm8 22.1 8-8.1v-1.9H26v10Z"
-        />
-        <path
-          className="lakitchen-logo__primary"
-          d="M40.1 13.5c5.7-5.1 12.2-4.8 16.7-2.5.2 5-2.9 10.7-10.4 12.1-2.2.4-4.2 0-5.8-1.1 3.1-1.3 6-3.1 8.5-5.6-3.1 1.4-6 2-9 2.1-.9-1.6-.9-3.4 0-5Z"
-        />
-        {theme !== "monochrome" ? <circle className="lakitchen-logo__accent" cx="47" cy="45" r="3.2" /> : null}
-      </g>
+    <span className={classes} role="img" aria-label={title}>
+      <LogoMark />
       {variant === "horizontal" ? (
-        <text className="lakitchen-logo__wordmark" x="78" y="42">
+        <span className="lakitchen-logo__wordmark" aria-hidden="true">
           LaKitchen
-        </text>
+        </span>
       ) : null}
-    </svg>
+    </span>
   );
 }
