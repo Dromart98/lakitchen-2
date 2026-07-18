@@ -20,7 +20,7 @@ export function ExpiringList({ items, todayKey }: { items: InventoryItemRecord[]
           {items.map((item) => (
             <div key={item.id}>
               <span className="pill">{locationLabels[item.location]}</span>
-              <strong style={{ display: "block", marginTop: 8 }}>{item.name}</strong>
+              <strong className="expiring-list__item-name">{item.name}</strong>
               <span className="muted">
                 {item.quantity} {item.unit} · {formatInventoryExpirationLabel(item.expires_at, todayKey)}
               </span>
