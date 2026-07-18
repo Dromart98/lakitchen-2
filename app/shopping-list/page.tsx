@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { AppShell } from "@/components/layout/AppShell";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -54,31 +53,46 @@ const shoppingListSuccessMessages: Record<string, string> = {
 };
 
 function ShoppingListGroup({ items, title }: { items: ShoppingListItemRow[]; title: string }) {
+  const headingId = `shopping-list-group-${title.toLocaleLowerCase("es-ES")}`;
+
   return (
-    <div className="card">
-      <h2>{title}</h2>
+    <section className="shopping-list-group" aria-labelledby={headingId}>
+      <div className="shopping-list-group__heading">
+        <h2 id={headingId}>{title}</h2>
+        <span>{items.length} productos</span>
+      </div>
       {items.length ? (
-        <ul>
+        <ul className="shopping-list-items">
           {items.map((item) => (
-            <li key={item.id}>
-              <strong>{item.name}</strong>
-              <br />
-              {item.quantity} {item.unit}
-              <form action={setShoppingListItemPurchasedAction} className="meal-log-form">
-                <input name="id" type="hidden" value={item.id} />
-                <input name="is_purchased" type="hidden" value={item.is_purchased ? "false" : "true"} />
-                <button className="button" type="submit">
-                  {item.is_purchased ? "Volver a pendientes" : "Marcar como comprado"}
-                </button>
-              </form>
-              <form action={deleteShoppingListItemAction} className="meal-log-form">
-                <input name="id" type="hidden" value={item.id} />
-                <button className="button" type="submit">Eliminar</button>
-              </form>
+            <li className={`shopping-list-item${item.is_purchased ? " shopping-list-item--purchased" : ""}`} key={item.id}>
+              <div className="shopping-list-item__heading">
+                <div>
+                  <h3>{item.name}</h3>
+                  <p className="shopping-list-item__quantity">{item.quantity} {item.unit}</p>
+                </div>
+                <span className="shopping-list-item__status">
+                  {item.is_purchased ? "Comprado" : "Pendiente"}
+                </span>
+              </div>
+
+              <div className="shopping-list-item__actions">
+                <form action={setShoppingListItemPurchasedAction}>
+                  <input name="id" type="hidden" value={item.id} />
+                  <input name="is_purchased" type="hidden" value={item.is_purchased ? "false" : "true"} />
+                  <button className={item.is_purchased ? "shopping-list-item__secondary" : "button"} type="submit">
+                    {item.is_purchased ? "Volver a pendientes" : "Marcar como comprado"}
+                  </button>
+                </form>
+                <form action={deleteShoppingListItemAction} className="shopping-list-item__delete">
+                  <input name="id" type="hidden" value={item.id} />
+                  <button type="submit">Eliminar</button>
+                </form>
+              </div>
+
               {item.is_purchased ? (
-                <details>
+                <details className="shopping-list-item__details shopping-list-item__details--transfer">
                   <summary>Pasar al inventario</summary>
-                  <form action={transferShoppingListItemToInventoryAction} className="meal-log-form">
+                  <form action={transferShoppingListItemToInventoryAction} className="shopping-list-item__transfer-form">
                     <input name="id" type="hidden" value={item.id} />
                     <label className="field" htmlFor={`shopping-list-transfer-location-${item.id}`}>
                       <span>Ubicación</span>
@@ -92,37 +106,23 @@ function ShoppingListGroup({ items, title }: { items: ShoppingListItemRow[]; tit
                       <span>Fecha de caducidad opcional</span>
                       <input id={`shopping-list-transfer-expires-at-${item.id}`} name="expires_at" type="date" />
                     </label>
-                    <p className="muted">Lakitchenapp intentará completar los macros automáticamente. Si no puede, el producto se añadirá igualmente.</p>
+                    <p>Lakitchenapp intentará completar los macros automáticamente. Si no puede, el producto se añadirá igualmente.</p>
                     <button className="button" type="submit">Añadir al inventario y calcular macros</button>
                   </form>
                 </details>
               ) : null}
-              <details>
+
+              <details className="shopping-list-item__details">
                 <summary>Editar</summary>
-                <form action={updateShoppingListItemAction} className="meal-log-form">
+                <form action={updateShoppingListItemAction} className="shopping-list-item__edit-form">
                   <input name="id" type="hidden" value={item.id} />
-                  <label className="field" htmlFor={`shopping-list-name-${item.id}`}>
+                  <label className="field shopping-list-item__edit-name" htmlFor={`shopping-list-name-${item.id}`}>
                     <span>Nombre</span>
-                    <input
-                      id={`shopping-list-name-${item.id}`}
-                      name="name"
-                      type="text"
-                      maxLength={120}
-                      required
-                      defaultValue={item.name}
-                    />
+                    <input id={`shopping-list-name-${item.id}`} name="name" type="text" maxLength={120} required defaultValue={item.name} />
                   </label>
                   <label className="field" htmlFor={`shopping-list-quantity-${item.id}`}>
                     <span>Cantidad</span>
-                    <input
-                      id={`shopping-list-quantity-${item.id}`}
-                      name="quantity"
-                      type="number"
-                      min="0.000001"
-                      step="any"
-                      required
-                      defaultValue={item.quantity}
-                    />
+                    <input id={`shopping-list-quantity-${item.id}`} name="quantity" type="number" min="0.000001" step="any" required defaultValue={item.quantity} />
                   </label>
                   <label className="field" htmlFor={`shopping-list-unit-${item.id}`}>
                     <span>Unidad</span>
@@ -141,9 +141,9 @@ function ShoppingListGroup({ items, title }: { items: ShoppingListItemRow[]; tit
           ))}
         </ul>
       ) : (
-        <p className="muted">No hay productos en esta sección.</p>
+        <p className="shopping-list-group__empty">No hay productos en esta sección.</p>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -182,61 +182,75 @@ export default async function ShoppingListPage({
     : null;
 
   return (
-    <main className="shell">
-      <div className="topbar">
-        <div>
-          <span className="pill">Lista de la compra</span>
-          <h1>Mis productos por comprar</h1>
+    <AppShell>
+      <div className="shopping-list-page">
+        <header className="shopping-list-header">
+          <span className="shopping-list-eyebrow">Lista de la compra</span>
+          <h1>Compra solo lo que necesitas</h1>
+          <p>Organiza lo que tienes pendiente, marca lo que ya has comprado y pásalo directamente al inventario.</p>
+        </header>
+
+        <div className="shopping-list-messages">
+          {shoppingListErrorMessage ? <p className="shopping-list-message shopping-list-message--error" role="alert">{shoppingListErrorMessage}</p> : null}
+          {shoppingListSuccessMessage ? <p className="shopping-list-message shopping-list-message--success" role="status">{shoppingListSuccessMessage}</p> : null}
         </div>
-        <Link className="logout-link" href="/dashboard">
-          Volver al dashboard
-        </Link>
+
+        {!error ? (
+          <section className="shopping-list-summary" aria-label="Resumen de la lista">
+            <div className="shopping-list-summary__item"><span>Total</span><strong>{items.length}</strong></div>
+            <div className="shopping-list-summary__item"><span>Pendientes</span><strong>{pendingItems.length}</strong></div>
+            <div className="shopping-list-summary__item"><span>Comprados</span><strong>{purchasedItems.length}</strong></div>
+          </section>
+        ) : null}
+
+        <section className="shopping-list-add" aria-labelledby="shopping-list-add-heading">
+          <div className="shopping-list-add__heading">
+            <span className="shopping-list-eyebrow">Nuevo producto</span>
+            <h2 id="shopping-list-add-heading">Añade algo a tu lista</h2>
+            <p>Añade los productos que necesitas comprar.</p>
+          </div>
+          <form action={addShoppingListItemAction} className="shopping-list-add__form">
+            <label className="field shopping-list-add__name" htmlFor="shopping-list-name">
+              <span>Nombre</span>
+              <input id="shopping-list-name" name="name" type="text" maxLength={120} required placeholder="Huevos" />
+            </label>
+            <label className="field" htmlFor="shopping-list-quantity">
+              <span>Cantidad</span>
+              <input id="shopping-list-quantity" name="quantity" type="number" min="0.000001" step="any" required defaultValue="1" />
+            </label>
+            <label className="field" htmlFor="shopping-list-unit">
+              <span>Unidad</span>
+              <select id="shopping-list-unit" name="unit" required defaultValue="ud">
+                <option value="ud">ud</option>
+                <option value="g">g</option>
+                <option value="kg">kg</option>
+                <option value="ml">ml</option>
+                <option value="l">l</option>
+              </select>
+            </label>
+            <button className="button" type="submit">Añadir a la lista</button>
+          </form>
+        </section>
+
+        {error ? (
+          <section className="shopping-list-load-error" role="alert" aria-labelledby="shopping-list-load-error-heading">
+            <span className="shopping-list-eyebrow">Error de carga</span>
+            <h2 id="shopping-list-load-error-heading">No se pudo cargar la lista de la compra</h2>
+            <p>No se pudo cargar la lista de la compra. Inténtalo de nuevo.</p>
+          </section>
+        ) : items.length === 0 ? (
+          <section className="shopping-list-empty" aria-labelledby="shopping-list-empty-heading">
+            <span className="shopping-list-eyebrow">Lista vacía</span>
+            <h2 id="shopping-list-empty-heading">Tu lista de la compra está vacía</h2>
+            <p>Añade tu primer producto para empezar.</p>
+          </section>
+        ) : (
+          <div className="shopping-list-groups">
+            <ShoppingListGroup items={pendingItems} title="Pendientes" />
+            <ShoppingListGroup items={purchasedItems} title="Comprados" />
+          </div>
+        )}
       </div>
-
-      <section className="card form-section">
-        <h2>Añadir producto</h2>
-        <p className="muted">Añade los productos que necesitas comprar.</p>
-        {shoppingListErrorMessage ? <p className="auth-message error" role="alert">{shoppingListErrorMessage}</p> : null}
-        {shoppingListSuccessMessage ? <p className="auth-message success" role="status">{shoppingListSuccessMessage}</p> : null}
-        <form action={addShoppingListItemAction} className="meal-log-form">
-          <label className="field" htmlFor="shopping-list-name">
-            <span>Nombre</span>
-            <input id="shopping-list-name" name="name" type="text" maxLength={120} required placeholder="Huevos" />
-          </label>
-          <label className="field" htmlFor="shopping-list-quantity">
-            <span>Cantidad</span>
-            <input id="shopping-list-quantity" name="quantity" type="number" min="0.000001" step="any" required defaultValue="1" />
-          </label>
-          <label className="field" htmlFor="shopping-list-unit">
-            <span>Unidad</span>
-            <select id="shopping-list-unit" name="unit" required defaultValue="ud">
-              <option value="ud">ud</option>
-              <option value="g">g</option>
-              <option value="kg">kg</option>
-              <option value="ml">ml</option>
-              <option value="l">l</option>
-            </select>
-          </label>
-          <button className="button" type="submit">Añadir a la lista</button>
-        </form>
-      </section>
-
-      {error ? (
-        <section className="card" role="alert">
-          <h2>No se pudo cargar la lista de la compra</h2>
-          <p className="muted">No se pudo cargar la lista de la compra. Inténtalo de nuevo.</p>
-        </section>
-      ) : items.length === 0 ? (
-        <section className="card">
-          <h2>Tu lista de la compra está vacía</h2>
-          <p className="muted">Añade tu primer producto para empezar.</p>
-        </section>
-      ) : (
-        <section className="grid cards">
-          <ShoppingListGroup items={pendingItems} title="Pendientes" />
-          <ShoppingListGroup items={purchasedItems} title="Comprados" />
-        </section>
-      )}
-    </main>
+    </AppShell>
   );
 }
