@@ -3,6 +3,7 @@ import Link from "next/link";
 import { cookRecipeAndLogMealAction } from "@/app/recipes/actions";
 import { RecipeAiGenerator } from "@/components/recipes/RecipeAiGenerator";
 import { SavedAiRecipes } from "@/components/recipes/SavedAiRecipes";
+import { AppShell } from "@/components/layout/AppShell";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
@@ -152,59 +153,75 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
   const matches = filterRecipeMatchesWithServingOptions(recipeMatchesWithServingOptions, mode);
 
   return (
-    <main className="container">
-      <section className="card">
-        <p><Link href="/dashboard">← Volver al dashboard</Link></p>
-        <h1>Recetas con tu inventario</h1>
-        <p className="muted">Encuentra recetas según lo que tienes disponible, el tiempo que quieres cocinar y los productos que conviene usar pronto.</p>
-        <p><Link className="button nav-button" href="/inventory">Gestionar inventario</Link></p>
-        {recipeSuccessMessage ? <p role="status">{recipeSuccessMessage}</p> : null}
-        {recipeErrorMessage ? <p role="alert">{recipeErrorMessage}</p> : null}
-        <nav className="nav-list" aria-label="Filtros de recetas">
-          {filterLinks.map((filter) => (
-            <Link key={filter.mode} className="button nav-button" aria-current={mode === filter.mode ? "page" : undefined} href={`/recipes?mode=${filter.mode}`}>
-              {filter.label}
-            </Link>
-          ))}
-        </nav>
-      </section>
+    <AppShell>
+      <div className="recipes-page">
+        <header className="recipes-header">
+          <div className="recipes-header__copy">
+            <p className="recipes-eyebrow">Recetas</p>
+            <h1>Cocina con lo que ya tienes</h1>
+            <p>LaKitchen combina tu inventario, el tiempo disponible y las caducidades para proponerte recetas que encajan con tu día.</p>
+          </div>
+          <div className="recipes-header__actions">
+            <Link className="button recipes-secondary-action" href="/inventory">Gestionar inventario</Link>
+          </div>
+        </header>
+        <div className="recipes-messages">
+          {recipeSuccessMessage ? <p className="recipes-message recipes-message--success" role="status">{recipeSuccessMessage}</p> : null}
+          {recipeErrorMessage ? <p className="recipes-message recipes-message--error" role="alert">{recipeErrorMessage}</p> : null}
+        </div>
 
-      <RecipeAiGenerator />
+        <RecipeAiGenerator />
 
-      <SavedAiRecipes recipes={savedRecipes} />
+        <SavedAiRecipes recipes={savedRecipes} />
 
-      {inventoryItems.length === 0 ? (
-        <section className="card" style={{ marginTop: 16 }}>
-          <p className="muted">Añade productos al inventario para saber qué recetas puedes preparar.</p>
-        </section>
-      ) : null}
+        <section className="recipes-section recipes-catalog" aria-labelledby="recipes-catalog-title">
+          <div className="recipes-section__heading">
+            <div>
+              <p className="recipes-eyebrow">Catálogo</p>
+              <h2 id="recipes-catalog-title">Recetas con tu inventario</h2>
+              <p>Compara cada propuesta con tus existencias y elige la cantidad que quieres preparar.</p>
+            </div>
+            <nav className="recipes-filters" aria-label="Filtros de recetas">
+              {filterLinks.map((filter) => (
+                <Link key={filter.mode} className={`recipes-filter${mode === filter.mode ? " recipes-filter--active" : ""}`} aria-current={mode === filter.mode ? "page" : undefined} href={`/recipes?mode=${filter.mode}`}>
+                  {filter.label}{mode === filter.mode ? <span className="recipes-filter__state">Seleccionado</span> : null}
+                </Link>
+              ))}
+            </nav>
+          </div>
 
-      {recipes.length === 0 ? (
-        <section className="card" style={{ marginTop: 16 }}>
-          <p className="muted">No hay recetas disponibles en el catálogo.</p>
-        </section>
-      ) : null}
+          {inventoryItems.length === 0 ? (
+            <div className="recipes-empty"><p>Añade productos al inventario para saber qué recetas puedes preparar.</p></div>
+          ) : null}
 
-      <section className="grid cards" style={{ marginTop: 16 }}>
-        {matches.map(({ match, servingOptions, maxCookableServings, loggableServingOptions }) => {
+          {recipes.length === 0 ? (
+            <div className="recipes-empty"><p>No hay recetas disponibles en el catálogo.</p></div>
+          ) : null}
+
+          <div className="recipes-grid">
+          {matches.map(({ match, servingOptions, maxCookableServings, loggableServingOptions }) => {
           const hasCookableButUnloggableServings = servingOptions.some((option) => option.canCookNow && !option.canLog);
           const urgentItemCount = getMaxUrgentItemCountForCookableServings(servingOptions);
 
           return (
-          <article className="card" key={match.recipe.id}>
-            <h2>{match.recipe.title}</h2>
-            <p className="muted">{match.recipe.description}</p>
-            <p>{match.recipe.prep_minutes} minutos · {match.recipe.servings} ración{match.recipe.servings === 1 ? "" : "es"}</p>
-            <p><strong>{maxCookableServings > 0 ? "Puedes cocinarla ahora." : "Te faltan productos o cantidades."}</strong></p>
+          <article className="recipes-card" key={match.recipe.id}>
+            <header className="recipes-card__header">
+              <h3>{match.recipe.title}</h3>
+              <p>{match.recipe.description}</p>
+              <p className="recipes-card__meta">{match.recipe.prep_minutes} minutos · {match.recipe.servings} ración{match.recipe.servings === 1 ? "" : "es"}</p>
+            </header>
+            <div className="recipes-card__badges">
+              <p className={maxCookableServings > 0 ? "recipes-badge recipes-badge--available" : "recipes-badge"}><strong>{maxCookableServings > 0 ? "Puedes cocinarla ahora." : "Te faltan productos o cantidades."}</strong></p>
             {maxCookableServings > 0 ? (
-              <p>Puedes preparar hasta {maxCookableServings} de {match.recipe.servings} ración{match.recipe.servings === 1 ? "" : "es"}.</p>
+              <p className="recipes-badge">Puedes preparar hasta {maxCookableServings} de {match.recipe.servings} ración{match.recipe.servings === 1 ? "" : "es"}.</p>
             ) : null}
-            {urgentItemCount > 0 ? <p>Usa pronto {urgentItemCount} producto{urgentItemCount === 1 ? "" : "s"}.</p> : null}
-            {match.recipe.prep_minutes <= 15 ? <p>Lista en 15 minutos.</p> : null}
+            {urgentItemCount > 0 ? <p className="recipes-badge recipes-badge--urgent">Usa pronto {urgentItemCount} producto{urgentItemCount === 1 ? "" : "s"}.</p> : null}
+            {match.recipe.prep_minutes <= 15 ? <p className="recipes-badge">Lista en 15 minutos.</p> : null}
+            </div>
 
             {loggableServingOptions.length > 0 ? (
-              <section>
-                <h3>Nutrición estimada</h3>
+              <section className="recipes-card__nutrition">
+                <h4>Nutrición estimada</h4>
                 <ul>
                   {loggableServingOptions.map((option) => (
                     <li key={option.servings}>
@@ -212,7 +229,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
                     </li>
                   ))}
                 </ul>
-                <p className="muted">Estimación basada en los valores nutricionales guardados en tu inventario.</p>
+                <p>Estimación basada en los valores nutricionales guardados en tu inventario.</p>
               </section>
             ) : maxCookableServings > 0 ? (
               <p className="muted">Puedes preparar esta receta, pero faltan datos nutricionales en alguno de los productos necesarios para registrarla.</p>
@@ -223,7 +240,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
             ) : null}
 
             {loggableServingOptions.length > 0 ? (
-              <form action={cookRecipeAndLogMealAction}>
+              <form className="recipes-card__form" action={cookRecipeAndLogMealAction}>
                 <input type="hidden" name="recipe_id" value={match.recipe.id} />
                 <input type="hidden" name="mode" value={mode} />
                 <label htmlFor={`servings-${match.recipe.id}`}>Raciones a preparar</label>
@@ -243,16 +260,19 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
               </form>
             ) : null}
 
-            <h3>Ingredientes</h3>
-            <ul>
-              {match.ingredientMatches.map((ingredientMatch) => (
-                <li key={ingredientMatch.ingredient.id}>
-                  <strong>{ingredientMatch.ingredient.display_name}</strong>: {formatQuantity(ingredientMatch.ingredient.required_quantity)} {ingredientMatch.ingredient.required_unit} · {ingredientStatusMessages[ingredientMatch.status]}
-                </li>
-              ))}
-            </ul>
+            <details className="recipes-card__details">
+              <summary>Ingredientes</summary>
+              <ul className="recipes-card__ingredients">
+                {match.ingredientMatches.map((ingredientMatch) => (
+                  <li key={ingredientMatch.ingredient.id}>
+                    <strong>{ingredientMatch.ingredient.display_name}: {formatQuantity(ingredientMatch.ingredient.required_quantity)} {ingredientMatch.ingredient.required_unit}</strong>
+                    <span>{ingredientStatusMessages[ingredientMatch.status]}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
 
-            <details>
+            <details className="recipes-card__details">
               <summary>Instrucciones</summary>
               <ol>
                 {match.recipe.instructions.map((instruction) => <li key={instruction}>{instruction}</li>)}
@@ -261,7 +281,9 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
           </article>
           );
         })}
-      </section>
-    </main>
+          </div>
+        </section>
+      </div>
+    </AppShell>
   );
 }

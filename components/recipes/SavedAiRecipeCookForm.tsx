@@ -50,7 +50,7 @@ export function SavedAiRecipeCookForm({ recipeId }: { recipeId: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "grid", gap: 8, marginTop: 12 }}>
+    <form className="saved-recipe__cook-form" onSubmit={handleSubmit}>
       <label>
         Tipo de comida
         <select value={mealType} onChange={(event) => setMealType(event.target.value as MealType)} disabled={isPending}>
@@ -58,7 +58,7 @@ export function SavedAiRecipeCookForm({ recipeId }: { recipeId: string }) {
         </select>
       </label>
       <button type="submit" disabled={isPending}>{isPending ? "Cocinando…" : "Cocinar y registrar"}</button>
-      {message ? <p className={isSuccess ? "success" : "error"}>{message}</p> : null}
+      {message ? <p className={isSuccess ? "success" : "error"} role={isSuccess ? "status" : "alert"}>{message}</p> : null}
     </form>
   );
 }
