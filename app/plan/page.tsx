@@ -45,6 +45,13 @@ export default async function PlanPage() {
           <span className="plan-eyebrow">Dieta</span>
           <h1>Tu plan para hoy</h1>
           <p>LaKitchen prepara un día completo de comidas a partir de tus objetivos nutricionales y los productos disponibles en tu inventario.</p>
+          <div className="plan-builder-link">
+            <div>
+              <strong>Construye tu propia comida</strong>
+              <span>Elige ingredientes de tu inventario y comprueba los macros antes de registrarla.</span>
+            </div>
+            <Link className="button" href="/meal-builder">Abrir compositor</Link>
+          </div>
         </header>
 
         {(error || savedPlanError) ? (

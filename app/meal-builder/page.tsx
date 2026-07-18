@@ -127,7 +127,7 @@ export default async function MealBuilderPage({ searchParams }: MealBuilderPageP
       <div className="meal-builder-page">
         <header className="meal-builder-header">
           <div className="meal-builder-header__copy">
-            <p className="meal-builder-eyebrow">Macros</p>
+            <p className="meal-builder-eyebrow">Dieta</p>
             <h1>Construye tu comida</h1>
             <p>Elige tus alimentos y comprueba sus calorías y macros antes de registrarlos.</p>
           </div>

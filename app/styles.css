@@ -703,12 +703,24 @@ h3 {
 }
 
 .dashboard-remaining-card__value {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   margin: 0;
   color: var(--brand-dark);
-  font-size: clamp(2.4rem, 11vw, 4.5rem);
+  line-height: 1;
+}
+
+.dashboard-remaining-card__value strong {
+  font-size: clamp(2rem, 7vw, 3.2rem);
   font-weight: 900;
-  letter-spacing: -0.07em;
-  line-height: 0.95;
+  letter-spacing: -0.05em;
+}
+
+.dashboard-remaining-card__value span {
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0;
 }
 
 .dashboard-remaining-card__hint {
@@ -1193,6 +1205,17 @@ h3 {
   gap: 5px;
 }
 
+.inventory-product__main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.inventory-product__location {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .inventory-product__quantity {
   color: var(--text);
   font-size: 1.1rem;
@@ -1206,18 +1229,20 @@ h3 {
 }
 
 .inventory-product__expiration {
-  margin: 12px 0;
+  margin: 0;
   font-size: 0.9rem;
   font-weight: 700;
 }
 
 .inventory-nutrition,
-.inventory-action {
+.inventory-action,
+.inventory-manage {
   border-top: 1px solid var(--border);
 }
 
 .inventory-nutrition summary,
 .inventory-action summary,
+.inventory-manage > summary,
 .inventory-add > summary {
   min-height: 44px;
   padding: 12px 0;
@@ -1234,6 +1259,42 @@ h3 {
   display: grid;
   gap: 2px;
   margin-top: 8px;
+}
+
+.inventory-manage {
+  margin-top: 10px;
+}
+
+.inventory-manage > summary {
+  width: fit-content;
+  min-width: 112px;
+}
+
+.inventory-manage__panel {
+  min-width: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.inventory-manage__panel .inventory-nutrition {
+  border-top: 0;
+}
+
+.inventory-barcode-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.inventory-barcode-divider::before,
+.inventory-barcode-divider::after {
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+  content: "";
 }
 
 .inventory-action__panel {
@@ -1305,9 +1366,205 @@ h3 {
 .inventory-delete-button:focus-visible,
 .inventory-nutrition summary:focus-visible,
 .inventory-action summary:focus-visible,
+.inventory-manage > summary:focus-visible,
 .inventory-add > summary:focus-visible {
   outline: 3px solid var(--ring);
   outline-offset: 3px;
+}
+
+/* Macros */
+.macros-page {
+  display: grid;
+  gap: 20px;
+}
+
+.macros-header {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.macros-header h1 {
+  margin: 8px 0;
+}
+
+.macros-header p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.macros-eyebrow {
+  color: var(--brand-dark);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.macros-header__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.macros-header__links a {
+  min-height: 44px;
+  color: var(--brand-dark);
+  font-weight: 800;
+}
+
+.macros-progress {
+  display: grid;
+  gap: 18px;
+}
+
+.macros-progress__row {
+  display: grid;
+  gap: 8px;
+}
+
+.macros-progress__heading {
+  display: flex;
+  min-width: 0;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.macros-progress__heading span {
+  color: var(--muted);
+  text-align: right;
+}
+
+.macros-lower-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.macros-add,
+.macros-goals {
+  min-width: 0;
+}
+
+.macros-modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.macros-mode {
+  display: flex;
+  min-height: 44px;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-soft);
+  color: var(--brand-dark);
+  padding: 8px;
+  font: inherit;
+  font-weight: 800;
+  text-align: center;
+}
+
+.macros-mode--active {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.macros-mode:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.macros-mode small {
+  font-size: 0.65rem;
+}
+
+.macros-ingredients-copy {
+  font-size: 0.88rem;
+}
+
+.macros-meal-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.macros-meal-form .field:first-of-type,
+.macros-meal-form .field:nth-of-type(2),
+.macros-submit {
+  grid-column: 1 / -1;
+}
+
+.macros-goals dl {
+  display: grid;
+  gap: 0;
+  margin: 16px 0 22px;
+}
+
+.macros-goals dl div {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.macros-goals dt {
+  color: var(--muted);
+}
+
+.macros-goals dd {
+  margin: 0;
+  font-weight: 900;
+}
+
+.plan-builder-link {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  margin-top: 20px;
+  padding-top: 16px;
+}
+
+.plan-builder-link div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.plan-builder-link span {
+  color: var(--muted);
+}
+
+@media (min-width: 760px) {
+  .macros-header {
+    flex-direction: row;
+    align-items: end;
+    justify-content: space-between;
+  }
+
+  .macros-lower-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .macros-modes {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .plan-builder-link {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
 }
 
 @media (min-width: 700px) {

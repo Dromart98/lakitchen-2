@@ -159,7 +159,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
           <div className="card dashboard-remaining-card">
             <span className="pill">Queda para hoy</span>
             <h2 id="nutrition-summary-title">Energía disponible</h2>
-            <p className="dashboard-remaining-card__value">{remaining.calories} kcal</p>
+            <p className="dashboard-remaining-card__value"><strong>{remaining.calories}</strong><span>kcal</span></p>
             <p className="muted dashboard-remaining-card__hint">Calorías restantes según tu objetivo diario.</p>
             <div className="dashboard-macro-chips" aria-label="Macronutrientes restantes">
               <div className="dashboard-macro-chip">
