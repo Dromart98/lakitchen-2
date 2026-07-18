@@ -91,9 +91,10 @@ export default async function MacrosPage({ searchParams }: { searchParams?: Prom
   })));
   const remaining = goal ? remainingMacros(goal, consumed) : null;
   const params = await searchParams;
-  const ingredientsMode = params?.mealMode === "ingredients";
-  const manualErrorMessage = ingredientsMode ? null : getMessage(params?.mealError, false);
-  const manualSuccessMessage = ingredientsMode ? null : getMessage(params?.mealSuccess, true);
+  const initialMode = params?.mealMode === "ingredients" ? "ingredients" : params?.mealMode === "text-ai" ? "text-ai" : "manual";
+  const ingredientsMode = initialMode === "ingredients";
+  const manualErrorMessage = initialMode === "manual" ? getMessage(params?.mealError, false) : null;
+  const manualSuccessMessage = initialMode === "manual" ? getMessage(params?.mealSuccess, true) : null;
   const ingredientErrorMessage = ingredientsMode ? getMealBuilderMessage(params?.mealError, false) : null;
   const ingredientSuccessMessage = ingredientsMode ? getMealBuilderMessage(params?.mealSuccess, true) : null;
 
@@ -133,7 +134,7 @@ export default async function MacrosPage({ searchParams }: { searchParams?: Prom
         <div className="macros-lower-grid">
           <MacroMealRecorder
             items={inventoryError ? [] : inventoryItems ?? []}
-            initialMode={ingredientsMode ? "ingredients" : "manual"}
+            initialMode={initialMode}
             inventoryUnavailable={Boolean(inventoryError)}
             manualErrorMessage={manualErrorMessage}
             manualSuccessMessage={manualSuccessMessage}
