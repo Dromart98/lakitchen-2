@@ -270,7 +270,12 @@ export default async function InventoryPage({
               se quede atrás.
             </p>
           </div>
-          <InventoryAddCta fieldId={INVENTORY_ADD_FORM_FIELD_IDS.name} />
+          <div className="inventory-header__actions">
+            <Link className="inventory-shopping-link" href="/shopping-list">
+              Lista de la compra
+            </Link>
+            <InventoryAddCta fieldId={INVENTORY_ADD_FORM_FIELD_IDS.name} />
+          </div>
         </header>
 
         {inventoryErrorMessage ? (
@@ -477,13 +482,12 @@ export default async function InventoryPage({
                         return (
                           <li className="inventory-product" key={item.id}>
                             <div className="inventory-product__main">
-                              <div>
+                              <div className="inventory-product__identity">
                                 <strong>{item.name}</strong>
                                 <span className="inventory-product__quantity">
                                   {item.quantity} {item.unit}
                                 </span>
                               </div>
-                              <span className="inventory-product__location">{group.label}</span>
                               <span className="inventory-category">
                                 {getInventoryCategoryLabel(item.category)}
                               </span>

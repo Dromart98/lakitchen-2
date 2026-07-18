@@ -133,23 +133,25 @@ h3 {
 }
 
 .lakitchen-logo {
-  display: block;
+  display: inline-flex;
   flex: 0 0 auto;
-  overflow: visible;
+  align-items: center;
+  color: var(--brand-logo-light);
+  white-space: nowrap;
 }
 
 .lakitchen-logo--horizontal {
-  width: min(210px, 58vw);
-  height: auto;
+  gap: 9px;
 }
 
+.lakitchen-logo__symbol,
 .lakitchen-logo--mark {
   width: 40px;
   height: 40px;
 }
 
 .lakitchen-logo__primary {
-  fill: var(--brand-logo-light);
+  color: var(--brand-logo-light);
 }
 
 .lakitchen-logo__accent {
@@ -157,30 +159,27 @@ h3 {
 }
 
 .lakitchen-logo__wordmark {
-  fill: var(--brand-foreground);
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-  font-size: 31px;
+  color: var(--brand-foreground);
+  font-size: 1.45rem;
   font-weight: 800;
-  letter-spacing: -1.2px;
+  letter-spacing: -0.045em;
+  line-height: 1;
 }
 
 .lakitchen-logo--dark .lakitchen-logo__primary {
-  fill: var(--brand-logo-dark);
+  color: var(--brand-logo-dark);
 }
 
 .lakitchen-logo--dark .lakitchen-logo__wordmark {
-  fill: var(--brand-logo-dark);
+  color: var(--brand-foreground);
 }
 
 .lakitchen-logo--monochrome .lakitchen-logo__primary,
 .lakitchen-logo--monochrome .lakitchen-logo__wordmark {
+  color: currentColor;
+}
+
+.lakitchen-logo--monochrome .lakitchen-logo__accent {
   fill: currentColor;
 }
 
@@ -463,37 +462,40 @@ h3 {
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #10150e;
-  --bg-strong: #182112;
-  --card: #171d14;
-  --card-soft: #202819;
-  --text: #f7f5ef;
-  --muted: #bac5b0;
-  --brand: #8fbf4d;
-  --brand-dark: #a9d46b;
-  --brand-soft: #243519;
-  --brand-background: #10150e;
-  --brand-foreground: #f7f5ef;
-  --brand-logo-light: #f7f5ef;
-  --brand-logo-dark: #f7f5ef;
-  --border: #33402a;
-  --ring: #a9d46b;
-  --shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+  --bg: #0b1220;
+  --bg-strong: #111c2e;
+  --card: #121d2d;
+  --card-soft: #18263a;
+  --text: #f5f1e8;
+  --muted: #aeb8c7;
+  --brand: #9caf68;
+  --brand-dark: #c0cf8b;
+  --brand-soft: #253249;
+  --brand-primary: #9caf68;
+  --brand-primary-strong: #b9c984;
+  --brand-accent: #df845b;
+  --brand-background: #0b1220;
+  --brand-foreground: #f5f1e8;
+  --brand-logo-light: #9caf68;
+  --brand-logo-dark: #c0cf8b;
+  --border: #2d3c52;
+  --ring: #c0cf8b;
+  --shadow: 0 24px 60px rgba(2, 6, 23, 0.48);
 }
 
 [data-theme="dark"] body {
   background:
     radial-gradient(
       circle at 12% 8%,
-      rgba(143, 191, 77, 0.16),
+      rgba(156, 175, 104, 0.12),
       transparent 30%
     ),
     radial-gradient(
       circle at 92% 12%,
-      rgba(216, 120, 74, 0.14),
+      rgba(223, 132, 91, 0.1),
       transparent 28%
     ),
-    linear-gradient(135deg, #10150e 0%, #151c12 48%, #1f2118 100%);
+    linear-gradient(135deg, #0b1220 0%, #101a2a 50%, #151f30 100%);
 }
 
 [data-theme="dark"] .card,
@@ -984,6 +986,31 @@ h3 {
   min-width: 0;
 }
 
+.inventory-header__actions {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.inventory-shopping-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--brand-dark);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--brand-dark);
+  padding: 11px 18px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.inventory-shopping-link:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+
 .inventory-header h1 {
   max-width: 760px;
   margin: 12px 0;
@@ -1199,8 +1226,9 @@ h3 {
   padding: 14px;
 }
 
-.inventory-product__main > div {
+.inventory-product__identity {
   display: grid;
+  grid-area: identity;
   min-width: 0;
   gap: 5px;
 }
@@ -1208,12 +1236,11 @@ h3 {
 .inventory-product__main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-}
-
-.inventory-product__location {
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 700;
+  grid-template-areas:
+    "identity category"
+    "expiration expiration";
+  gap: 8px 12px;
+  align-items: start;
 }
 
 .inventory-product__quantity {
@@ -1223,12 +1250,16 @@ h3 {
 }
 
 .inventory-category {
-  max-width: 46%;
-  overflow-wrap: anywhere;
-  text-align: right;
+  grid-area: category;
+  justify-self: end;
+  max-width: none;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  text-align: center;
 }
 
 .inventory-product__expiration {
+  grid-area: expiration;
   margin: 0;
   font-size: 0.9rem;
   font-weight: 700;
@@ -1238,6 +1269,20 @@ h3 {
 .inventory-action,
 .inventory-manage {
   border-top: 1px solid var(--border);
+}
+
+@media (max-width: 420px) {
+  .inventory-product__main {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "identity"
+      "category"
+      "expiration";
+  }
+
+  .inventory-category {
+    justify-self: start;
+  }
 }
 
 .inventory-nutrition summary,
@@ -1604,6 +1649,10 @@ h3 {
   }
   .inventory-header {
     grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .inventory-header__actions {
+    grid-template-columns: auto auto;
+    align-items: center;
   }
   .inventory-summary {
     grid-template-columns: repeat(4, minmax(0, 1fr));
