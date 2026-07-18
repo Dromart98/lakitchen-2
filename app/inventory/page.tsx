@@ -483,18 +483,22 @@ export default async function InventoryPage({
                                   {item.quantity} {item.unit}
                                 </span>
                               </div>
+                              <span className="inventory-product__location">{group.label}</span>
                               <span className="inventory-category">
                                 {getInventoryCategoryLabel(item.category)}
                               </span>
+                              <p className="inventory-product__expiration">
+                                {formatInventoryExpirationLabel(
+                                  item.expires_at,
+                                  todayKey,
+                                )}
+                              </p>
                             </div>
-                            <p className="inventory-product__expiration">
-                              {formatInventoryExpirationLabel(
-                                item.expires_at,
-                                todayKey,
-                              )}
-                            </p>
-                            <details className="inventory-nutrition">
-                              <summary>Ver información nutricional</summary>
+                            <details className="inventory-manage">
+                              <summary>Gestionar</summary>
+                              <div className="inventory-manage__panel">
+                              <div className="inventory-nutrition">
+                                <strong>Información nutricional</strong>
                               {nutritionParts.length ? (
                                 <div>
                                   <strong>
@@ -507,7 +511,7 @@ export default async function InventoryPage({
                               ) : (
                                 <p>Nutrición pendiente</p>
                               )}
-                            </details>
+                              </div>
                             <div className="inventory-product__actions">
                               <details className="inventory-action">
                                 <summary>Descontar cantidad</summary>
@@ -771,6 +775,8 @@ export default async function InventoryPage({
                                 </button>
                               </form>
                             </div>
+                              </div>
+                            </details>
                           </li>
                         );
                       })}
@@ -807,9 +813,6 @@ export default async function InventoryPage({
               </Link>
             </div>
             <form action={addInventoryItemAction} className="meal-log-form">
-              <BarcodeCatalogControls
-                lookupAction={lookupBarcodeProductAction}
-              />
               <label
                 className="field"
                 htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.name}
@@ -998,6 +1001,12 @@ export default async function InventoryPage({
                   carbsG: INVENTORY_ADD_FORM_FIELD_IDS.carbsG,
                   fatG: INVENTORY_ADD_FORM_FIELD_IDS.fatG,
                 }}
+              />
+              <div className="inventory-barcode-divider">
+                <span>O utiliza un código de barras</span>
+              </div>
+              <BarcodeCatalogControls
+                lookupAction={lookupBarcodeProductAction}
               />
               <button className="button" type="submit">
                 Añadir producto

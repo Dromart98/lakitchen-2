@@ -8,6 +8,11 @@ import { createClient } from "@/lib/supabase/server";
 import { isMealLogId, validateMealLogInput } from "@/modules/meals/meal-validation";
 
 const DASHBOARD_PATH = "/dashboard";
+const MACROS_PATH = "/macros";
+
+function getMealReturnPath(formData: FormData) {
+  return formData.get("return_to") === MACROS_PATH ? MACROS_PATH : DASHBOARD_PATH;
+}
 
 function redirectMealValidationError(error: string, destination = DASHBOARD_PATH): never {
   redirect(`${destination}?mealError=${error}`);
@@ -15,10 +20,11 @@ function redirectMealValidationError(error: string, destination = DASHBOARD_PATH
 
 
 export async function addMealLogAction(formData: FormData) {
+  const destination = getMealReturnPath(formData);
   const mealInput = validateMealLogInput(formData);
 
   if ("error" in mealInput) {
-    redirectMealValidationError(mealInput.error);
+    redirectMealValidationError(mealInput.error, destination);
   }
 
   const { name, mealType, calories, proteinG, carbsG, fatG } = mealInput.value;
@@ -40,11 +46,12 @@ export async function addMealLogAction(formData: FormData) {
 
   if (error) {
     console.warn("Supabase could not save the dashboard meal log:", error.message);
-    redirect(`${DASHBOARD_PATH}?mealError=save-failed`);
+    redirect(`${destination}?mealError=save-failed`);
   }
 
   revalidatePath(DASHBOARD_PATH);
-  redirect(`${DASHBOARD_PATH}?mealSuccess=meal-created`);
+  revalidatePath(MACROS_PATH);
+  redirect(`${destination}?mealSuccess=meal-created`);
 }
 
 export async function updateMealLogAction(formData: FormData) {
