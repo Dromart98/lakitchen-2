@@ -1,0 +1,3 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+describe("voice shopping UI boundaries", () => { it("keeps browser speech and preview-only controls", () => { const source = readFileSync("components/shopping/VoiceShoppingBatchInput.tsx", "utf8"); expect(source).toContain("getSpeechRecognitionConstructor"); expect(source).toContain("mergeVoiceTranscript"); expect(source).toContain("getVoiceRecognitionErrorMessage"); expect(source).toContain('"es-ES"'); expect(source).not.toContain("createClient"); expect(readFileSync("components/shopping/VoiceShoppingBatchPreview.tsx", "utf8")).not.toContain("Guardar"); }); });

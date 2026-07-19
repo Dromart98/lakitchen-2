@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { estimateInventoryNutritionWithOpenAi } from "@/lib/openai/inventory-nutrition";
+import { generateVoiceShoppingBatch } from "@/lib/openai/voice-shopping-batch-generation";
+import { parseVoiceShoppingBatchInput, type VoiceShoppingBatchResult } from "@/modules/shopping/voice-shopping-batch";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -313,4 +315,16 @@ export async function deleteShoppingListItemAction(formData: FormData) {
 
   revalidatePath("/shopping-list");
   redirect("/shopping-list?shoppingListSuccess=item-deleted");
+}
+
+
+/** Estimates a local-only shopping-list draft; it deliberately performs no persistence. */
+export async function estimateVoiceShoppingBatchAction(text: string): Promise<VoiceShoppingBatchResult> {
+  const input = parseVoiceShoppingBatchInput(text);
+  if (!input) return { status: "error", code: "invalid-input", message: "Escribe una lista de entre 1 y 4.000 caracteres." };
+  const supabase = await createClient();
+  await requireAuthenticatedUser(supabase, "shopping list batch estimate");
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return { status: "error", code: "not-configured", message: "El análisis no está disponible ahora." };
+  return generateVoiceShoppingBatch(input, { apiKey, model: process.env.OPENAI_VOICE_SHOPPING_BATCH_MODEL || undefined });
 }

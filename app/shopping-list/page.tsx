@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { VoiceShoppingBatchInput } from "@/components/shopping/VoiceShoppingBatchInput";
 
 import {
   addShoppingListItemAction,
@@ -231,6 +232,8 @@ export default async function ShoppingListPage({
             <button className="button" type="submit">Añadir a la lista</button>
           </form>
         </section>
+
+        <VoiceShoppingBatchInput />
 
         {error ? (
           <section className="shopping-list-load-error" role="alert" aria-labelledby="shopping-list-load-error-heading">
