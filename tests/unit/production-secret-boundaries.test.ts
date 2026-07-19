@@ -65,6 +65,8 @@ describe("production secret boundary contracts", () => {
     expect(envExample).toContain("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=");
     expect(envExample).toContain("Server-only OpenAI configuration");
     expect(envExample).toContain("OPENAI_API_KEY=");
+    expect(envExample).toContain("OPENAI_VOICE_INVENTORY_BATCH_MODEL=");
+    expect(envExample).toContain("Optional private server-only model override");
     expect(envExample).not.toContain("NEXT_PUBLIC_OPENAI_API_KEY=");
   });
 
