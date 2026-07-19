@@ -19,7 +19,8 @@ No inventes ingredientes, suplementos ni productos externos. No cambies unidades
 Respeta el tiempo máximo por comida, crea comidas normales y coherentes, evita planes formados solo por productos aislados cuando sea posible y devuelve exactamente una comida de cada tipo en este orden: breakfast, lunch, snack, dinner.
 Intenta acercarte a los objetivos numéricos diarios y distribuir razonablemente calorías y proteína entre las cuatro comidas.
 No des consejos médicos ni presentes el plan como prescripción sanitaria. No afirmes que se guarda, consume inventario o registra comidas.
-Si priority_mode es expiration, usa expiration_context.today_key y expiration_context.urgent_inventory_item_ids como autoridad del servidor: prioriza productos que caducan hoy o en los próximos siete días, incluye al menos un ID urgente cuando exista alguno y prefiere caducidad más cercana.
+reference_date es la fecha para la que se prepara el plan. Un alimento caducado antes de reference_date no puede utilizarse.
+Si priority_mode es expiration, usa expiration_context.reference_date y expiration_context.urgent_inventory_item_ids como autoridad del servidor: prioriza productos que caducan hoy o en los próximos siete días, incluye al menos un ID urgente cuando exista alguno y prefiere caducidad más cercana.
 Devuelve solo JSON conforme al esquema estricto.`;
 
 type ExtractionResult =
@@ -59,14 +60,14 @@ export function extractDailyPlanOutputText(responseBody: unknown): ExtractionRes
   return { status: "invalid-ai-response" };
 }
 
-function parseDailyPlanResponse(request: DailyPlanPublicRequest, inventoryItems: DailyPlanInventoryItem[], todayKey: string, responseBody: unknown): DailyPlanGenerationResult {
+function parseDailyPlanResponse(request: DailyPlanPublicRequest, inventoryItems: DailyPlanInventoryItem[], referenceDate: string, responseBody: unknown): DailyPlanGenerationResult {
   const extracted = extractDailyPlanOutputText(responseBody);
   if (extracted.status !== "success") {
     console.warn("daily_plan_ai_response_rejected", { reason: extracted.status });
     return { status: "error", code: extracted.status === "provider-error" ? "provider-error" : "invalid-ai-response" };
   }
   try {
-    return validateDailyPlanProviderOutput(request, inventoryItems, JSON.parse(extracted.text) as unknown, todayKey);
+    return validateDailyPlanProviderOutput(request, inventoryItems, JSON.parse(extracted.text) as unknown, referenceDate);
   } catch {
     console.warn("daily_plan_ai_response_rejected", { reason: "invalid-json" });
     return { status: "error", code: "invalid-ai-response" };
@@ -81,7 +82,7 @@ export async function generateDailyPlanWithOpenAi(
   request: DailyPlanPublicRequest,
   target: DailyPlanTarget,
   inventoryItems: DailyPlanInventoryItem[],
-  todayKey: string,
+  referenceDate: string,
   options: { apiKey: string; model?: string; fetchImpl?: typeof fetch },
 ): Promise<DailyPlanGenerationResult> {
   const controller = new AbortController();
@@ -96,7 +97,7 @@ export async function generateDailyPlanWithOpenAi(
         model: options.model ?? DAILY_PLAN_AI_MODEL_DEFAULT,
         input: [
           { role: "system", content: DAILY_PLAN_SYSTEM_PROMPT },
-          { role: "user", content: buildDailyPlanInputText(request, target, inventoryItems, todayKey) },
+          { role: "user", content: buildDailyPlanInputText(request, target, inventoryItems, referenceDate) },
         ],
         text: { format: { type: "json_schema", name: "daily_meal_plan", strict: true, schema: DAILY_PLAN_JSON_SCHEMA } },
         store: false,
@@ -108,7 +109,7 @@ export async function generateDailyPlanWithOpenAi(
 
     if (response.status === 408) return { status: "error", code: "provider-timeout" };
     if (!response.ok) return { status: "error", code: "provider-error" };
-    return parseDailyPlanResponse(request, inventoryItems, todayKey, await response.json() as unknown);
+    return parseDailyPlanResponse(request, inventoryItems, referenceDate, await response.json() as unknown);
   } catch (error) {
     if (isAbortError(error)) return { status: "error", code: "provider-timeout" };
     return { status: "error", code: "provider-error" };

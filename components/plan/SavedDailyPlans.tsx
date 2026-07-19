@@ -2,7 +2,8 @@ import { deleteSavedDailyPlanAction } from "@/app/plan/actions";
 import { CookSavedPlanMealButton } from "@/components/plan/CookSavedPlanMealButton";
 import { MEAL_TYPE_LABELS } from "@/modules/meals/meal-types";
 import type { DailyPlanNutrition } from "@/modules/plans/daily-plan-ai";
-import type { SavedDailyPlan } from "@/modules/plans/saved-daily-plans";
+import { canCookSavedPlanOnDate, formatPlanDateLabel, getPlanDateOptions } from "@/modules/plans/plan-date";
+import { groupSavedDailyPlansForAgenda, type SavedDailyPlan } from "@/modules/plans/saved-daily-plans";
 
 const fitLabels = {
   close: "Muy cerca del objetivo",
@@ -30,7 +31,8 @@ function MacroLine({ value }: { value: DailyPlanNutrition }) {
   );
 }
 
-export function SavedDailyPlans({ plans }: { plans: SavedDailyPlan[] }) {
+export function SavedDailyPlans({ plans, todayKey }: { plans: SavedDailyPlan[]; todayKey: string }) {
+  const { dates, primaryPlans, legacyDuplicates, outsideWindow } = groupSavedDailyPlansForAgenda(plans, todayKey);
   return (
     <section className="saved-plans" aria-labelledby="saved-plans-title">
       <div className="saved-plans__heading">
@@ -39,10 +41,12 @@ export function SavedDailyPlans({ plans }: { plans: SavedDailyPlan[] }) {
         <p>Puedes registrar cada comida por separado. Solo entonces se descuentan sus ingredientes del inventario.</p>
       </div>
 
+      <h3>Próximos siete días</h3>
+      <div className="weekly-plan-agenda">{dates.map((date) => { const plan = primaryPlans[dates.indexOf(date)]; return <div className="weekly-plan-slot" key={date}><h4>{formatPlanDateLabel(date, todayKey)}</h4>{plan ? <><p><strong>Plan guardado</strong></p><MacroLine value={plan.total} /><p>{Object.values(plan.completed_meals).filter(Boolean).length} de 4 comidas registradas</p><a href={`#saved-plan-${plan.id}`}>Ver detalles</a></> : <p><strong>Sin plan</strong></p>}</div>; })}</div>
       {plans.length === 0 ? <p className="saved-plans__empty">Todavía no has guardado ningún plan.</p> : null}
 
-      {plans.map((plan) => (
-        <article className="saved-plan" key={plan.id}>
+      {[...primaryPlans.filter((plan): plan is SavedDailyPlan => Boolean(plan)), ...outsideWindow, ...legacyDuplicates].map((plan) => (
+        <article className="saved-plan" id={`saved-plan-${plan.id}`} key={plan.id}>
           <div className="saved-plan__header">
             <div className="saved-plan__identity">
               <span className="saved-plan__fit">{fitLabels[plan.fit]}</span>
@@ -73,11 +77,13 @@ export function SavedDailyPlans({ plans }: { plans: SavedDailyPlan[] }) {
                       <li key={ingredient.inventory_item_id}>{formatNumber(ingredient.quantity)} {ingredient.unit} · {ingredient.name}</li>
                     ))}
                   </ul>
-                  <CookSavedPlanMealButton
+                  <h5>Pasos</h5>
+                  <ol>{meal.steps.map((step, index) => <li key={`${meal.meal_type}-${index}`}>{step}</li>)}</ol>
+                  {canCookSavedPlanOnDate(plan.plan_date, todayKey) ? <CookSavedPlanMealButton
                     planId={plan.id}
                     mealType={meal.meal_type}
                     completed={Boolean(plan.completed_meals[meal.meal_type])}
-                  />
+                  /> : <p className="saved-plan-action__note">Disponible para cocinar el {formatPlanDateLabel(plan.plan_date, todayKey)}.</p>}
                 </section>
               ))}
             </div>

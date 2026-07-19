@@ -23,6 +23,7 @@ function meal(mealType: "breakfast" | "lunch" | "snack" | "dinner", itemId: stri
 
 function request() {
   return {
+    plan_date: "2026-07-15",
     priority_mode: "balanced" as const,
     max_minutes_per_meal: 30 as const,
     plan: {

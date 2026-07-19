@@ -12,6 +12,7 @@ const errorMessages = {
   "already-completed": "Esta comida ya estaba registrada.",
   "inventory-changed": "El inventario cambió o ya no tiene cantidades suficientes para esta comida.",
   "unexpected-error": "No se pudo registrar la comida.",
+  "not-yet-available": "Este plan todavía no está disponible para cocinar.",
 } as const;
 
 export function CookSavedPlanMealButton({ planId, mealType, completed }: {

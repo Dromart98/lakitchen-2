@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { generateDailyPlanAction, saveDailyPlanAction } from "@/app/plan/actions";
-import type { DailyPlanActionResult, DailyPlanFit, DailyPlanInventoryExclusionReason, DailyPlanInventoryReadiness, DailyPlanNutrition, DailyPlanPriorityMode } from "@/modules/plans/daily-plan-ai";
+import { getDailyPlanInventoryReadiness, type DailyPlanActionResult, type DailyPlanFit, type DailyPlanInventoryExclusionReason, type DailyPlanInventorySourceItem, type DailyPlanNutrition, type DailyPlanPriorityMode } from "@/modules/plans/daily-plan-ai";
+import { formatPlanDateLabel, getPlanDateOptions } from "@/modules/plans/plan-date";
 import { MEAL_TYPE_LABELS } from "@/modules/meals/meal-types";
 
 const errorMessages: Record<string, string> = {
@@ -27,6 +28,7 @@ const fitLabels: Record<DailyPlanFit, string> = {
 };
 
 type GeneratedSettings = {
+  plan_date: string;
   priority_mode: DailyPlanPriorityMode;
   max_minutes_per_meal: 15 | 30 | 45 | 60;
 };
@@ -52,8 +54,11 @@ const exclusionMessages: Record<DailyPlanInventoryExclusionReason, { reason: str
   "incompatible-unit": { reason: "la unidad no es compatible con su base nutricional", action: "Corrige la unidad o la base nutricional." },
 };
 
-export function DailyPlanGenerator({ readiness }: { readiness: DailyPlanInventoryReadiness }) {
+export function DailyPlanGenerator({ inventoryItems, todayKey }: { inventoryItems: DailyPlanInventorySourceItem[]; todayKey: string }) {
+  const dateOptions = getPlanDateOptions(todayKey);
   const router = useRouter();
+  const [planDate, setPlanDate] = useState(todayKey);
+  const readiness = useMemo(() => getDailyPlanInventoryReadiness(inventoryItems, planDate), [inventoryItems, planDate]);
   const [priorityMode, setPriorityMode] = useState<DailyPlanPriorityMode>("balanced");
   const [maxMinutes, setMaxMinutes] = useState<15 | 30 | 45 | 60>(30);
   const [result, setResult] = useState<DailyPlanActionResult | null>(null);
@@ -63,16 +68,17 @@ export function DailyPlanGenerator({ readiness }: { readiness: DailyPlanInventor
   const [isPending, startTransition] = useTransition();
   const isBusy = isPending || isSaving;
 
+  function invalidatePreview() { setResult(null); setGeneratedSettings(null); setSaveMessage(null); }
+
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isBusy || !readiness.canGenerate) return;
     const settings: GeneratedSettings = {
+      plan_date: planDate,
       priority_mode: priorityMode,
       max_minutes_per_meal: maxMinutes,
     };
-    setResult(null);
-    setGeneratedSettings(null);
-    setSaveMessage(null);
+    invalidatePreview();
     startTransition(async () => {
       try {
         const nextResult = await generateDailyPlanAction(settings);
@@ -89,22 +95,12 @@ export function DailyPlanGenerator({ readiness }: { readiness: DailyPlanInventor
     if (isBusy || !generatedSettings) return;
     setIsSaving(true);
     setSaveMessage(null);
-    const saved = await saveDailyPlanAction({
-      ...generatedSettings,
-      plan,
-    });
-    setIsSaving(false);
-
-    if (saved.status === "success") {
-      setSaveMessage(saved.code === "already-saved" ? "Este plan ya estaba guardado." : "Plan guardado.");
-      router.refresh();
-      return;
-    }
-
-    const message = saved.code === "inventory-changed"
-      ? "El inventario cambió y el plan ya no se puede guardar tal como fue generado. Genera uno nuevo."
-      : "No se pudo guardar el plan.";
-    setSaveMessage(message);
+    try {
+      const saved = await saveDailyPlanAction({ ...generatedSettings, plan });
+      if (saved.status === "success") { setSaveMessage(saved.code === "already-saved" ? "Este plan ya estaba guardado." : "Plan guardado."); router.refresh(); return; }
+      const messages: Record<string, string> = { "date-occupied": "Ya tienes un plan guardado para ese día. Elimínalo antes de guardar otro.", "invalid-plan-date": "La fecha seleccionada ya no está disponible. Elige otra fecha.", "inventory-changed": "El inventario cambió y el plan ya no se puede guardar tal como fue generado. Genera uno nuevo.", "save-failed": "No se pudo guardar el plan.", "unexpected-error": "Ha ocurrido un error inesperado al guardar." };
+      setSaveMessage(messages[saved.code] ?? "No se pudo guardar el plan.");
+    } catch { setSaveMessage("Ha ocurrido un error inesperado al guardar."); } finally { setIsSaving(false); }
   }
 
   return (
@@ -126,23 +122,25 @@ export function DailyPlanGenerator({ readiness }: { readiness: DailyPlanInventor
           </div>
         </div>
         <form onSubmit={onSubmit} className="plan-options__form">
+          <label className="field" htmlFor="plan-date"><span>Fecha del plan</span><select id="plan-date" value={planDate} disabled={isBusy} onChange={(event) => { setPlanDate(event.target.value); invalidatePreview(); }}>{dateOptions.map((date) => <option key={date} value={date}>{formatPlanDateLabel(date, todayKey)}</option>)}</select></label>
+          <p className="plan-inventory-notice">El plan usa el inventario disponible ahora y las fechas de caducidad registradas. Los productos no quedan reservados.</p>
           <label className="field" htmlFor="plan-priority">
             <span>Prioridad</span>
-            <select id="plan-priority" value={priorityMode} onChange={(event) => setPriorityMode(event.target.value as DailyPlanPriorityMode)} disabled={isBusy}>
+            <select id="plan-priority" value={priorityMode} onChange={(event) => { setPriorityMode(event.target.value as DailyPlanPriorityMode); invalidatePreview(); }} disabled={isBusy}>
               <option value="balanced">Equilibrado</option>
               <option value="expiration">Priorizar productos que caducan</option>
             </select>
           </label>
           <label className="field" htmlFor="plan-minutes">
             <span>Tiempo máximo por comida</span>
-            <select id="plan-minutes" value={maxMinutes} onChange={(event) => setMaxMinutes(Number(event.target.value) as 15 | 30 | 45 | 60)} disabled={isBusy}>
+            <select id="plan-minutes" value={maxMinutes} onChange={(event) => { setMaxMinutes(Number(event.target.value) as 15 | 30 | 45 | 60); invalidatePreview(); }} disabled={isBusy}>
               <option value={15}>15 minutos</option>
               <option value={30}>30 minutos</option>
               <option value={45}>45 minutos</option>
               <option value={60}>60 minutos</option>
             </select>
           </label>
-          <button className="button plan-options__submit" type="submit" disabled={isBusy || !readiness.canGenerate}>{isPending ? "Generando tu plan…" : "Generar plan"}</button>
+          <button className="button plan-options__submit" type="submit" disabled={isBusy || !readiness.canGenerate}>{isPending ? "Generando tu plan…" : "Generar plan para este día"}</button>
         </form>
       </div>
 
@@ -157,7 +155,7 @@ export function DailyPlanGenerator({ readiness }: { readiness: DailyPlanInventor
         <div className="plan-preview__messages">
           {isPending ? <p className="plan-status" role="status">Generando tu plan…</p> : null}
           {isSaving ? <p className="plan-status" role="status">Guardando el plan…</p> : null}
-          {saveMessage ? <p className="plan-status" role="status">{saveMessage}</p> : null}
+          {saveMessage ? <p className={saveMessage === "Plan guardado." || saveMessage === "Este plan ya estaba guardado." ? "plan-status" : "auth-message error"} role={saveMessage === "Plan guardado." || saveMessage === "Este plan ya estaba guardado." ? "status" : "alert"}>{saveMessage}</p> : null}
         {result?.status === "error" ? <p className="auth-message error" role="alert">{errorMessages[result.code]}</p> : null}
         {result?.status === "needs-clarification" ? <p className="auth-message error" role="alert">{result.message}</p> : null}
         </div>
@@ -167,7 +165,7 @@ export function DailyPlanGenerator({ readiness }: { readiness: DailyPlanInventor
               <div className="plan-summary__heading">
                 <div>
                   <span className="plan-summary__fit">{fitLabels[result.fit]}</span>
-                  <h3 id="plan-summary-title">Resumen diario</h3>
+                  <h3 id="plan-summary-title">Plan para el {formatPlanDateLabel(generatedSettings?.plan_date ?? planDate, todayKey)}</h3>
                 </div>
                 <div className="plan-summary__calories"><strong>{formatNumber(result.total.calories)}</strong><span>kcal generadas</span></div>
               </div>
@@ -185,7 +183,7 @@ export function DailyPlanGenerator({ readiness }: { readiness: DailyPlanInventor
                 <button className="button" type="button" disabled={isBusy || !generatedSettings} onClick={() => handleSave(result)}>
                   {isSaving ? "Guardando…" : "Guardar plan"}
                 </button>
-                <p>Guardar crea una copia del plan. No descuenta inventario ni registra comidas.</p>
+                <p>Guardar crea una copia del plan. No descuenta inventario ni registra comidas.</p>{planDate !== todayKey ? <p>Antes de cocinar, LaKitchen comprobará de nuevo las cantidades disponibles.</p> : null}
               </div>
             </section>
             <div className="plan-meals">
