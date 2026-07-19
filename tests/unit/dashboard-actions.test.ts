@@ -39,6 +39,24 @@ describe("Text AI meal confirmation", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/macros");
   });
 
+  it("records decimal manual macros as one meal and returns to the default manual mode", async () => {
+    const form = new FormData();
+    form.set("return_to", "/macros");
+    form.set("meal_mode", "manual");
+    form.set("name", "Cena manual");
+    form.set("meal_type", "dinner");
+    form.set("calories", "512.5");
+    form.set("protein_g", "31.25");
+    form.set("carbs_g", "48.75");
+    form.set("fat_g", "18.5");
+
+    await expect(addMealLogAction(form)).rejects.toThrow("redirect:/macros?mealSuccess=meal-created");
+    expect(mocks.insert).toHaveBeenCalledTimes(1);
+    expect(mocks.insert).toHaveBeenCalledWith(expect.objectContaining({
+      name: "Cena manual", calories: 512.5, protein_g: 31.3, carbs_g: 48.8, fat_g: 18.5,
+    }));
+  });
+
   it("keeps an insertion error inside the Text AI destination", async () => {
     mocks.insert.mockResolvedValue({ error: { message: "insert failed" } });
     await expect(addMealLogAction(textAiForm())).rejects.toThrow("redirect:/macros?mealMode=text-ai&mealError=save-failed");
