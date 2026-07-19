@@ -149,6 +149,7 @@ export async function saveDailyPlanAction(input: unknown): Promise<SaveDailyPlan
     }) as { data: string | null; error: { code?: string; message?: string } | null };
 
     if (error?.message?.includes("date_occupied")) return { status: "error", code: "date-occupied" };
+    if (error?.message?.includes("invalid_plan_date")) return { status: "error", code: "invalid-plan-date" };
     if (error || !data || !UUID_PATTERN.test(data)) {
       console.warn("Supabase could not save the daily plan.");
       return { status: "error", code: "save-failed" };
