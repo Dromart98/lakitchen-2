@@ -30,6 +30,10 @@ export async function estimatePhotoMealAction(formData: FormData): Promise<TextM
 }
 
 
+function isAiMealMode(value: unknown): value is "text-ai" | "photo-ai" {
+  return value === "text-ai" || value === "photo-ai";
+}
+
 function aiDestination(mode: "text-ai" | "photo-ai", kind: "mealError" | "mealSuccess", code: string) {
   return `/macros?mealMode=${mode}&${kind}=${encodeURIComponent(code)}#registrar-comida`;
 }
@@ -42,7 +46,9 @@ function aiConsumptionError(error: { code?: string; message: string }) {
   return "consume-failed";
 }
 export async function consumeAiMealInventoryAction(formData: FormData) {
-  const mode = formData.get("meal_mode") === "photo-ai" ? "photo-ai" : "text-ai";
+  const rawMode = formData.get("meal_mode");
+  if (!isAiMealMode(rawMode)) redirect("/macros?mealError=invalid-meal-mode#registrar-comida");
+  const mode = rawMode;
   const name = String(formData.get("meal_name") ?? "").trim(); const type = String(formData.get("meal_type") ?? "").trim();
   if (!name || name.length > 120) redirect(aiDestination(mode, "mealError", "invalid-name"));
   if (!isMealType(type)) redirect(aiDestination(mode, "mealError", "invalid-meal-type"));

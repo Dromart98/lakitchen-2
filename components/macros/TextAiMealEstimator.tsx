@@ -136,6 +136,7 @@ export function TextAiMealEstimator({ active = true, errorMessage, successMessag
   async function submit() {
     if (state === "estimating" || voiceState === "listening" || voiceState === "processing") return;
     const version = ++requestVersion.current;
+    setResult(null);
     setState("estimating");
     try {
       const next = await estimateTextMealAction({ description });
