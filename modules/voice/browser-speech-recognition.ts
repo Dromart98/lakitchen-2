@@ -23,14 +23,24 @@ export type SpeechRecognitionWindow = {
   webkitSpeechRecognition?: SpeechRecognitionConstructor;
 };
 
+export const TEXT_AI_DESCRIPTION_MAX_LENGTH = 2000;
+
 export function getSpeechRecognitionConstructor(browserWindow?: SpeechRecognitionWindow): SpeechRecognitionConstructor | null {
   return browserWindow?.SpeechRecognition ?? browserWindow?.webkitSpeechRecognition ?? null;
 }
 
-export function mergeVoiceTranscript(currentText: string, transcript: string): string {
+export function mergeVoiceTranscript(currentText: string, transcript: string, maxLength = TEXT_AI_DESCRIPTION_MAX_LENGTH): string {
   const current = currentText.trim().replace(/\s+/g, " ");
   const next = transcript.trim().replace(/\s+/g, " ");
-  return next ? (current ? `${current} ${next}` : next) : current;
+  return (next ? (current ? `${current} ${next}` : next) : current).slice(0, maxLength).trimEnd();
+}
+
+export function startVoiceSession(currentVersion: number): number {
+  return currentVersion + 1;
+}
+
+export function isCurrentVoiceSession(currentVersion: number, sessionVersion: number): boolean {
+  return currentVersion === sessionVersion;
 }
 
 export function getVoiceRecognitionErrorMessage(error: string, wasCancelled = false): string | null {
