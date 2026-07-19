@@ -62,14 +62,14 @@ describe("scheduled daily plan database contract", () => {
   it("checks ownership and date availability before consuming a saved meal", () => {
     const cookStart = actions.indexOf("export async function cookSavedDailyPlanMealAction");
     const queryIndex = actions.indexOf('.select("plan_date")', cookStart);
-    const queryErrorIndex = actions.indexOf("savedPlanError", cookStart);
+    const queryErrorGuardIndex = actions.indexOf("if (savedPlanError)", cookStart);
     const validDateIndex = actions.indexOf("isValidDateKey", cookStart);
     const availabilityIndex = actions.indexOf("canCookSavedPlanOnDate", cookStart);
     const consumeRpcIndex = actions.indexOf('rpc("consume_saved_daily_plan_meal"', cookStart);
 
     expect(cookStart).toBeGreaterThanOrEqual(0);
     expect(queryIndex).toBeGreaterThan(cookStart);
-    expect(queryErrorIndex).toBeGreaterThan(queryIndex);
+    expect(queryErrorGuardIndex).toBeGreaterThan(queryIndex);
     expect(validDateIndex).toBeGreaterThan(queryIndex);
     expect(availabilityIndex).toBeGreaterThan(validDateIndex);
     expect(consumeRpcIndex).toBeGreaterThan(availabilityIndex);
