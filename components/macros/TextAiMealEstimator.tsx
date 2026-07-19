@@ -6,14 +6,15 @@ import { estimateTextMealAction } from "@/app/macros/actions";
 import { AiMealEstimationPreview } from "@/components/macros/AiMealEstimationPreview";
 import { getSpeechRecognitionConstructor, getVoiceRecognitionErrorMessage, isCurrentVoiceSession, mergeVoiceTranscript, startVoiceSession, TEXT_AI_DESCRIPTION_MAX_LENGTH, type BrowserSpeechRecognition, type SpeechRecognitionWindow } from "@/modules/voice/browser-speech-recognition";
 import type { TextMealEstimationResult } from "@/modules/meals/text-meal-ai";
+import type { MealBuilderInventoryItem } from "@/modules/meals/meal-builder";
 
 type State = "idle" | "estimating" | "success" | "needs-clarification" | "error";
 type VoiceState = "unsupported" | "idle" | "listening" | "processing" | "error";
-type TextAiMealEstimatorProps = { active?: boolean; errorMessage?: string | null; successMessage?: string | null };
+type TextAiMealEstimatorProps = { active?: boolean; errorMessage?: string | null; successMessage?: string | null; items: MealBuilderInventoryItem[]; inventoryUnavailable: boolean };
 
 const errors: Record<string, string> = { "invalid-input": "Describe la comida con al menos 3 caracteres.", unauthenticated: "Tu sesión ha caducado. Vuelve a iniciar sesión.", "missing-api-key": "La estimación no está disponible ahora.", "provider-timeout": "La estimación tardó demasiado. Inténtalo de nuevo.", "provider-error": "No se pudo calcular la estimación. Inténtalo de nuevo.", "invalid-ai-response": "No se pudo validar la estimación. Reformula la comida e inténtalo de nuevo.", "unexpected-error": "Ocurrió un error inesperado. Inténtalo de nuevo." };
 
-export function TextAiMealEstimator({ active = true, errorMessage, successMessage }: TextAiMealEstimatorProps) {
+export function TextAiMealEstimator({ active = true, errorMessage, successMessage, items, inventoryUnavailable }: TextAiMealEstimatorProps) {
   const [description, setDescription] = useState("");
   const [state, setState] = useState<State>("idle");
   const [result, setResult] = useState<TextMealEstimationResult | null>(null);
@@ -135,6 +136,7 @@ export function TextAiMealEstimator({ active = true, errorMessage, successMessag
   async function submit() {
     if (state === "estimating" || voiceState === "listening" || voiceState === "processing") return;
     const version = ++requestVersion.current;
+    setResult(null);
     setState("estimating");
     try {
       const next = await estimateTextMealAction({ description });
@@ -172,6 +174,6 @@ export function TextAiMealEstimator({ active = true, errorMessage, successMessag
     <button type="button" className="button" disabled={state === "estimating" || isDictating || description.trim().length < 3 || description.length > TEXT_AI_DESCRIPTION_MAX_LENGTH} onClick={submit}>{state === "estimating" ? "Calculando estimación…" : "Calcular estimación"}</button>
     {state === "needs-clarification" && result?.status === "needs-clarification" ? <p className="auth-message error" role="alert">{result.message}</p> : null}
     {state === "error" && result?.status === "error" ? <p className="auth-message error" role="alert">{errors[result.code]}</p> : null}
-    {success ? <AiMealEstimationPreview result={success} mealMode="text-ai" warning="Los valores pueden variar según la marca, preparación y tamaño real de las porciones." /> : null}
+    {success ? <AiMealEstimationPreview result={success} mealMode="text-ai" warning="Los valores pueden variar según la marca, preparación y tamaño real de las porciones." items={items} inventoryUnavailable={inventoryUnavailable} /> : null}
   </div>;
 }

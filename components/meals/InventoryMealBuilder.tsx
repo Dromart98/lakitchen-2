@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { consumeMealBuilderAndLogMealAction } from "@/app/meal-builder/actions";
 import {
+  MAX_MEAL_BUILDER_LINES,
   calculateMealBuilderLineNutrition,
   calculateMealBuilderTotals,
   createMealBuilderConsumptionPayload,
@@ -17,7 +18,6 @@ import {
 } from "@/modules/meals/meal-builder";
 import { MEAL_TYPE_LABELS, MEAL_TYPES, isMealType, type MealType } from "@/modules/meals/meal-types";
 
-const MAX_MEAL_BUILDER_ROWS = 10;
 
 const UNAVAILABLE_REASON_LABELS: Record<RepeatedMealBuilderUnavailableItem["reason"], string> = {
   missing: "Ya no está en tu inventario.",
@@ -53,7 +53,7 @@ function createInitialRows(initialRows: RepeatedMealBuilderDraftLine[] | undefin
   const rows: BuilderRow[] = [];
 
   for (const row of initialRows ?? []) {
-    if (!row.itemId || seenItemIds.has(row.itemId) || rows.length >= MAX_MEAL_BUILDER_ROWS) continue;
+    if (!row.itemId || seenItemIds.has(row.itemId) || rows.length >= MAX_MEAL_BUILDER_LINES) continue;
 
     seenItemIds.add(row.itemId);
     rows.push({
@@ -150,7 +150,7 @@ export function InventoryMealBuilder({
 
   function addRow() {
     setRows((currentRows) => {
-      if (currentRows.length >= MAX_MEAL_BUILDER_ROWS) return currentRows;
+      if (currentRows.length >= MAX_MEAL_BUILDER_LINES) return currentRows;
 
       return [...currentRows, createRow(currentRows.length)];
     });
@@ -263,7 +263,7 @@ export function InventoryMealBuilder({
         })}
         </div>
 
-      {rows.length < MAX_MEAL_BUILDER_ROWS ? (
+      {rows.length < MAX_MEAL_BUILDER_LINES ? (
         <button className="meal-builder-add" type="button" onClick={addRow}>
           Añadir otro producto
         </button>

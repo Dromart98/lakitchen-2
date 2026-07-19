@@ -28,6 +28,8 @@ export function getMacroModeMessages(input: {
   genericSuccessMessage: string | null;
   ingredientErrorMessage: string | null;
   ingredientSuccessMessage: string | null;
+  aiInventoryErrorMessage: string | null;
+  aiInventorySuccessMessage: string | null;
 }): MacroModeMessages {
   const empty = (): ModeMessage => ({ errorMessage: null, successMessage: null });
   const messages: MacroModeMessages = {
@@ -45,14 +47,18 @@ export function getMacroModeMessages(input: {
     return messages;
   }
 
-  const modeMessages = {
+  const genericModeMessages = {
     errorMessage: input.genericErrorMessage,
     successMessage: input.genericSuccessMessage,
   };
+  const aiModeMessages = {
+    errorMessage: input.genericErrorMessage ?? input.aiInventoryErrorMessage,
+    successMessage: input.genericSuccessMessage ?? input.aiInventorySuccessMessage,
+  };
 
-  if (input.mode === "text-ai") messages.textAi = modeMessages;
-  else if (input.mode === "photo-ai") messages.photoAi = modeMessages;
-  else messages.manual = modeMessages;
+  if (input.mode === "text-ai") messages.textAi = aiModeMessages;
+  else if (input.mode === "photo-ai") messages.photoAi = aiModeMessages;
+  else messages.manual = genericModeMessages;
 
   return messages;
 }

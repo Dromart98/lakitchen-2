@@ -87,7 +87,7 @@ export default async function MacrosPage({ searchParams }: { searchParams?: Prom
       .select("calories, protein_g, carbs_g, fat_g")
       .eq("user_id", user.id).eq("consumed_on", today) as Promise<{ data: MealRow[] | null; error: { message: string } | null }>,
     (supabase as any).from("inventory_items")
-      .select("id, name, quantity, unit, nutrition_basis, calories, protein_g, carbs_g, fat_g")
+      .select("id, name, quantity, unit, category, nutrition_basis, calories, protein_g, carbs_g, fat_g")
       .eq("user_id", user.id)
       .gt("quantity", 0)
       .order("name", { ascending: true }) as Promise<{ data: MealBuilderInventoryItem[] | null; error: { message: string } | null }>,
@@ -140,6 +140,8 @@ export default async function MacrosPage({ searchParams }: { searchParams?: Prom
     genericSuccessMessage: getMessage(params?.mealSuccess, true),
     ingredientErrorMessage: getMealBuilderMessage(params?.mealError, false),
     ingredientSuccessMessage: getMealBuilderMessage(params?.mealSuccess, true),
+    aiInventoryErrorMessage: getMealBuilderMessage(params?.mealError, false),
+    aiInventorySuccessMessage: getMealBuilderMessage(params?.mealSuccess, true),
   });
 
   return (

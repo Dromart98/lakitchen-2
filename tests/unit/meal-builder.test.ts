@@ -246,10 +246,11 @@ describe("meal builder consumption payload", () => {
     expect(createMealBuilderConsumptionPayload([])).toBeNull();
   });
 
-  it("rejects more than ten products", () => {
-    const lines = Array.from({ length: 11 }, (_, index) => ({ ...pasta, id: `pasta-${index}` }));
-
-    expect(createMealBuilderConsumptionPayload(lines)).toBeNull();
+  it("accepts twenty products and rejects twenty-one", () => {
+    const twenty = Array.from({ length: 20 }, (_, index) => ({ ...pasta, id: `pasta-${index}` }));
+    const twentyOne = Array.from({ length: 21 }, (_, index) => ({ ...pasta, id: `pasta-${index}` }));
+    expect(createMealBuilderConsumptionPayload(twenty)).toHaveLength(20);
+    expect(createMealBuilderConsumptionPayload(twentyOne)).toBeNull();
   });
 
   it("rejects duplicate products", () => {
@@ -383,8 +384,8 @@ describe("repeated meal builder drafts", () => {
     expect(draft.availableLines).toEqual([{ itemId: "pasta", quantity: "250" }]);
   });
 
-  it("limits available lines to ten snapshots", () => {
-    const snapshots = Array.from({ length: 11 }, (_, index) => snapshot(`item-${index}`, `Producto ${index}`, 1, "ud"));
+  it("limits available lines to twenty snapshots", () => {
+    const snapshots = Array.from({ length: 21 }, (_, index) => snapshot(`item-${index}`, `Producto ${index}`, 1, "ud"));
     const inventory: MealBuilderInventoryItem[] = snapshots.map((entry) => ({
       id: entry.source_inventory_item_id,
       name: entry.product_name,
@@ -399,7 +400,7 @@ describe("repeated meal builder drafts", () => {
 
     const draft = createRepeatedMealBuilderDraft(meal, snapshots, inventory);
 
-    expect(draft.availableLines).toHaveLength(10);
+    expect(draft.availableLines).toHaveLength(20);
   });
 
   it("handles an empty snapshot list", () => {

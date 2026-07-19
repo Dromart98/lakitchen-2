@@ -101,11 +101,11 @@ export function MacroMealRecorder({
       </div>
 
       <div id="meal-panel-text-ai" className="macros-mode-panel" role="region" aria-labelledby="meal-mode-text-ai" hidden={mode !== "text-ai"}>
-        <TextAiMealEstimator active={mode === "text-ai"} errorMessage={textAiErrorMessage} successMessage={textAiSuccessMessage} />
+        <TextAiMealEstimator active={mode === "text-ai"} errorMessage={textAiErrorMessage} successMessage={textAiSuccessMessage} items={items} inventoryUnavailable={inventoryUnavailable} />
       </div>
 
       <div id="meal-panel-photo-ai" className="macros-mode-panel" role="region" aria-labelledby="meal-mode-photo-ai" hidden={mode !== "photo-ai"}>
-        <PhotoAiMealEstimator errorMessage={photoAiErrorMessage} successMessage={photoAiSuccessMessage} />
+        <PhotoAiMealEstimator errorMessage={photoAiErrorMessage} successMessage={photoAiSuccessMessage} items={items} inventoryUnavailable={inventoryUnavailable} />
       </div>
 
       <div id="meal-panel-ingredients" className="macros-mode-panel macros-mode-panel--ingredients" role="region" aria-labelledby="meal-mode-ingredients" hidden={mode !== "ingredients"}>

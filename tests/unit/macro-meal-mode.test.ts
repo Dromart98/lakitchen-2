@@ -13,6 +13,8 @@ function messages(mode: ReturnType<typeof resolveMacroMealMode>) {
     genericSuccessMessage: "generic-success",
     ingredientErrorMessage: "ingredient-error",
     ingredientSuccessMessage: "ingredient-success",
+    aiInventoryErrorMessage: "ai-inventory-error",
+    aiInventorySuccessMessage: "ai-inventory-success",
   });
 }
 
@@ -39,6 +41,15 @@ describe("macro meal modes", () => {
     expect(messages("text-ai").photoAi).toEqual({ errorMessage: null, successMessage: null });
     expect(messages("photo-ai").photoAi).toEqual({ errorMessage: "generic-error", successMessage: "generic-success" });
     expect(messages("photo-ai").textAi).toEqual({ errorMessage: null, successMessage: null });
+  });
+
+
+  it("uses inventory messages only for the originating AI mode", () => {
+    const input = { genericErrorMessage: null, genericSuccessMessage: null, ingredientErrorMessage: "ingredient-error", ingredientSuccessMessage: "ingredient-success", aiInventoryErrorMessage: "quantity-too-high", aiInventorySuccessMessage: "Comida registrada y productos descontados correctamente." };
+    expect(getMacroModeMessages({ mode: "text-ai", ...input }).textAi).toEqual({ errorMessage: "quantity-too-high", successMessage: "Comida registrada y productos descontados correctamente." });
+    expect(getMacroModeMessages({ mode: "photo-ai", ...input }).photoAi).toEqual({ errorMessage: "quantity-too-high", successMessage: "Comida registrada y productos descontados correctamente." });
+    expect(getMacroModeMessages({ mode: "manual", ...input }).manual).toEqual({ errorMessage: null, successMessage: null });
+    expect(getMacroModeMessages({ mode: "ingredients", ...input }).ingredients).toEqual({ errorMessage: "ingredient-error", successMessage: "ingredient-success" });
   });
 
   it("delivers ingredient messages only to ingredients", () => {
