@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export type MacroTotals = { calories: number; protein_g: number; carbs_g: number; fat_g: number };
 export type TextMealEstimatedIngredient = { name: string; quantity: number; unit: string; preparation: string | null; calories: number; protein_g: number; carbs_g: number; fat_g: number };
-export type TextMealEstimationErrorCode = "invalid-input" | "unauthenticated" | "missing-api-key" | "provider-timeout" | "provider-error" | "invalid-ai-response" | "unexpected-error";
+export type TextMealEstimationErrorCode = "invalid-input" | "invalid-photo" | "unsupported-photo" | "photo-too-large" | "photo-processing-failed" | "unauthenticated" | "missing-api-key" | "provider-timeout" | "provider-error" | "invalid-ai-response" | "unexpected-error";
 export type TextMealEstimationResult =
   | { status: "success"; suggested_name: string; ingredients: TextMealEstimatedIngredient[]; total: MacroTotals; assumptions: string[]; confidence: "high" | "medium" | "low" }
   | { status: "needs-clarification"; message: string }

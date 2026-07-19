@@ -6306,3 +6306,9 @@ h3 {
 .text-ai-assumptions { border-left: 3px solid var(--brand-accent); padding-left: 12px; }
 .text-ai-totals { display: grid; gap: 4px; border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
 .text-ai-confirm { border-top: 1px solid var(--border); padding-top: 16px; }
+.photo-ai-estimator { display: grid; gap: 12px; }
+.photo-ai-privacy { border-left: 3px solid var(--brand-accent); margin: 0; padding-left: 12px; }
+.photo-ai-preview { display: grid; gap: 8px; }
+.photo-ai-preview img { width: 100%; max-height: 320px; object-fit: contain; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.photo-ai-preview p, .photo-ai-status { margin: 0; color: var(--muted); }
+.photo-ai-preview .button { min-height: 44px; }

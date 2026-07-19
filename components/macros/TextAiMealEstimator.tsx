@@ -1,10 +1,43 @@
 "use client";
-import { useState } from "react";
+
+import { useEffect, useRef, useState } from "react";
+
 import { estimateTextMealAction } from "@/app/macros/actions";
-import { addMealLogAction } from "@/app/dashboard/actions";
-import { MEAL_TYPES, MEAL_TYPE_LABELS } from "@/modules/meals/meal-types";
+import { AiMealEstimationPreview } from "@/components/macros/AiMealEstimationPreview";
 import type { TextMealEstimationResult } from "@/modules/meals/text-meal-ai";
+
 type State = "idle" | "estimating" | "success" | "needs-clarification" | "error";
-const labels = { high: "Confianza alta", medium: "Confianza media", low: "Confianza baja" };
+type TextAiMealEstimatorProps = {
+  errorMessage?: string | null;
+  successMessage?: string | null;
+};
+
 const errors: Record<string, string> = { "invalid-input": "Describe la comida con al menos 3 caracteres.", unauthenticated: "Tu sesión ha caducado. Vuelve a iniciar sesión.", "missing-api-key": "La estimación no está disponible ahora.", "provider-timeout": "La estimación tardó demasiado. Inténtalo de nuevo.", "provider-error": "No se pudo calcular la estimación. Inténtalo de nuevo.", "invalid-ai-response": "No se pudo validar la estimación. Reformula la comida e inténtalo de nuevo.", "unexpected-error": "Ocurrió un error inesperado. Inténtalo de nuevo." };
-export function TextAiMealEstimator() { const [description, setDescription] = useState(""); const [state, setState] = useState<State>("idle"); const [result, setResult] = useState<TextMealEstimationResult | null>(null); async function submit() { if (state === "estimating") return; setState("estimating"); try { const next = await estimateTextMealAction({ description }); setResult(next); setState(next.status === "success" ? "success" : next.status === "needs-clarification" ? "needs-clarification" : "error"); } catch { setResult({ status: "error", code: "unexpected-error" }); setState("error"); } } const success = result?.status === "success" ? result : null; return <div className="text-ai-estimator"><label className="field" htmlFor="text-ai-description"><span>Describe lo que has comido</span><textarea id="text-ai-description" value={description} onChange={(event) => setDescription(event.target.value)} minLength={3} maxLength={2000} placeholder="240 g de pollo, 150 g de arroz cocido y una cucharadita de aceite" /><small className="text-ai-counter">{description.length}/2000</small></label><p className="muted">Incluye cantidades, unidades y estado del alimento siempre que sea posible.</p><button type="button" className="button" disabled={state === "estimating" || description.trim().length < 3} onClick={submit}>{state === "estimating" ? "Calculando estimación…" : "Calcular estimación"}</button>{state === "needs-clarification" && result?.status === "needs-clarification" ? <p className="auth-message error" role="alert">{result.message}</p> : null}{state === "error" && result?.status === "error" ? <p className="auth-message error" role="alert">{errors[result.code]}</p> : null}{success ? <section className="text-ai-preview" aria-live="polite"><p className="text-ai-badge">Estimación orientativa · {labels[success.confidence]}</p><h3>{success.suggested_name}</h3><p className="muted">Los valores pueden variar según la marca, preparación y tamaño real de las porciones.</p><ul className="text-ai-ingredients">{success.ingredients.map((item, index) => <li key={`${item.name}-${index}`}><strong>{item.name}</strong><span>{item.quantity} {item.unit}{item.preparation ? ` · ${item.preparation}` : ""}</span><span>{item.calories} kcal · P {item.protein_g} g · C {item.carbs_g} g · G {item.fat_g} g</span></li>)}</ul>{success.assumptions.length ? <div className="text-ai-assumptions"><strong>Suposiciones</strong><ul>{success.assumptions.map((assumption) => <li key={assumption}>{assumption}</li>)}</ul></div> : null}<div className="text-ai-totals"><strong>Total estimado</strong><span>{success.total.calories} kcal · P {success.total.protein_g} g · C {success.total.carbs_g} g · G {success.total.fat_g} g</span></div><form action={addMealLogAction} className="meal-log-form macros-meal-form text-ai-confirm"><input type="hidden" name="return_to" value="/macros" /><input type="hidden" name="meal_mode" value="text-ai" /><label className="field"><span>Nombre</span><input name="name" required defaultValue={success.suggested_name} /></label><label className="field"><span>Tipo de comida</span><select name="meal_type" required defaultValue=""><option value="" disabled>Selecciona un tipo</option>{MEAL_TYPES.map((type) => <option key={type} value={type}>{MEAL_TYPE_LABELS[type]}</option>)}</select></label>{([['calories', success.total.calories, 'Calorías'], ['protein_g', success.total.protein_g, 'Proteína (g)'], ['carbs_g', success.total.carbs_g, 'Carbohidratos (g)'], ['fat_g', success.total.fat_g, 'Grasas (g)']] as const).map(([name, value, label]) => <label className="field" key={name}><span>{label}</span><input name={name} readOnly value={value} /></label>)}<button className="button macros-submit" type="submit">Registrar estimación</button></form></section> : null}</div>; }
+
+export function TextAiMealEstimator({ errorMessage, successMessage }: TextAiMealEstimatorProps) {
+  const [description, setDescription] = useState("");
+  const [state, setState] = useState<State>("idle");
+  const [result, setResult] = useState<TextMealEstimationResult | null>(null);
+  const requestVersion = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; requestVersion.current += 1; }, []);
+
+  function change(value: string) { requestVersion.current += 1; setDescription(value); setResult(null); setState("idle"); }
+  async function submit() {
+    if (state === "estimating") return;
+    const version = ++requestVersion.current;
+    setState("estimating");
+    try {
+      const next = await estimateTextMealAction({ description });
+      if (!mounted.current || version !== requestVersion.current) return;
+      setResult(next);
+      setState(next.status === "success" ? "success" : next.status === "needs-clarification" ? "needs-clarification" : "error");
+    } catch {
+      if (!mounted.current || version !== requestVersion.current) return;
+      setResult({ status: "error", code: "unexpected-error" });
+      setState("error");
+    }
+  }
+  const success = result?.status === "success" ? result : null;
+  return <div className="text-ai-estimator">{errorMessage ? <p className="auth-message error" role="alert">{errorMessage}</p> : null}{successMessage ? <p className="auth-message success" role="status">{successMessage}</p> : null}<label className="field" htmlFor="text-ai-description"><span>Describe lo que has comido</span><textarea id="text-ai-description" value={description} onChange={(event) => change(event.target.value)} disabled={state === "estimating"} minLength={3} maxLength={2000} placeholder="240 g de pollo, 150 g de arroz cocido y una cucharadita de aceite" /><small className="text-ai-counter">{description.length}/2000</small></label><p className="muted">Incluye cantidades, unidades y estado del alimento siempre que sea posible.</p><button type="button" className="button" disabled={state === "estimating" || description.trim().length < 3} onClick={submit}>{state === "estimating" ? "Calculando estimación…" : "Calcular estimación"}</button>{state === "needs-clarification" && result?.status === "needs-clarification" ? <p className="auth-message error" role="alert">{result.message}</p> : null}{state === "error" && result?.status === "error" ? <p className="auth-message error" role="alert">{errors[result.code]}</p> : null}{success ? <AiMealEstimationPreview result={success} mealMode="text-ai" warning="Los valores pueden variar según la marca, preparación y tamaño real de las porciones." /> : null}</div>;
+}

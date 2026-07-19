@@ -12,7 +12,7 @@ const MACROS_PATH = "/macros";
 
 function getMealReturnPath(formData: FormData) {
   const base = formData.get("return_to") === MACROS_PATH ? MACROS_PATH : DASHBOARD_PATH;
-  return base === MACROS_PATH && formData.get("meal_mode") === "text-ai" ? `${MACROS_PATH}?mealMode=text-ai` : base;
+  return base === MACROS_PATH && ["text-ai", "photo-ai"].includes(String(formData.get("meal_mode"))) ? `${MACROS_PATH}?mealMode=${formData.get("meal_mode")}` : base;
 }
 
 function withMealParameter(destination: string, parameter: string) {
