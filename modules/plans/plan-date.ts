@@ -42,3 +42,12 @@ export function formatPlanDateLabel(planDate: string, todayKey: string): string 
   if (difference === 1) return `Mañana, ${label.replace(/^.*?, /, "")}`;
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
+
+export function isValidDateKey(dateKey: string): boolean {
+  return dateKeyTimestamp(dateKey) !== null;
+}
+
+export function canCookSavedPlanOnDate(planDate: string, todayKey: string): boolean {
+  const difference = getPlanDateDayDifference(planDate, todayKey);
+  return difference !== null && difference <= 0;
+}

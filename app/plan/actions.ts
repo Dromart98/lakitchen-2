@@ -20,7 +20,7 @@ import {
   type CookSavedDailyPlanMealResult,
   type SaveDailyPlanResult,
 } from "@/modules/plans/saved-daily-plans";
-import { isAllowedPlanDate } from "@/modules/plans/plan-date";
+import { canCookSavedPlanOnDate, isAllowedPlanDate } from "@/modules/plans/plan-date";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUser } from "@/lib/supabase/auth";
 
@@ -136,43 +136,26 @@ export async function saveDailyPlanAction(input: unknown): Promise<SaveDailyPlan
       meals: enriched.meals,
     })).digest("hex");
 
-    const { data: occupiedPlan } = await (supabase as any).from("user_saved_daily_plans").select("id").eq("user_id", user.id).eq("plan_date", request.data.plan_date).maybeSingle() as { data: { id: string } | null };
-    if (occupiedPlan?.id) return { status: "error", code: "date-occupied" };
+    const { data, error } = await (supabase as any).rpc("save_scheduled_daily_plan", {
+      p_plan_date: request.data.plan_date,
+      p_priority_mode: request.data.priority_mode,
+      p_max_minutes_per_meal: request.data.max_minutes_per_meal,
+      p_target: enriched.target,
+      p_total: enriched.total,
+      p_difference: enriched.difference,
+      p_fit: enriched.fit,
+      p_meals: enriched.meals,
+      p_fingerprint: fingerprint,
+    }) as { data: string | null; error: { code?: string; message?: string } | null };
 
-    const { data, error } = await (supabase as any)
-      .from("user_saved_daily_plans")
-      .insert({
-        user_id: user.id,
-        plan_date: request.data.plan_date,
-        priority_mode: request.data.priority_mode,
-        max_minutes_per_meal: request.data.max_minutes_per_meal,
-        target: enriched.target,
-        total: enriched.total,
-        difference: enriched.difference,
-        fit: enriched.fit,
-        meals: enriched.meals,
-        fingerprint,
-      })
-      .select("id")
-      .single() as { data: { id: string } | null; error: { code?: string; message: string } | null };
-
-    if (error?.code === "23505") {
-      const { data: existing } = await (supabase as any)
-        .from("user_saved_daily_plans")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("fingerprint", fingerprint)
-        .maybeSingle() as { data: { id: string } | null };
-      if (existing?.id) return { status: "success", code: "already-saved", planId: existing.id };
-    }
-
-    if (error || !data?.id) {
+    if (error?.message?.includes("date_occupied")) return { status: "error", code: "date-occupied" };
+    if (error || !data || !UUID_PATTERN.test(data)) {
       console.warn("Supabase could not save the daily plan.");
       return { status: "error", code: "save-failed" };
     }
 
     revalidatePath(PLAN_PATH);
-    return { status: "success", code: "saved", planId: data.id };
+    return { status: "success", code: "saved", planId: data };
   } catch {
     return { status: "error", code: "unexpected-error" };
   }
@@ -186,6 +169,9 @@ export async function cookSavedDailyPlanMealAction(input: unknown): Promise<Cook
     const supabase = await createClient();
     const user = await getAuthenticatedUser(supabase, "saved daily plan meal cooking");
     if (!user) return { status: "error", code: "unauthenticated" };
+
+    const { data: savedPlan } = await (supabase as any).from("user_saved_daily_plans").select("plan_date").eq("id", request.data.plan_id).eq("user_id", user.id).maybeSingle() as { data: { plan_date: string } | null };
+    if (!savedPlan || !canCookSavedPlanOnDate(savedPlan.plan_date, getCurrentInventoryExpirationDateKey())) return { status: "error", code: "not-yet-available" };
 
     const { data, error } = await (supabase as any).rpc("consume_saved_daily_plan_meal", {
       p_plan_id: request.data.plan_id,

@@ -75,7 +75,7 @@ export const cookSavedDailyPlanMealRequestSchema = z.object({
 
 export type CookSavedDailyPlanMealResult =
   | { status: "success"; mealLogId: string }
-  | { status: "error"; code: "invalid-input" | "unauthenticated" | "already-completed" | "inventory-changed" | "unexpected-error" };
+  | { status: "error"; code: "invalid-input" | "unauthenticated" | "already-completed" | "inventory-changed" | "unexpected-error" | "not-yet-available" };
 
 export function buildProviderOutputForSavedPlan(request: SaveDailyPlanRequest) {
   return {
