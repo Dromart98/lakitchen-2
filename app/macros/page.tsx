@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { MacroMealRecorder } from "@/components/macros/MacroMealRecorder";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getMacroModeMessages, resolveMacroMealMode } from "@/modules/meals/macro-meal-mode";
 import { remainingMacros, sumMacros } from "@/modules/meals/meal-summary";
 import { getMealBuilderMessage, type MealBuilderInventoryItem } from "@/modules/meals/meal-builder";
 import type { MacroTotals } from "@/modules/nutrition/nutrition.types";
@@ -91,12 +92,14 @@ export default async function MacrosPage({ searchParams }: { searchParams?: Prom
   })));
   const remaining = goal ? remainingMacros(goal, consumed) : null;
   const params = await searchParams;
-  const initialMode = params?.mealMode === "ingredients" ? "ingredients" : params?.mealMode === "text-ai" ? "text-ai" : params?.mealMode === "photo-ai" ? "photo-ai" : "manual";
-  const ingredientsMode = initialMode === "ingredients";
-  const manualErrorMessage = initialMode === "manual" ? getMessage(params?.mealError, false) : null;
-  const manualSuccessMessage = initialMode === "manual" ? getMessage(params?.mealSuccess, true) : null;
-  const ingredientErrorMessage = ingredientsMode ? getMealBuilderMessage(params?.mealError, false) : null;
-  const ingredientSuccessMessage = ingredientsMode ? getMealBuilderMessage(params?.mealSuccess, true) : null;
+  const initialMode = resolveMacroMealMode(params?.mealMode);
+  const modeMessages = getMacroModeMessages({
+    mode: initialMode,
+    genericErrorMessage: getMessage(params?.mealError, false),
+    genericSuccessMessage: getMessage(params?.mealSuccess, true),
+    ingredientErrorMessage: getMealBuilderMessage(params?.mealError, false),
+    ingredientSuccessMessage: getMealBuilderMessage(params?.mealSuccess, true),
+  });
 
   return (
     <AppShell>
@@ -136,10 +139,14 @@ export default async function MacrosPage({ searchParams }: { searchParams?: Prom
             items={inventoryError ? [] : inventoryItems ?? []}
             initialMode={initialMode}
             inventoryUnavailable={Boolean(inventoryError)}
-            manualErrorMessage={manualErrorMessage}
-            manualSuccessMessage={manualSuccessMessage}
-            ingredientErrorMessage={ingredientErrorMessage}
-            ingredientSuccessMessage={ingredientSuccessMessage}
+            manualErrorMessage={modeMessages.manual.errorMessage}
+            manualSuccessMessage={modeMessages.manual.successMessage}
+            textAiErrorMessage={modeMessages.textAi.errorMessage}
+            textAiSuccessMessage={modeMessages.textAi.successMessage}
+            photoAiErrorMessage={modeMessages.photoAi.errorMessage}
+            photoAiSuccessMessage={modeMessages.photoAi.successMessage}
+            ingredientErrorMessage={modeMessages.ingredients.errorMessage}
+            ingredientSuccessMessage={modeMessages.ingredients.successMessage}
           />
 
           <section className="card macros-goals" aria-labelledby="macros-goals-title">
