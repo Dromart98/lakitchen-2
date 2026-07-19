@@ -2,11 +2,15 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 
-import { estimateVoiceShoppingBatchAction } from "@/app/shopping-list/actions";
+import {
+  estimateVoiceShoppingBatchAction,
+  saveVoiceShoppingBatchAction,
+} from "@/app/shopping-list/actions";
 import {
   VOICE_SHOPPING_BATCH_MAX_LENGTH,
   type VoiceShoppingDraftItem,
 } from "@/modules/shopping/voice-shopping-batch";
+import { buildVoiceShoppingBatchSaveItems } from "@/modules/shopping/voice-shopping-batch-save";
 import {
   getSpeechRecognitionConstructor,
   getVoiceRecognitionErrorMessage,
@@ -21,9 +25,11 @@ export function VoiceShoppingBatchInput() {
   const [text, setText] = useState("");
   const [items, setItems] = useState<VoiceShoppingDraftItem[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [saving, setSaving] = useState(false);
 
   const recognition = useRef<BrowserSpeechRecognition | null>(null);
   const requestVersion = useRef(0);
@@ -53,6 +59,7 @@ export function VoiceShoppingBatchInput() {
     setText("");
     setItems([]);
     setMessage(null);
+    setSubmissionId(crypto.randomUUID());
   }
 
   function dictate() {
@@ -60,7 +67,7 @@ export function VoiceShoppingBatchInput() {
       window as unknown as SpeechRecognitionWindow,
     );
 
-    if (!Constructor || pending) return;
+    if (!Constructor || pending || saving) return;
 
     const instance = new Constructor();
     recognition.current = instance;
@@ -107,12 +114,13 @@ export function VoiceShoppingBatchInput() {
   }
 
   function analyze() {
-    if (pending || !text.trim()) return;
+    if (pending || saving || !text.trim()) return;
 
     stop();
     const version = ++requestVersion.current;
     setItems([]);
     setMessage(null);
+    setSubmissionId(null);
 
     startTransition(async () => {
       const result = await estimateVoiceShoppingBatchAction(text);
@@ -125,10 +133,40 @@ export function VoiceShoppingBatchInput() {
       }
 
       setItems(result.items);
+      setSubmissionId(crypto.randomUUID());
       setMessage(
         result.status === "needs-clarification" ? result.message : null,
       );
     });
+  }
+
+  async function save() {
+    if (saving || !submissionId) return;
+
+    const saveItems = buildVoiceShoppingBatchSaveItems(items);
+    if (!saveItems.success) {
+      setMessage("Revisa los productos antes de añadirlos a la lista de compra.");
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
+    try {
+      const result = await saveVoiceShoppingBatchAction(submissionId, saveItems.data);
+      if (result.status === "error") {
+        setMessage(result.message);
+        return;
+      }
+
+      setItems([]);
+      setText("");
+      setSubmissionId(crypto.randomUUID());
+      setMessage(result.message);
+    } catch {
+      setMessage("No se pudieron añadir los productos. Inténtalo de nuevo.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -146,7 +184,7 @@ export function VoiceShoppingBatchInput() {
           id="voice-shopping-batch-text"
           maxLength={VOICE_SHOPPING_BATCH_MAX_LENGTH}
           value={text}
-          disabled={pending}
+          disabled={pending || saving}
           onChange={(event) =>
             setText(
               event.target.value.slice(0, VOICE_SHOPPING_BATCH_MAX_LENGTH),
@@ -159,20 +197,20 @@ export function VoiceShoppingBatchInput() {
         <button
           type="button"
           onClick={listening ? stop : dictate}
-          disabled={!supported || pending}
+          disabled={!supported || pending || saving}
           aria-pressed={listening}
         >
           {listening ? "Cancelar dictado" : "Dictar lista"}
         </button>
 
-        <button type="button" onClick={clear}>
+        <button type="button" onClick={clear} disabled={saving}>
           Borrar texto
         </button>
 
         <button
           type="button"
           onClick={analyze}
-          disabled={pending || !text.trim()}
+          disabled={pending || saving || !text.trim()}
         >
           {pending ? "Analizando productos…" : "Analizar lista"}
         </button>
@@ -192,7 +230,13 @@ export function VoiceShoppingBatchInput() {
       </div>
 
       {items.length ? (
-        <VoiceShoppingBatchPreview items={items} onChange={setItems} />
+        <VoiceShoppingBatchPreview
+          items={items}
+          onChange={setItems}
+          submissionId={submissionId}
+          saving={saving}
+          onSave={save}
+        />
       ) : null}
     </details>
   );
