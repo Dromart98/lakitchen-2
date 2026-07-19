@@ -109,8 +109,8 @@ export function InventoryMealBuilder({
   initialMealType = "",
   initialRows,
   unavailableItems = [],
-  returnPath = "/meal-builder",
-  presentation = "page",
+  returnPath = "/macros",
+  presentation = "embedded",
 }: InventoryMealBuilderProps) {
   const eligibleItems = useMemo(() => items.filter(isMealBuilderInventoryItemEligible), [items]);
   const [rows, setRows] = useState<BuilderRow[]>(() => createInitialRows(initialRows));

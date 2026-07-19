@@ -6,7 +6,7 @@ import { MacroProgress } from "@/components/nutrition/MacroProgress";
 import { getInventoryExpirationAlertItems } from "@/modules/inventory/inventory-expiration";
 import { remainingMacros, sumMacros } from "@/modules/meals/meal-summary";
 import { MEAL_TYPE_LABELS, MEAL_TYPES, normalizeMealType } from "@/modules/meals/meal-types";
-import { addMealLogAction, deleteMealLogAction } from "./actions";
+import { deleteMealLogAction } from "./actions";
 import type { MacroTotals } from "@/modules/nutrition/nutrition.types";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -50,27 +50,8 @@ function getProfileGoal(profile: NutritionProfileTargetsRow | null): MacroTotals
 
 export const dynamic = "force-dynamic";
 
-function getMealErrorMessage(code: string | undefined) {
-  if (code === "meal-name-required") return "Escribe un nombre para la comida.";
-  if (code === "meal-name-too-long") return "El nombre de la comida no puede superar los 120 caracteres.";
-  if (code === "invalid-macros") return "Los macros deben ser números enteros de 0 o más.";
-  if (code === "invalid-meal-type") return "Selecciona un tipo de comida válido.";
-  if (code === "meal-not-found") return "No se encontró la comida de hoy.";
-  if (code === "save-failed") return "No se pudo guardar la comida. Inténtalo de nuevo.";
-  if (code === "delete-failed") return "No se pudo eliminar la comida. Inténtalo de nuevo.";
-  if (code === "load-edit-failed") return "No se pudo cargar la comida para editar. Inténtalo de nuevo.";
-  return null;
-}
 
-function getMealSuccessMessage(code: string | undefined) {
-  if (code === "meal-created") return "Comida registrada correctamente.";
-  if (code === "meal-deleted") return "Comida eliminada correctamente.";
-  if (code === "meal-updated") return "Comida actualizada correctamente.";
-  if (code === "meal-repeated") return "Comida repetida y añadida a hoy.";
-  return null;
-}
-
-export default async function DashboardPage({ searchParams }: { searchParams?: Promise<{ mealError?: string; mealSuccess?: string }> }) {
+export default async function DashboardPage() {
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "dashboard");
 
@@ -120,9 +101,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
     carbsG: meal.carbs_g,
     fatG: meal.fat_g,
   })));
-  const resolvedSearchParams = await searchParams;
-  const mealErrorMessage = getMealErrorMessage(resolvedSearchParams?.mealError);
-  const mealSuccessMessage = getMealSuccessMessage(resolvedSearchParams?.mealSuccess);
   const goal = getProfileGoal(profile ?? null);
   const remaining = goal ? remainingMacros(goal, consumedToday) : null;
   const expiring = getInventoryExpirationAlertItems(inventoryItems, today);
@@ -197,11 +175,8 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
           <p className="muted">Acciones rápidas para completar tu día sin repetir la navegación principal.</p>
         </div>
         <div className="dashboard-quick-actions__links">
-          <a className="button dashboard-action-button dashboard-action-button--primary" href="#registro-rapido">
+          <Link className="button dashboard-action-button dashboard-action-button--primary" href="/macros?mealMode=ingredients#registrar-comida">
             Registrar comida
-          </a>
-          <Link className="button dashboard-action-button" href="/meal-builder">
-            Componer comida
           </Link>
           <Link className="button dashboard-action-button" href="/recipes?mode=all">
             Ver recetas
@@ -254,44 +229,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
         )}
       </section>
 
-      <section className="card dashboard-manual-log" id="registro-rapido" aria-labelledby="quick-log-title">
-        <h2 id="quick-log-title">Registro manual rápido</h2>
-        <p className="muted">Añade una comida consumida hoy para sumar sus macros al dashboard.</p>
-        {mealErrorMessage ? <p className="auth-message error" role="alert">{mealErrorMessage}</p> : null}
-        {mealSuccessMessage ? <p className="auth-message success">{mealSuccessMessage}</p> : null}
-        <form action={addMealLogAction} className="meal-log-form dashboard-meal-log-form">
-          <label className="field" htmlFor="meal-name">
-            <span>Nombre</span>
-            <input id="meal-name" name="name" type="text" required placeholder="Pollo con arroz" />
-          </label>
-          <label className="field" htmlFor="meal-type">
-            <span>Tipo de comida</span>
-            <select id="meal-type" name="meal_type" required defaultValue="">
-              <option value="" disabled>Selecciona un tipo</option>
-              {MEAL_TYPES.map((mealType) => (
-                <option key={mealType} value={mealType}>{MEAL_TYPE_LABELS[mealType]}</option>
-              ))}
-            </select>
-          </label>
-          <label className="field" htmlFor="meal-calories">
-            <span>Calorías</span>
-            <input id="meal-calories" name="calories" type="number" min="0" step="1" required defaultValue="0" />
-          </label>
-          <label className="field" htmlFor="meal-protein">
-            <span>Proteína (g)</span>
-            <input id="meal-protein" name="protein_g" type="number" min="0" step="1" required defaultValue="0" />
-          </label>
-          <label className="field" htmlFor="meal-carbs">
-            <span>Carbohidratos (g)</span>
-            <input id="meal-carbs" name="carbs_g" type="number" min="0" step="1" required defaultValue="0" />
-          </label>
-          <label className="field" htmlFor="meal-fat">
-            <span>Grasas (g)</span>
-            <input id="meal-fat" name="fat_g" type="number" min="0" step="1" required defaultValue="0" />
-          </label>
-          <button className="button dashboard-submit-button" type="submit">Registrar comida</button>
-        </form>
-      </section>
 
       <section className="dashboard-support-grid">
         <ExpiringList items={expiring} todayKey={today} />

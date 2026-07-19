@@ -1,143 +1,14 @@
-import Link from "next/link";
-import { AppShell } from "@/components/layout/AppShell";
+import { redirect } from "next/navigation";
 
-import { InventoryMealBuilder } from "@/components/meals/InventoryMealBuilder";
-import { requireAuthenticatedUser } from "@/lib/supabase/auth";
-import { createClient } from "@/lib/supabase/server";
-import {
-  createRepeatedMealBuilderDraft,
-  getMealBuilderMessage,
-  type MealBuilderInventoryItem,
-  type RepeatedMealBuilderDraft,
-  type RepeatedMealBuilderMeal,
-  type RepeatedMealBuilderSnapshot,
-} from "@/modules/meals/meal-builder";
-import { isValidUuid } from "@/modules/meals/meal-validation";
+import { buildMealBuilderCompatibilityDestination } from "@/modules/meals/meal-builder";
 
 export const dynamic = "force-dynamic";
 
-const REPEAT_MEAL_LOAD_ERROR = "No se pudo cargar esta comida para repetirla.";
-
-type InventoryItemsQueryResult = {
-  data: MealBuilderInventoryItem[] | null;
-  error: { message: string } | null;
-};
-
-type RepeatMealQueryResult = {
-  data: RepeatedMealBuilderMeal | null;
-  error: { message: string } | null;
-};
-
-type RepeatMealSnapshotsQueryResult = {
-  data: RepeatedMealBuilderSnapshot[] | null;
-  error: { message: string } | null;
-};
-
 type MealBuilderPageProps = {
-  searchParams?: Promise<{
-    mealError?: string;
-    mealSuccess?: string;
-    repeatMeal?: string;
-  }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
+/** Compatibility route for saved meal-builder URLs. */
 export default async function MealBuilderPage({ searchParams }: MealBuilderPageProps) {
-  const params = await searchParams;
-  const mealErrorMessage = getMealBuilderMessage(params?.mealError, false);
-  const mealSuccessMessage = getMealBuilderMessage(params?.mealSuccess, true);
-  const repeatMeal = params?.repeatMeal?.trim() ?? "";
-
-  const supabase = await createClient();
-  const user = await requireAuthenticatedUser(supabase, "meal builder");
-
-  const { data: inventoryItems, error } = await supabase
-    .from("inventory_items")
-    .select("id, name, quantity, unit, nutrition_basis, calories, protein_g, carbs_g, fat_g")
-    .eq("user_id", user.id)
-    .gt("quantity", 0)
-    .order("name", { ascending: true }) as InventoryItemsQueryResult;
-
-  if (error) {
-    console.warn("Supabase could not load the meal builder inventory items:", error.message);
-  }
-
-  const availableInventoryItems = error ? [] : inventoryItems ?? [];
-  let repeatMealDraft: RepeatedMealBuilderDraft | null = null;
-  let repeatMealMessage: string | null = null;
-  let repeatMealLoaded = false;
-
-  if (repeatMeal) {
-    if (!isValidUuid(repeatMeal)) {
-      repeatMealMessage = "El enlace para repetir esta comida no es válido.";
-    } else {
-      const { data: meal, error: mealError } = await (supabase as any)
-        .from("daily_meal_logs")
-        .select("name, meal_type")
-        .eq("id", repeatMeal)
-        .eq("user_id", user.id)
-        .maybeSingle() as RepeatMealQueryResult;
-
-      if (mealError) {
-        console.warn("Supabase could not load the repeated meal:", mealError.message);
-        repeatMealMessage = REPEAT_MEAL_LOAD_ERROR;
-      } else if (!meal) {
-        repeatMealMessage = REPEAT_MEAL_LOAD_ERROR;
-      } else {
-        const { data: snapshots, error: snapshotsError } = await (supabase as any)
-          .from("daily_meal_log_items")
-          .select("source_inventory_item_id, product_name, consumed_quantity, unit")
-          .eq("meal_log_id", repeatMeal)
-          .eq("user_id", user.id)
-          .order("product_name", { ascending: true })
-          .order("source_inventory_item_id", { ascending: true }) as RepeatMealSnapshotsQueryResult;
-
-        if (snapshotsError) {
-          console.warn("Supabase could not load the repeated meal snapshots:", snapshotsError.message);
-          repeatMealMessage = REPEAT_MEAL_LOAD_ERROR;
-        } else if (!snapshots?.length) {
-          repeatMealMessage = REPEAT_MEAL_LOAD_ERROR;
-        } else {
-          repeatMealDraft = createRepeatedMealBuilderDraft(meal, snapshots, availableInventoryItems);
-          repeatMealLoaded = true;
-        }
-      }
-    }
-  }
-
-  return (
-    <AppShell>
-      <div className="meal-builder-page">
-        <header className="meal-builder-header">
-          <div className="meal-builder-header__copy">
-            <p className="meal-builder-eyebrow">Dieta</p>
-            <h1>Construye tu comida</h1>
-            <p>Elige tus alimentos y comprueba sus calorías y macros antes de registrarlos.</p>
-          </div>
-          <nav className="meal-builder-header__links" aria-label="Enlaces de comidas">
-            <Link href="/meal-history">Ver historial</Link>
-            <Link href="/weekly-summary">Resumen semanal</Link>
-          </nav>
-        </header>
-
-        <div className="meal-builder-messages">
-          {mealSuccessMessage ? <p className="auth-message success" role="status">{mealSuccessMessage}</p> : null}
-          {mealErrorMessage ? <p className="auth-message error" role="alert">{mealErrorMessage}</p> : null}
-          {repeatMealMessage ? <p className="auth-message error" role="alert">{repeatMealMessage}</p> : null}
-          {repeatMealLoaded ? (
-            <p className="auth-message success" role="status">Comida anterior cargada. Revisa las cantidades antes de confirmar.</p>
-          ) : null}
-          {error ? <p className="auth-message error" role="alert">No se pudo cargar tu inventario. Inténtalo de nuevo.</p> : null}
-        </div>
-
-        <InventoryMealBuilder
-          key={repeatMeal || "new-meal"}
-          items={availableInventoryItems}
-          initialMealName={repeatMealDraft?.mealName}
-          initialMealType={repeatMealDraft?.mealType}
-          initialRows={repeatMealDraft?.availableLines}
-          unavailableItems={repeatMealDraft?.unavailableItems}
-        />
-      </div>
-    </AppShell>
-  );
+  redirect(buildMealBuilderCompatibilityDestination(await searchParams));
 }

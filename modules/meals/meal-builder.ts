@@ -7,7 +7,7 @@ import {
 import { isMealType, type MealType } from "@/modules/meals/meal-types";
 import { isValidUuid } from "@/modules/meals/meal-validation";
 
-export type MealBuilderReturnPath = "/meal-builder" | "/macros";
+export type MealBuilderReturnPath = "/macros";
 
 const MEAL_BUILDER_ERROR_MESSAGES: Record<string, string> = {
   "invalid-name": "El nombre de la comida es obligatorio y no puede superar 120 caracteres.",
@@ -24,8 +24,22 @@ const MEAL_BUILDER_ERROR_MESSAGES: Record<string, string> = {
   "consume-failed": "No se pudo registrar la comida. Inténtalo de nuevo.",
 };
 
-export function resolveMealBuilderReturnPath(value: unknown): MealBuilderReturnPath {
-  return value === "/macros" ? "/macros" : "/meal-builder";
+export function resolveMealBuilderReturnPath(_value: unknown): MealBuilderReturnPath {
+  return "/macros";
+}
+
+export function buildMealBuilderResultDestination(kind: "mealError" | "mealSuccess", code: string): string {
+  return `/macros?mealMode=ingredients&${kind}=${encodeURIComponent(code)}#registrar-comida`;
+}
+
+/** Builds a safe internal destination for historic /meal-builder links. */
+export function buildMealBuilderCompatibilityDestination(params: Record<string, string | string[] | undefined> | undefined): string {
+  const query = new URLSearchParams({ mealMode: "ingredients" });
+  for (const key of ["repeatMeal", "mealError", "mealSuccess"] as const) {
+    const value = params?.[key];
+    if (typeof value === "string" && value) query.set(key, value);
+  }
+  return `/macros?${query.toString()}#registrar-comida`;
 }
 
 export function getMealBuilderMessage(code: string | undefined, success: boolean): string | null {

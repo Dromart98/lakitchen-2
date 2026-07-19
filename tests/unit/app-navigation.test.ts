@@ -38,11 +38,11 @@ describe("app navigation", () => {
     expect(isNavigationItemActive("/plan", macros!)).toBe(false);
   });
 
-  it("marks the meal builder as part of diet", () => {
+  it("does not mark the compatibility meal builder route as part of diet", () => {
     const diet = navigationItems.find((item) => item.href === "/plan");
     expect(diet).toBeDefined();
     expect(isNavigationItemActive("/plan", diet!)).toBe(true);
-    expect(isNavigationItemActive("/meal-builder", diet!)).toBe(true);
+    expect(isNavigationItemActive("/meal-builder", diet!)).toBe(false);
     expect(isNavigationItemActive("/macros", diet!)).toBe(false);
   });
 });
