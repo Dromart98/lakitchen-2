@@ -59,7 +59,7 @@ export default async function NutritionProfilePage() {
           <h1>Define tus objetivos</h1>
           <p>Utilizamos estos datos para calcular tus objetivos diarios y personalizar tu plan de comidas.</p>
         </header>
-        {error ? <p className="nutrition-profile-errors auth-message error" role="alert">Supabase no pudo cargar el perfil: {error.message}</p> : null}
+        {error ? <p className="nutrition-profile-errors auth-message error" role="alert">No se pudo cargar el perfil. Inténtalo de nuevo.</p> : null}
         <NutritionProfileForm initialValues={getInitialValues(profile ?? null)} />
       </div>
     </AppShell>

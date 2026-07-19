@@ -69,7 +69,7 @@ export async function saveNutritionProfileAction(formData: FormData): Promise<Nu
   if (userError || !userData.user) return { error: "Debes iniciar sesión para guardar tu perfil nutricional." };
 
   const { error } = await (supabase as any).from("user_nutrition_profiles").upsert({ ...payload, user_id: userData.user.id }, { onConflict: "user_id" });
-  if (error) return { error: `Supabase no pudo guardar el perfil: ${error.message}` };
+  if (error) return { error: "No se pudo guardar el perfil. Inténtalo de nuevo." };
 
   revalidatePath("/nutrition-profile");
   revalidatePath("/dashboard");

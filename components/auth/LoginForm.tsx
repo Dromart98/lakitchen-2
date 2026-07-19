@@ -36,7 +36,7 @@ export function LoginForm() {
       : await supabase.auth.signUp({ email, password });
 
     if (error) {
-      setState({ error: error.message });
+      setState({ error: "No se pudo completar la autenticación. Inténtalo de nuevo." });
       setPendingMode(null);
       return;
     }
