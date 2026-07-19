@@ -9,12 +9,14 @@ import { isValidUuid } from "@/modules/meals/meal-validation";
 
 export type MealBuilderReturnPath = "/macros";
 
+export const MAX_MEAL_BUILDER_LINES = 20;
+
 const MEAL_BUILDER_ERROR_MESSAGES: Record<string, string> = {
   "invalid-name": "El nombre de la comida es obligatorio y no puede superar 120 caracteres.",
   "invalid-meal-type": "Selecciona un tipo de comida válido.",
   "invalid-lines-json": "No se pudo leer la selección de productos. Revisa la comida e inténtalo de nuevo.",
   "invalid-lines": "Añade al menos un producto válido a la comida.",
-  "too-many-products": "La comida no puede contener más de diez productos.",
+  "too-many-products": "La comida no puede contener más de veinte productos.",
   "duplicate-product": "No puedes registrar el mismo producto más de una vez en la misma comida.",
   "product-not-found": "Uno de los productos ya no está disponible en tu inventario.",
   "invalid-quantity": "Revisa las cantidades de los productos.",
@@ -169,7 +171,7 @@ export function parseMealBuilderConsumptionLines(rawLines: unknown): MealBuilder
 
   if (!Array.isArray(parsedLines)) return { error: "invalid-lines-json" };
   if (parsedLines.length < 1) return { error: "invalid-lines" };
-  if (parsedLines.length > 10) return { error: "too-many-products" };
+  if (parsedLines.length > MAX_MEAL_BUILDER_LINES) return { error: "too-many-products" };
 
   const seenItemIds = new Set<string>();
   const lines: MealBuilderConsumptionPayloadLine[] = [];
@@ -198,7 +200,7 @@ export function parseMealBuilderConsumptionLines(rawLines: unknown): MealBuilder
 export function createMealBuilderConsumptionPayload(
   lines: MealBuilderLine[],
 ): MealBuilderConsumptionPayloadLine[] | null {
-  if (!lines.length || lines.length > 10) return null;
+  if (!lines.length || lines.length > MAX_MEAL_BUILDER_LINES) return null;
   if (!calculateMealBuilderTotals(lines)) return null;
 
   const seenItemIds = new Set<string>();
@@ -249,7 +251,6 @@ export type RepeatedMealBuilderDraft = {
   unavailableItems: RepeatedMealBuilderUnavailableItem[];
 };
 
-const MAX_REPEATED_MEAL_BUILDER_LINES = 10;
 
 export function createRepeatedMealBuilderDraft(
   meal: RepeatedMealBuilderMeal,
@@ -289,7 +290,7 @@ export function createRepeatedMealBuilderDraft(
       continue;
     }
 
-    if (availableLines.length >= MAX_REPEATED_MEAL_BUILDER_LINES) continue;
+    if (availableLines.length >= MAX_MEAL_BUILDER_LINES) continue;
 
     availableLines.push({
       itemId: currentItem.id,
