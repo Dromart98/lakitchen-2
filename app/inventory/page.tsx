@@ -3,6 +3,7 @@ import { AppShell } from "@/components/layout/AppShell";
 
 import { InventoryConsumeForm } from "@/components/inventory/InventoryConsumeForm";
 import { InventoryNutritionAiControls } from "@/components/inventory/InventoryNutritionAiControls";
+import { VoiceInventoryBatchInput } from "@/components/inventory/VoiceInventoryBatchInput";
 import { BarcodeCatalogControls } from "./BarcodeCatalogControls";
 import { InventoryAddCta } from "./InventoryAddCta";
 import { InventoryNutritionCta } from "./InventoryNutritionCta";
@@ -831,6 +832,10 @@ export default async function InventoryPage({
                 Gestionar productos recordados
               </Link>
             </div>
+            <details className="inventory-action">
+              <summary>Añadir varios por voz</summary>
+              <VoiceInventoryBatchInput />
+            </details>
             <form action={addInventoryItemAction} className="meal-log-form">
               <label
                 className="field"

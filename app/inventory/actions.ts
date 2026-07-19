@@ -435,3 +435,15 @@ export async function deleteInventoryItemAction(formData: FormData) {
   revalidatePath(INVENTORY_PATH);
   redirect(`${INVENTORY_PATH}?inventorySuccess=item-deleted`);
 }
+
+export async function estimateVoiceInventoryBatchAction(text: string) {
+  const { parseVoiceInventoryBatchInput } = await import("@/modules/inventory/voice-inventory-batch");
+  const input = parseVoiceInventoryBatchInput(text);
+  if (!input) return { status: "error" as const, code: "invalid-input" as const, message: "Escribe una lista de hasta 4.000 caracteres." };
+  const supabase = await createClient();
+  await requireAuthenticatedUser(supabase, "voice inventory batch estimate");
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return { status: "error" as const, code: "not-configured" as const, message: "La estimación con IA no está configurada todavía." };
+  const { generateVoiceInventoryBatch } = await import("@/lib/openai/voice-inventory-batch-generation");
+  return generateVoiceInventoryBatch(input, { apiKey, model: process.env.OPENAI_VOICE_INVENTORY_BATCH_MODEL || undefined });
+}
