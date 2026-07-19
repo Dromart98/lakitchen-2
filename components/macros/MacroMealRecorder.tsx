@@ -3,6 +3,7 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 
 import { addMealLogAction } from "@/app/dashboard/actions";
+import { PendingSubmitButton } from "@/components/forms/PendingSubmitButton";
 import { PhotoAiMealEstimator } from "@/components/macros/PhotoAiMealEstimator";
 import { TextAiMealEstimator } from "@/components/macros/TextAiMealEstimator";
 import { InventoryMealBuilder } from "@/components/meals/InventoryMealBuilder";
@@ -96,7 +97,7 @@ export function MacroMealRecorder({
           <label className="field" htmlFor="macros-carbs"><span>Carbohidratos (g)</span><input id="macros-carbs" name="carbs_g" type="number" min="0" step="0.1" inputMode="decimal" required defaultValue="0" /></label>
           <label className="field" htmlFor="macros-fat"><span>Grasas (g)</span><input id="macros-fat" name="fat_g" type="number" min="0" step="0.1" inputMode="decimal" required defaultValue="0" /></label>
           <p className="macros-manual-note">Solo macros no utiliza ni descuenta productos del inventario.</p>
-          <button className="button macros-submit" type="submit">Guardar solo macros</button>
+          <PendingSubmitButton className="button macros-submit" idleLabel="Guardar solo macros" pendingLabel="Guardando macros…" />
         </form>
       </div>
 

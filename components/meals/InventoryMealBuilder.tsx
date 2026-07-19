@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { consumeMealBuilderAndLogMealAction } from "@/app/meal-builder/actions";
+import { PendingSubmitButton } from "@/components/forms/PendingSubmitButton";
 import {
   MAX_MEAL_BUILDER_LINES,
   calculateMealBuilderLineNutrition,
@@ -326,9 +327,12 @@ export function InventoryMealBuilder({
             Al confirmar, las cantidades seleccionadas se descontarán del inventario y se registrará una única comida.
           </p>
 
-          <button className="button meal-builder-submit" disabled={!canSubmitMeal} type="submit">
-            {presentation === "embedded" ? "Registrar comida y descontar inventario" : "Registrar comida"}
-          </button>
+          <PendingSubmitButton
+            className="button meal-builder-submit"
+            disabled={!canSubmitMeal}
+            idleLabel={presentation === "embedded" ? "Registrar comida y descontar inventario" : "Registrar comida"}
+            pendingLabel={presentation === "embedded" ? "Registrando y descontando…" : "Registrando comida…"}
+          />
         </form>
       </section>
       </div>
