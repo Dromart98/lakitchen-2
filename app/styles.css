@@ -6296,6 +6296,19 @@ h3 {
 
 .text-ai-estimator { display: grid; gap: 12px; }
 .text-ai-estimator textarea { min-height: 120px; resize: vertical; }
+.text-ai-description-row { display: grid; gap: 8px; }
+.voice-dictation-button { align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); cursor: pointer; display: inline-flex; font: inherit; font-weight: 700; justify-content: center; min-height: 44px; padding: 10px 14px; }
+.voice-dictation-button:hover { border-color: var(--brand-accent); }
+.voice-dictation-button:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.voice-dictation-button.is-listening { border-color: var(--brand-accent); color: var(--brand-dark); }
+.voice-dictation-button:disabled { cursor: not-allowed; opacity: 0.6; }
+.voice-dictation-details { display: grid; gap: 6px; }
+.voice-dictation-details p { margin: 0; }
+.voice-status, .voice-interim { color: var(--muted); }
+.voice-interim { overflow-wrap: anywhere; }
+.voice-error { color: var(--danger); }
+.voice-compatibility { color: var(--muted); }
+.voice-privacy { border-left: 3px solid var(--brand-accent); color: var(--muted); font-size: 0.9rem; padding-left: 10px; }
 .text-ai-counter { color: var(--muted); text-align: right; }
 .text-ai-preview { display: grid; gap: 14px; border-top: 1px solid var(--border); margin-top: 8px; padding-top: 18px; }
 .text-ai-preview h3, .text-ai-preview p { margin: 0; }
