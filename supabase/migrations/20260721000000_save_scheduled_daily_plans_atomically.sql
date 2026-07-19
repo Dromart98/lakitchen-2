@@ -6,6 +6,8 @@ create or replace function public.save_scheduled_daily_plan(
 declare v_user_id uuid := auth.uid(); v_id uuid;
 begin
   if v_user_id is null then raise exception using errcode = '28000', message = 'Authentication required'; end if;
+  if p_plan_date is null or p_plan_date < current_date or p_plan_date > current_date + 6 then raise exception using errcode = '22023', message = 'invalid_plan_date'; end if;
+  if p_priority_mode not in ('balanced', 'expiration') or p_max_minutes_per_meal not in (15,30,45,60) or p_fit not in ('close','acceptable','far') or jsonb_typeof(p_target) <> 'object' or jsonb_typeof(p_total) <> 'object' or jsonb_typeof(p_difference) <> 'object' or jsonb_typeof(p_meals) <> 'array' or jsonb_array_length(p_meals) <> 4 or p_fingerprint is null or p_fingerprint !~ '^[0-9a-f]{64}$' then raise exception using errcode = '22023', message = 'invalid_plan_payload'; end if;
   perform pg_advisory_xact_lock(hashtextextended(v_user_id::text || ':' || p_plan_date::text, 0));
   if exists (select 1 from public.user_saved_daily_plans where user_id = v_user_id and plan_date = p_plan_date) then
     raise exception using errcode = 'P0001', message = 'date_occupied';

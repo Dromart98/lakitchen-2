@@ -3,7 +3,7 @@ import { CookSavedPlanMealButton } from "@/components/plan/CookSavedPlanMealButt
 import { MEAL_TYPE_LABELS } from "@/modules/meals/meal-types";
 import type { DailyPlanNutrition } from "@/modules/plans/daily-plan-ai";
 import { canCookSavedPlanOnDate, formatPlanDateLabel, getPlanDateOptions } from "@/modules/plans/plan-date";
-import type { SavedDailyPlan } from "@/modules/plans/saved-daily-plans";
+import { groupSavedDailyPlansForAgenda, type SavedDailyPlan } from "@/modules/plans/saved-daily-plans";
 
 const fitLabels = {
   close: "Muy cerca del objetivo",
@@ -32,12 +32,7 @@ function MacroLine({ value }: { value: DailyPlanNutrition }) {
 }
 
 export function SavedDailyPlans({ plans, todayKey }: { plans: SavedDailyPlan[]; todayKey: string }) {
-  const dates = getPlanDateOptions(todayKey);
-  const grouped = new Map<string, SavedDailyPlan[]>();
-  for (const plan of [...plans].sort((a, b) => b.created_at.localeCompare(a.created_at))) grouped.set(plan.plan_date, [...(grouped.get(plan.plan_date) ?? []), plan]);
-  const primaryByDate = new Map(dates.map((date) => [date, grouped.get(date)?.[0]]));
-  const legacyDuplicates = dates.flatMap((date) => (grouped.get(date) ?? []).slice(1));
-  const outsideWindow = plans.filter((plan) => !dates.includes(plan.plan_date));
+  const { dates, primaryPlans, legacyDuplicates, outsideWindow } = groupSavedDailyPlansForAgenda(plans, todayKey);
   return (
     <section className="saved-plans" aria-labelledby="saved-plans-title">
       <div className="saved-plans__heading">
@@ -47,10 +42,10 @@ export function SavedDailyPlans({ plans, todayKey }: { plans: SavedDailyPlan[]; 
       </div>
 
       <h3>Próximos siete días</h3>
-      <div className="weekly-plan-agenda">{dates.map((date) => { const plan = primaryByDate.get(date); return <div className="weekly-plan-slot" key={date}><h4>{formatPlanDateLabel(date, todayKey)}</h4>{plan ? <><p><strong>Plan guardado</strong></p><MacroLine value={plan.total} /><p>{Object.values(plan.completed_meals).filter(Boolean).length} de 4 comidas registradas</p><a href={`#saved-plan-${plan.id}`}>Ver detalles</a></> : <p><strong>Sin plan</strong></p>}</div>; })}</div>
+      <div className="weekly-plan-agenda">{dates.map((date) => { const plan = primaryPlans[dates.indexOf(date)]; return <div className="weekly-plan-slot" key={date}><h4>{formatPlanDateLabel(date, todayKey)}</h4>{plan ? <><p><strong>Plan guardado</strong></p><MacroLine value={plan.total} /><p>{Object.values(plan.completed_meals).filter(Boolean).length} de 4 comidas registradas</p><a href={`#saved-plan-${plan.id}`}>Ver detalles</a></> : <p><strong>Sin plan</strong></p>}</div>; })}</div>
       {plans.length === 0 ? <p className="saved-plans__empty">Todavía no has guardado ningún plan.</p> : null}
 
-      {[...Array.from(primaryByDate.values()).filter((plan): plan is SavedDailyPlan => Boolean(plan)), ...outsideWindow, ...legacyDuplicates].map((plan) => (
+      {[...primaryPlans.filter((plan): plan is SavedDailyPlan => Boolean(plan)), ...outsideWindow, ...legacyDuplicates].map((plan) => (
         <article className="saved-plan" id={`saved-plan-${plan.id}`} key={plan.id}>
           <div className="saved-plan__header">
             <div className="saved-plan__identity">

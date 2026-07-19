@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export const PLAN_SCHEDULING_DAYS = 7;
 
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -51,3 +53,5 @@ export function canCookSavedPlanOnDate(planDate: string, todayKey: string): bool
   const difference = getPlanDateDayDifference(planDate, todayKey);
   return difference !== null && difference <= 0;
 }
+
+export const planDateKeySchema = z.string().refine(isValidDateKey, "Invalid plan date");

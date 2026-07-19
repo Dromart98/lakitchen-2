@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { planDateKeySchema } from "@/modules/plans/plan-date";
 
 import { getInventoryExpirationDayDifference } from "@/modules/inventory/inventory-expiration";
 import { hasCompleteInventoryNutritionValues, isInventoryNutritionBasis, type InventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
@@ -18,10 +19,10 @@ export const DAILY_PLAN_MAX_MINUTES = [15, 30, 45, 60] as const;
 
 type DailyPlanMaxMinutes = (typeof DAILY_PLAN_MAX_MINUTES)[number];
 
-const planDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
 
 export const dailyPlanPublicRequestSchema = z.object({
-  plan_date: planDateSchema,
+  plan_date: planDateKeySchema,
   priority_mode: z.enum(DAILY_PLAN_PRIORITY_MODES),
   max_minutes_per_meal: z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60)]),
 }).strict();

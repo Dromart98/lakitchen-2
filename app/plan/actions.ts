@@ -20,7 +20,7 @@ import {
   type CookSavedDailyPlanMealResult,
   type SaveDailyPlanResult,
 } from "@/modules/plans/saved-daily-plans";
-import { canCookSavedPlanOnDate, isAllowedPlanDate } from "@/modules/plans/plan-date";
+import { canCookSavedPlanOnDate, isAllowedPlanDate, isValidDateKey } from "@/modules/plans/plan-date";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUser } from "@/lib/supabase/auth";
 
@@ -170,8 +170,10 @@ export async function cookSavedDailyPlanMealAction(input: unknown): Promise<Cook
     const user = await getAuthenticatedUser(supabase, "saved daily plan meal cooking");
     if (!user) return { status: "error", code: "unauthenticated" };
 
-    const { data: savedPlan } = await (supabase as any).from("user_saved_daily_plans").select("plan_date").eq("id", request.data.plan_id).eq("user_id", user.id).maybeSingle() as { data: { plan_date: string } | null };
-    if (!savedPlan || !canCookSavedPlanOnDate(savedPlan.plan_date, getCurrentInventoryExpirationDateKey())) return { status: "error", code: "not-yet-available" };
+    const { data: savedPlan, error: savedPlanError } = await (supabase as any).from("user_saved_daily_plans").select("plan_date").eq("id", request.data.plan_id).eq("user_id", user.id).maybeSingle() as { data: { plan_date: string } | null; error: { message: string } | null };
+    if (savedPlanError) { console.warn("Supabase could not load the saved daily plan."); return { status: "error", code: "unexpected-error" }; }
+    if (!savedPlan || !isValidDateKey(savedPlan.plan_date)) return { status: "error", code: "unexpected-error" };
+    if (!canCookSavedPlanOnDate(savedPlan.plan_date, getCurrentInventoryExpirationDateKey())) return { status: "error", code: "not-yet-available" };
 
     const { data, error } = await (supabase as any).rpc("consume_saved_daily_plan_meal", {
       p_plan_id: request.data.plan_id,

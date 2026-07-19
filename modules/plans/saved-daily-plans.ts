@@ -6,9 +6,8 @@ import {
   type DailyPlanMeal,
   type DailyPlanSuccessResult,
 } from "@/modules/plans/daily-plan-ai";
+import { getPlanDateOptions, planDateKeySchema } from "@/modules/plans/plan-date";
 import { RECIPE_MAX_INGREDIENTS } from "@/modules/recipes/recipe-limits";
-
-const planDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 const maxMinutesSchema = z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60)]);
 
@@ -56,7 +55,7 @@ const successPlanSchema = z.object({
 });
 
 export const saveDailyPlanRequestSchema = z.object({
-  plan_date: planDateSchema,
+  plan_date: planDateKeySchema,
   priority_mode: z.enum(DAILY_PLAN_PRIORITY_MODES),
   max_minutes_per_meal: maxMinutesSchema,
   plan: successPlanSchema,
@@ -99,7 +98,7 @@ const completedMealsSchema = z.object({
 
 const savedDailyPlanRowSchema = z.object({
   id: z.string().uuid(),
-  plan_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  plan_date: planDateKeySchema,
   priority_mode: z.enum(DAILY_PLAN_PRIORITY_MODES),
   max_minutes_per_meal: maxMinutesSchema,
   target: nutritionSchema,
@@ -118,4 +117,15 @@ export type SavedDailyPlan = Omit<z.infer<typeof savedDailyPlanRowSchema>, "meal
 export function toSavedDailyPlan(value: unknown): SavedDailyPlan | null {
   const parsed = savedDailyPlanRowSchema.safeParse(value);
   return parsed.success ? parsed.data as SavedDailyPlan : null;
+}
+
+export function groupSavedDailyPlansForAgenda(plans: SavedDailyPlan[], todayKey: string) {
+  const dates = getPlanDateOptions(todayKey);
+  const sortNewest = (a: SavedDailyPlan, b: SavedDailyPlan) => b.created_at.localeCompare(a.created_at);
+  const byDate = new Map<string, SavedDailyPlan[]>();
+  for (const plan of [...plans].sort(sortNewest)) byDate.set(plan.plan_date, [...(byDate.get(plan.plan_date) ?? []), plan]);
+  const primaryPlans = dates.map((date) => byDate.get(date)?.[0] ?? null);
+  const legacyDuplicates = dates.flatMap((date) => (byDate.get(date) ?? []).slice(1));
+  const outsideWindow = plans.filter((plan) => !dates.includes(plan.plan_date)).sort((a, b) => b.plan_date.localeCompare(a.plan_date) || sortNewest(a, b));
+  return { dates, primaryPlans, legacyDuplicates, outsideWindow };
 }
