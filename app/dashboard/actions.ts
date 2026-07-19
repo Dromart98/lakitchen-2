@@ -5,15 +5,11 @@ import { redirect } from "next/navigation";
 
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getMealLogReturnPath } from "@/modules/meals/macro-meal-mode";
 import { isMealLogId, validateMealLogInput } from "@/modules/meals/meal-validation";
 
 const DASHBOARD_PATH = "/dashboard";
 const MACROS_PATH = "/macros";
-
-function getMealReturnPath(formData: FormData) {
-  const base = formData.get("return_to") === MACROS_PATH ? MACROS_PATH : DASHBOARD_PATH;
-  return base === MACROS_PATH && ["text-ai", "photo-ai"].includes(String(formData.get("meal_mode"))) ? `${MACROS_PATH}?mealMode=${formData.get("meal_mode")}` : base;
-}
 
 function withMealParameter(destination: string, parameter: string) {
   return `${destination}${destination.includes("?") ? "&" : "?"}${parameter}`;
@@ -25,7 +21,7 @@ function redirectMealValidationError(error: string, destination = DASHBOARD_PATH
 
 
 export async function addMealLogAction(formData: FormData) {
-  const destination = getMealReturnPath(formData);
+  const destination = getMealLogReturnPath(formData.get("return_to"), formData.get("meal_mode"));
   const mealInput = validateMealLogInput(formData);
 
   if ("error" in mealInput) {

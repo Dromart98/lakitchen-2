@@ -1,5 +1,10 @@
 export type MacroMealMode = "manual" | "text-ai" | "photo-ai" | "ingredients";
 
+export function getMealLogReturnPath(returnTo: unknown, mealMode: unknown) {
+  const base = returnTo === "/macros" ? "/macros" : "/dashboard";
+  return base === "/macros" && ["text-ai", "photo-ai"].includes(String(mealMode)) ? `/macros?mealMode=${mealMode}` : base;
+}
+
 type ModeMessage = {
   errorMessage: string | null;
   successMessage: string | null;

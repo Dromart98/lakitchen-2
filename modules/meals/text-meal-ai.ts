@@ -10,8 +10,9 @@ export type TextMealEstimationResult =
 
 export const textMealRequestSchema = z.object({ description: z.string().trim().min(3).max(2000) }).strict();
 
+const recognizedUnits = ["g", "ml", "unidad", "unidades", "loncha", "lonchas", "cucharadita", "cucharaditas", "cucharada", "cucharadas", "taza", "tazas", "lata", "latas", "plato", "platos"] as const;
 const ingredientSchema = z.object({
-  name: z.string().trim().min(1).max(120), quantity: z.number().finite().positive().max(10000), unit: z.string().trim().min(1).max(40), preparation: z.string().trim().min(1).max(120).nullable(),
+  name: z.string().trim().min(1).max(120), quantity: z.number().finite().positive().max(10000), unit: z.enum(recognizedUnits), preparation: z.string().trim().min(1).max(120).nullable(),
   calories: z.number().finite().min(0).max(5000), protein_g: z.number().finite().min(0).max(500), carbs_g: z.number().finite().min(0).max(1000), fat_g: z.number().finite().min(0).max(500),
 }).strict();
 const assumptionsSchema = z.array(z.string().trim().min(1).max(300)).max(20);
@@ -22,7 +23,7 @@ export const textMealRawProviderSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("needs-clarification"), suggested_name: z.null(), ingredients: z.null(), assumptions: z.null(), confidence: z.null(), message: z.string().trim().min(12).max(500) }).strict(),
 ]);
 
-export const TEXT_MEAL_JSON_SCHEMA = { type: "object", additionalProperties: false, required: ["status", "suggested_name", "ingredients", "assumptions", "confidence", "message"], properties: { status: { type: "string", enum: ["success", "needs-clarification"] }, suggested_name: { type: ["string", "null"] }, ingredients: { type: ["array", "null"], minItems: 1, maxItems: 20, items: { type: "object", additionalProperties: false, required: ["name", "quantity", "unit", "preparation", "calories", "protein_g", "carbs_g", "fat_g"], properties: { name: { type: "string" }, quantity: { type: "number" }, unit: { type: "string" }, preparation: { type: ["string", "null"] }, calories: { type: "number" }, protein_g: { type: "number" }, carbs_g: { type: "number" }, fat_g: { type: "number" } } } }, assumptions: { type: ["array", "null"], items: { type: "string" } }, confidence: { type: ["string", "null"], enum: ["high", "medium", "low", null] }, message: { type: ["string", "null"] } } } as const;
+export const TEXT_MEAL_JSON_SCHEMA = { type: "object", additionalProperties: false, required: ["status", "suggested_name", "ingredients", "assumptions", "confidence", "message"], properties: { status: { type: "string", enum: ["success", "needs-clarification"] }, suggested_name: { type: ["string", "null"] }, ingredients: { type: ["array", "null"], minItems: 1, maxItems: 20, items: { type: "object", additionalProperties: false, required: ["name", "quantity", "unit", "preparation", "calories", "protein_g", "carbs_g", "fat_g"], properties: { name: { type: "string" }, quantity: { type: "number" }, unit: { type: "string", enum: recognizedUnits }, preparation: { type: ["string", "null"] }, calories: { type: "number" }, protein_g: { type: "number" }, carbs_g: { type: "number" }, fat_g: { type: "number" } } } }, assumptions: { type: ["array", "null"], items: { type: "string" } }, confidence: { type: ["string", "null"], enum: ["high", "medium", "low", null] }, message: { type: ["string", "null"] } } } as const;
 
 const round = (value: number) => Math.round((value + Number.EPSILON) * 10) / 10;
 export function calculateTextMealTotals(ingredients: TextMealEstimatedIngredient[]): MacroTotals | null {

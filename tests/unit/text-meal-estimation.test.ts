@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateTextMealWithOpenAi } from "@/lib/openai/text-meal-estimation";
+import { TEXT_MEAL_AI_MODEL_DEFAULT, TEXT_MEAL_SYSTEM_PROMPT, estimateTextMealWithOpenAi } from "@/lib/openai/text-meal-estimation";
 
 const success = { status: "success", suggested_name: "Comida", ingredients: [{ name: "Arroz", quantity: 150, unit: "g", preparation: "cocido", calories: 195, protein_g: 4, carbs_g: 42, fat_g: 0.5 }], assumptions: [], confidence: "medium", message: null };
 const clarification = { status: "needs-clarification", suggested_name: null, ingredients: null, assumptions: null, confidence: null, message: "No puedo estimar cuánto arroz se consumió aproximadamente." };
@@ -7,6 +7,16 @@ const response = (status: number, body: unknown) => ({ ok: status >= 200 && stat
 const completed = (output: unknown) => response(200, { status: "completed", output_text: JSON.stringify(output) });
 
 describe("text meal OpenAI provider", () => {
+  it("instructs the provider to estimate common approximate portions and apply the raw default", () => {
+    expect(TEXT_MEAL_SYSTEM_PROMPT).toContain("200 g de pollo debe tratarse como pollo crudo");
+    expect(TEXT_MEAL_SYSTEM_PROMPT).toContain("100 g de arroz debe tratarse como arroz crudo");
+    expect(TEXT_MEAL_SYSTEM_PROMPT).toContain("preparación explícita tiene prioridad");
+    expect(TEXT_MEAL_SYSTEM_PROMPT).toContain("cantidades aproximadas");
+    expect(TEXT_MEAL_SYSTEM_PROMPT).toContain("needs-clarification solo");
+  });
+  it("keeps the documented default model", () => {
+    expect(TEXT_MEAL_AI_MODEL_DEFAULT).toBe("gpt-5.6-terra");
+  });
   it("normalizes the complete Structured Output success shape", async () => { let body = ""; const result = await estimateTextMealWithOpenAi("150 g arroz", { apiKey: "key", fetchImpl: async (_url, init) => { body = String(init?.body); return completed(success); } }); expect(result).toEqual({ status: "success", suggested_name: "Comida", ingredients: success.ingredients, total: { calories: 195, protein_g: 4, carbs_g: 42, fat_g: 0.5 }, assumptions: [], confidence: "medium" }); expect(body).toContain('"store":false'); expect(body).toContain('"effort":"low"'); });
   it("normalizes the complete Structured Output clarification shape", async () => { expect(await estimateTextMealWithOpenAi("arroz", { apiKey: "key", fetchImpl: async () => completed(clarification) })).toEqual({ status: "needs-clarification", message: clarification.message }); });
   it("rejects incompatible complete provider payloads", async () => { expect(await estimateTextMealWithOpenAi("arroz", { apiKey: "key", fetchImpl: async () => completed({ ...success, message: "No nulo" }) })).toEqual({ status: "error", code: "invalid-ai-response" }); expect(await estimateTextMealWithOpenAi("arroz", { apiKey: "key", fetchImpl: async () => completed({ ...clarification, ingredients: success.ingredients }) })).toEqual({ status: "error", code: "invalid-ai-response" }); });

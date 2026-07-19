@@ -1,10 +1,10 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { getMacroModeMessages, resolveMacroMealMode } from "@/modules/meals/macro-meal-mode";
 import { PHOTO_MEAL_MAX_BYTES } from "@/modules/meals/photo-meal-ai";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 function messages(mode: ReturnType<typeof resolveMacroMealMode>) {
   return getMacroModeMessages({
@@ -55,5 +55,17 @@ describe("photo upload limits", () => {
     const config = readFileSync(resolve(process.cwd(), "next.config.mjs"), "utf8");
     expect(config).toContain('bodySizeLimit: "6mb"');
     expect(PHOTO_MEAL_MAX_BYTES).toBe(5 * 1024 * 1024);
+  });
+});
+
+describe("Text AI confirmation form", () => {
+  it("submits only the validated meal fields and preserves the Text AI destination", () => {
+    const preview = readFileSync(resolve(process.cwd(), "components/macros/AiMealEstimationPreview.tsx"), "utf8");
+    for (const field of ["return_to", "meal_mode", "name", "meal_type"]) expect(preview).toContain(`name=\"${field}\"`);
+    for (const field of ["calories", "protein_g", "carbs_g", "fat_g"]) expect(preview).toContain(`['${field}'`);
+    expect(preview).toContain('name="return_to" value="/macros"');
+    const estimator = readFileSync(resolve(process.cwd(), "components/macros/TextAiMealEstimator.tsx"), "utf8");
+    expect(estimator).toContain('mealMode="text-ai"');
+    expect(preview).not.toContain("consume_meal_builder_items_and_log_meal");
   });
 });
