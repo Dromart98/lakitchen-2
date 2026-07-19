@@ -7,11 +7,34 @@ import {
   createRepeatedMealBuilderDraft,
   formatMealBuilderNutritionValue,
   isMealBuilderInventoryItemEligible,
+  parseMealBuilderConsumptionLines,
   resolveMealBuilderReturnPath,
   type MealBuilderInventoryItem,
   type MealBuilderLine,
   type RepeatedMealBuilderSnapshot,
 } from "@/modules/meals/meal-builder";
+import { isValidUuid } from "@/modules/meals/meal-validation";
+
+const supabaseInventoryItemId = "123e4567-e89b-42d3-a456-426614174000";
+
+describe("meal builder UUID validation", () => {
+  it("accepts a standard Supabase UUID before calling the consumption RPC", () => {
+    expect(isValidUuid(supabaseInventoryItemId)).toBe(true);
+    expect(parseMealBuilderConsumptionLines(JSON.stringify([
+      { item_id: supabaseInventoryItemId, consumed_quantity: 200 },
+    ]))).toEqual({
+      lines: [{ item_id: supabaseInventoryItemId, consumed_quantity: 200 }],
+    });
+  });
+
+  it("rejects UUIDs with a missing group", () => {
+    expect(isValidUuid("123e4567-e89b-42d3-a456")).toBe(false);
+  });
+
+  it("rejects UUIDs with invalid characters", () => {
+    expect(isValidUuid("123e4567-e89b-42d3-a456-42661417400z")).toBe(false);
+  });
+});
 
 describe("meal builder return path", () => {
   it.each([
@@ -171,6 +194,19 @@ describe("meal builder totals", () => {
 });
 
 describe("meal builder consumption payload", () => {
+  it("rejects duplicate payload lines before an RPC can be called", () => {
+    expect(parseMealBuilderConsumptionLines(JSON.stringify([
+      { item_id: supabaseInventoryItemId, consumed_quantity: 200 },
+      { item_id: supabaseInventoryItemId, consumed_quantity: 100 },
+    ]))).toEqual({ error: "duplicate-product" });
+  });
+
+  it("rejects non-finite or non-positive payload quantities", () => {
+    expect(parseMealBuilderConsumptionLines(JSON.stringify([
+      { item_id: supabaseInventoryItemId, consumed_quantity: 0 },
+    ]))).toEqual({ error: "invalid-quantity" });
+  });
+
   it("creates a payload with two valid products", () => {
     expect(createMealBuilderConsumptionPayload([pasta, juice])).toEqual([
       { item_id: "pasta", consumed_quantity: 250 },

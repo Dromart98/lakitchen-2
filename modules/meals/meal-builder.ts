@@ -5,6 +5,7 @@ import {
   type InventoryNutritionBasis,
 } from "@/modules/inventory/inventory-nutrition";
 import { isMealType, type MealType } from "@/modules/meals/meal-types";
+import { isValidUuid } from "@/modules/meals/meal-validation";
 
 export type MealBuilderReturnPath = "/meal-builder" | "/macros";
 
@@ -126,6 +127,58 @@ export type MealBuilderConsumptionPayloadLine = {
   item_id: string;
   consumed_quantity: number;
 };
+
+export type MealBuilderConsumptionLinesValidation =
+  | { lines: MealBuilderConsumptionPayloadLine[] }
+  | {
+    error:
+      | "invalid-lines-json"
+      | "invalid-lines"
+      | "too-many-products"
+      | "product-not-found"
+      | "duplicate-product"
+      | "invalid-quantity";
+  };
+
+/** Validates the untrusted form payload before the single atomic inventory RPC. */
+export function parseMealBuilderConsumptionLines(rawLines: unknown): MealBuilderConsumptionLinesValidation {
+  if (typeof rawLines !== "string") return { error: "invalid-lines-json" };
+
+  let parsedLines: unknown;
+
+  try {
+    parsedLines = JSON.parse(rawLines);
+  } catch {
+    return { error: "invalid-lines-json" };
+  }
+
+  if (!Array.isArray(parsedLines)) return { error: "invalid-lines-json" };
+  if (parsedLines.length < 1) return { error: "invalid-lines" };
+  if (parsedLines.length > 10) return { error: "too-many-products" };
+
+  const seenItemIds = new Set<string>();
+  const lines: MealBuilderConsumptionPayloadLine[] = [];
+
+  for (const line of parsedLines) {
+    if (!line || typeof line !== "object" || Array.isArray(line)) return { error: "invalid-lines-json" };
+
+    const { item_id: itemId, consumed_quantity: consumedQuantity } = line as {
+      item_id: unknown;
+      consumed_quantity: unknown;
+    };
+
+    if (!isValidUuid(itemId)) return { error: "product-not-found" };
+    if (seenItemIds.has(itemId)) return { error: "duplicate-product" };
+
+    const quantity = Number(consumedQuantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) return { error: "invalid-quantity" };
+
+    seenItemIds.add(itemId);
+    lines.push({ item_id: itemId, consumed_quantity: quantity });
+  }
+
+  return { lines };
+}
 
 export function createMealBuilderConsumptionPayload(
   lines: MealBuilderLine[],
