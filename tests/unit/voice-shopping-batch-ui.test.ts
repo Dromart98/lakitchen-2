@@ -1,3 +1,45 @@
-import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-describe("voice shopping UI boundaries", () => { it("keeps browser speech and preview-only controls", () => { const source = readFileSync("components/shopping/VoiceShoppingBatchInput.tsx", "utf8"); expect(source).toContain("getSpeechRecognitionConstructor"); expect(source).toContain("mergeVoiceTranscript"); expect(source).toContain("getVoiceRecognitionErrorMessage"); expect(source).toContain('"es-ES"'); expect(source).not.toContain("createClient"); expect(readFileSync("components/shopping/VoiceShoppingBatchPreview.tsx", "utf8")).not.toContain("Guardar"); }); });
+
+import { describe, expect, it } from "vitest";
+
+const inputSource = readFileSync(
+  "components/shopping/VoiceShoppingBatchInput.tsx",
+  "utf8",
+);
+const previewSource = readFileSync(
+  "components/shopping/VoiceShoppingBatchPreview.tsx",
+  "utf8",
+);
+
+describe("voice shopping UI boundaries", () => {
+  it("keeps browser speech and preview-only controls", () => {
+    expect(inputSource).toContain("getSpeechRecognitionConstructor");
+    expect(inputSource).toContain("mergeVoiceTranscript");
+    expect(inputSource).toContain("getVoiceRecognitionErrorMessage");
+    expect(inputSource).toContain('instance.lang = "es-ES"');
+    expect(inputSource).not.toContain("createClient");
+    expect(previewSource).not.toContain("Guardar");
+  });
+
+  it("invalidates pending analysis when the text is cleared", () => {
+    expect(inputSource).toContain("disabled={pending}");
+    expect(inputSource).toContain('requestVersion.current += 1;');
+    expect(inputSource).toContain('setText("");');
+    expect(inputSource).toContain("setItems([]);");
+    expect(inputSource).toContain("setMessage(null);");
+    expect(inputSource).toContain("if (version !== requestVersion.current) return;");
+
+    const clearButton = inputSource.match(
+      /<button type="button" onClick=\{clear\}>\s*Borrar texto\s*<\/button>/,
+    );
+    expect(clearButton).not.toBeNull();
+    expect(clearButton?.[0]).not.toContain("disabled={pending}");
+  });
+
+  it("keeps dictation and analysis blocked while a request is pending", () => {
+    expect(inputSource).toContain("disabled={!supported || pending}");
+    expect(inputSource).toContain("disabled={pending || !text.trim()}");
+    expect(inputSource).toContain("if (!Constructor || pending) return;");
+    expect(inputSource).toContain("if (pending || !text.trim()) return;");
+  });
+});
