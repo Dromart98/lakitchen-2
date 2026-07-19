@@ -6,6 +6,8 @@ import { estimateInventoryNutritionAction } from "@/app/inventory/actions";
 import { requiresInventoryNutritionAiOverwriteConfirmation, type InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
 
 type InventoryNutritionAiControlsProps = {
+  controlId?: string;
+  buttonId?: string;
   fieldIds: {
     name: string;
     quantity: string;
@@ -75,7 +77,11 @@ function readCurrentInput(fieldIds: InventoryNutritionAiControlsProps["fieldIds"
   };
 }
 
-export function InventoryNutritionAiControls({ fieldIds }: InventoryNutritionAiControlsProps) {
+export function InventoryNutritionAiControls({
+  controlId,
+  buttonId,
+  fieldIds,
+}: InventoryNutritionAiControlsProps) {
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<Message | null>(null);
   const [awaitingOverwriteConfirmation, setAwaitingOverwriteConfirmation] = useState(false);
@@ -133,8 +139,8 @@ export function InventoryNutritionAiControls({ fieldIds }: InventoryNutritionAiC
   }
 
   return (
-    <div className="meal-log-form" aria-live="polite">
-      <button className="button" type="button" onClick={handleClick} disabled={isPending}>
+    <div id={controlId} className="meal-log-form" aria-live="polite">
+      <button id={buttonId} className="button" type="button" onClick={handleClick} disabled={isPending}>
         {isPending ? "Calculando..." : awaitingOverwriteConfirmation ? "Sustituir valores con IA" : "Calcular macros con IA"}
       </button>
       <p className="muted">La IA ofrece una estimación que puede contener errores. Revísala antes de guardar.</p>

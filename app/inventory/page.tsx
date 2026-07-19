@@ -5,6 +5,7 @@ import { InventoryConsumeForm } from "@/components/inventory/InventoryConsumeFor
 import { InventoryNutritionAiControls } from "@/components/inventory/InventoryNutritionAiControls";
 import { BarcodeCatalogControls } from "./BarcodeCatalogControls";
 import { InventoryAddCta } from "./InventoryAddCta";
+import { InventoryNutritionCta } from "./InventoryNutritionCta";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import {
   getInventoryCategoryLabel,
@@ -15,6 +16,7 @@ import { INVENTORY_ADD_FORM_FIELD_IDS } from "@/modules/inventory/inventory-form
 import { createClient } from "@/lib/supabase/server";
 import {
   getInventoryNutritionBasisLabel,
+  hasCompleteInventoryNutritionValues,
   INVENTORY_NUTRITION_BASIS_LABELS,
   NUTRITION_BASES,
 } from "@/modules/inventory/inventory-nutrition";
@@ -479,6 +481,9 @@ export default async function InventoryPage({
                     <ul className="inventory-product-list">
                       {group.items.map((item) => {
                         const nutritionParts = getInventoryNutritionParts(item);
+                        const hasCompleteNutrition = Boolean(item.nutrition_basis)
+                          && hasCompleteInventoryNutritionValues(item);
+                        const hasValidItemId = typeof item.id === "string" && item.id.trim().length > 0;
                         return (
                           <li className="inventory-product" key={item.id}>
                             <div className="inventory-product__main">
@@ -498,7 +503,15 @@ export default async function InventoryPage({
                                 )}
                               </p>
                             </div>
-                            <details className="inventory-manage">
+                            {!hasCompleteNutrition && hasValidItemId ? (
+                              <InventoryNutritionCta
+                                editId={`inventory-edit-${item.id}`}
+                                manageId={`inventory-manage-${item.id}`}
+                                nutritionControlId={`inventory-nutrition-ai-${item.id}`}
+                                nutritionButtonId={`inventory-nutrition-ai-button-${item.id}`}
+                              />
+                            ) : null}
+                            <details className="inventory-manage" id={`inventory-manage-${item.id}`}>
                               <summary>Gestionar</summary>
                               <div className="inventory-manage__panel">
                               <div className="inventory-nutrition">
@@ -532,7 +545,7 @@ export default async function InventoryPage({
                                   />
                                 </div>
                               </details>
-                              <details className="inventory-action">
+                              <details className="inventory-action" id={`inventory-edit-${item.id}`}>
                                 <summary>Editar</summary>
                                 <div className="inventory-action__panel">
                                   {" "}
@@ -744,6 +757,8 @@ export default async function InventoryPage({
                                       </label>
                                     </fieldset>
                                     <InventoryNutritionAiControls
+                                      controlId={`inventory-nutrition-ai-${item.id}`}
+                                      buttonId={`inventory-nutrition-ai-button-${item.id}`}
                                       fieldIds={{
                                         name: `inventory-name-${item.id}`,
                                         quantity: `inventory-quantity-${item.id}`,
@@ -803,7 +818,7 @@ export default async function InventoryPage({
         >
           <summary>
             <span>
-              <strong>Añadir producto</strong>
+              <strong>Nuevo producto</strong>
               <small>Registra un producto en unos pasos</small>
             </span>
           </summary>
@@ -1013,7 +1028,7 @@ export default async function InventoryPage({
                 lookupAction={lookupBarcodeProductAction}
               />
               <button className="button" type="submit">
-                Añadir producto
+                Guardar producto
               </button>
             </form>
           </div>
