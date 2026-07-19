@@ -89,7 +89,7 @@ export function MacroMealRecorder({
       </div>
 
       <div id="meal-panel-text-ai" className="macros-mode-panel" role="region" aria-labelledby="meal-mode-text-ai" hidden={mode !== "text-ai"}>
-        <TextAiMealEstimator errorMessage={textAiErrorMessage} successMessage={textAiSuccessMessage} />
+        <TextAiMealEstimator active={mode === "text-ai"} errorMessage={textAiErrorMessage} successMessage={textAiSuccessMessage} />
       </div>
 
       <div id="meal-panel-photo-ai" className="macros-mode-panel" role="region" aria-labelledby="meal-mode-photo-ai" hidden={mode !== "photo-ai"}>
