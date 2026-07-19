@@ -9,14 +9,12 @@ import { isMealType } from "@/modules/meals/meal-types";
 import {
   parseMealBuilderConsumptionLines,
   resolveMealBuilderReturnPath,
+  buildMealBuilderResultDestination,
   type MealBuilderReturnPath,
 } from "@/modules/meals/meal-builder";
 
-const MEAL_BUILDER_PATH = "/meal-builder";
-
-function redirectWithMealError(errorCode: string, returnPath: MealBuilderReturnPath): never {
-  const mode = returnPath === "/macros" ? "mealMode=ingredients&" : "";
-  redirect(`${returnPath}?${mode}mealError=${errorCode}`);
+function redirectWithMealError(errorCode: string, _returnPath: MealBuilderReturnPath): never {
+  redirect(buildMealBuilderResultDestination("mealError", errorCode));
 }
 
 function parseMealBuilderLines(rawLines: FormDataEntryValue | null, returnPath: MealBuilderReturnPath) {
@@ -64,13 +62,11 @@ export async function consumeMealBuilderAndLogMealAction(formData: FormData) {
     redirectWithMealError(getSafeMealBuilderError(error), returnPath);
   }
 
-  revalidatePath(MEAL_BUILDER_PATH);
   revalidatePath("/macros");
   revalidatePath("/inventory");
   revalidatePath("/dashboard");
   revalidatePath("/meal-history");
   revalidatePath("/weekly-summary");
 
-  const mode = returnPath === "/macros" ? "mealMode=ingredients&" : "";
-  redirect(`${returnPath}?${mode}mealSuccess=meal-consumed-logged`);
+  redirect(buildMealBuilderResultDestination("mealSuccess", "meal-consumed-logged"));
 }

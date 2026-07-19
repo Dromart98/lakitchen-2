@@ -6,7 +6,15 @@ import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getMacroModeMessages, resolveMacroMealMode } from "@/modules/meals/macro-meal-mode";
 import { remainingMacros, sumMacros } from "@/modules/meals/meal-summary";
-import { getMealBuilderMessage, type MealBuilderInventoryItem } from "@/modules/meals/meal-builder";
+import {
+  createRepeatedMealBuilderDraft,
+  getMealBuilderMessage,
+  type MealBuilderInventoryItem,
+  type RepeatedMealBuilderDraft,
+  type RepeatedMealBuilderMeal,
+  type RepeatedMealBuilderSnapshot,
+} from "@/modules/meals/meal-builder";
+import { isValidUuid } from "@/modules/meals/meal-validation";
 import type { MacroTotals } from "@/modules/nutrition/nutrition.types";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +32,9 @@ type MealRow = {
   carbs_g: number;
   fat_g: number;
 };
+type RepeatMealQueryResult = { data: RepeatedMealBuilderMeal | null; error: { message: string } | null };
+type RepeatMealSnapshotsQueryResult = { data: RepeatedMealBuilderSnapshot[] | null; error: { message: string } | null };
+const REPEAT_MEAL_LOAD_ERROR = "No se pudo cargar esta comida para repetirla.";
 
 function getGoal(profile: ProfileRow | null): MacroTotals | null {
   if (!profile) return null;
@@ -63,7 +74,7 @@ function MacroRow({ label, consumed, goal, remaining, unit }: { label: string; c
   );
 }
 
-export default async function MacrosPage({ searchParams }: { searchParams?: Promise<{ mealError?: string; mealSuccess?: string; mealMode?: string }> }) {
+export default async function MacrosPage({ searchParams }: { searchParams?: Promise<{ mealError?: string; mealSuccess?: string; mealMode?: string; repeatMeal?: string }> }) {
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "macros page");
   const today = new Date().toISOString().slice(0, 10);
@@ -92,7 +103,37 @@ export default async function MacrosPage({ searchParams }: { searchParams?: Prom
   })));
   const remaining = goal ? remainingMacros(goal, consumed) : null;
   const params = await searchParams;
-  const initialMode = resolveMacroMealMode(params?.mealMode);
+  const repeatMeal = params?.repeatMeal?.trim() ?? "";
+  let repeatMealDraft: RepeatedMealBuilderDraft | null = null;
+  let repeatMealErrorMessage: string | null = null;
+  let repeatMealLoaded = false;
+
+  if (repeatMeal) {
+    if (!isValidUuid(repeatMeal)) {
+      repeatMealErrorMessage = "El enlace para repetir esta comida no es válido.";
+    } else {
+      const { data: meal, error: mealError } = await (supabase as any).from("daily_meal_logs")
+        .select("name, meal_type").eq("id", repeatMeal).eq("user_id", user.id).maybeSingle() as RepeatMealQueryResult;
+      if (mealError || !meal) {
+        if (mealError) console.warn("Supabase could not load the repeated meal:", mealError.message);
+        repeatMealErrorMessage = REPEAT_MEAL_LOAD_ERROR;
+      } else {
+        const { data: snapshots, error: snapshotsError } = await (supabase as any).from("daily_meal_log_items")
+          .select("source_inventory_item_id, product_name, consumed_quantity, unit")
+          .eq("meal_log_id", repeatMeal).eq("user_id", user.id)
+          .order("product_name", { ascending: true }).order("source_inventory_item_id", { ascending: true }) as RepeatMealSnapshotsQueryResult;
+        if (snapshotsError || !snapshots?.length) {
+          if (snapshotsError) console.warn("Supabase could not load the repeated meal snapshots:", snapshotsError.message);
+          repeatMealErrorMessage = REPEAT_MEAL_LOAD_ERROR;
+        } else {
+          repeatMealDraft = createRepeatedMealBuilderDraft(meal, snapshots, inventoryError ? [] : inventoryItems ?? []);
+          repeatMealLoaded = true;
+        }
+      }
+    }
+  }
+
+  const initialMode = repeatMeal ? "ingredients" : resolveMacroMealMode(params?.mealMode);
   const modeMessages = getMacroModeMessages({
     mode: initialMode,
     genericErrorMessage: getMessage(params?.mealError, false),
@@ -147,6 +188,12 @@ export default async function MacrosPage({ searchParams }: { searchParams?: Prom
             photoAiSuccessMessage={modeMessages.photoAi.successMessage}
             ingredientErrorMessage={modeMessages.ingredients.errorMessage}
             ingredientSuccessMessage={modeMessages.ingredients.successMessage}
+            repeatMealErrorMessage={repeatMealErrorMessage}
+            repeatMealLoaded={repeatMealLoaded}
+            initialMealName={repeatMealDraft?.mealName}
+            initialMealType={repeatMealDraft?.mealType}
+            initialRows={repeatMealDraft?.availableLines}
+            unavailableItems={repeatMealDraft?.unavailableItems}
           />
 
           <section className="card macros-goals" aria-labelledby="macros-goals-title">

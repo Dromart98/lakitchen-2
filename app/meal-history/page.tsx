@@ -203,8 +203,8 @@ export default async function MealHistoryPage({ searchParams }: { searchParams?:
                           </div>
                           {(repeatMode === "composer" || repeatMode === "direct") ? <div className="meal-history-meal__actions">
                             {repeatMode === "composer" ? (
-                              <Link href={`/meal-builder?repeatMeal=${meal.id}`}>
-                                Repetir en el compositor
+                              <Link href={`/macros?mealMode=ingredients&repeatMeal=${meal.id}#registrar-comida`}>
+                                Revisar y repetir
                               </Link>
                             ) : null}
                             {repeatMode === "direct" ? (

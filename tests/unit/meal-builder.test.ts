@@ -9,6 +9,8 @@ import {
   isMealBuilderInventoryItemEligible,
   parseMealBuilderConsumptionLines,
   resolveMealBuilderReturnPath,
+  buildMealBuilderCompatibilityDestination,
+  buildMealBuilderResultDestination,
   type MealBuilderInventoryItem,
   type MealBuilderLine,
   type RepeatedMealBuilderSnapshot,
@@ -37,16 +39,21 @@ describe("meal builder UUID validation", () => {
 });
 
 describe("meal builder return path", () => {
-  it.each([
-    [undefined, "/meal-builder"],
-    ["", "/meal-builder"],
-    ["/meal-builder", "/meal-builder"],
-    ["/macros", "/macros"],
-    ["https://example.com", "/meal-builder"],
-    ["//example.com", "/meal-builder"],
-    ["/inventory", "/meal-builder"],
-  ])("resolves %s to %s", (value, expected) => {
-    expect(resolveMealBuilderReturnPath(value)).toBe(expected);
+  it.each([undefined, "", "/meal-builder", "/macros", "https://example.com", "//example.com", "/inventory"])("normalizes %s to Macros", (value) => {
+    expect(resolveMealBuilderReturnPath(value)).toBe("/macros");
+  });
+
+  it("keeps only recognized legacy query parameters in an internal Macros URL", () => {
+    expect(buildMealBuilderCompatibilityDestination({ repeatMeal: "123e4567-e89b-42d3-a456-426614174000", mealError: "invalid-lines", unknown: "https://example.com" })).toBe(
+      "/macros?mealMode=ingredients&repeatMeal=123e4567-e89b-42d3-a456-426614174000&mealError=invalid-lines#registrar-comida",
+    );
+    expect(buildMealBuilderCompatibilityDestination({})).toBe("/macros?mealMode=ingredients#registrar-comida");
+  });
+
+  it("returns ingredient-mode action destinations with the registration fragment", () => {
+    expect(buildMealBuilderResultDestination("mealSuccess", "meal-consumed-logged")).toBe(
+      "/macros?mealMode=ingredients&mealSuccess=meal-consumed-logged#registrar-comida",
+    );
   });
 });
 

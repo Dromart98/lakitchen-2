@@ -7,7 +7,7 @@ export const navigationItems: NavigationItem[] = [
   { label: "Inicio", href: "/dashboard", icon: "home" },
   { label: "Inventario", href: "/inventory", icon: "inventory" },
   { label: "Macros", href: "/macros", icon: "macros", activePaths: ["/meal-history", "/weekly-summary"] },
-  { label: "Dieta", href: "/plan", icon: "plan", activePaths: ["/meal-builder"] },
+  { label: "Dieta", href: "/plan", icon: "plan" },
   { label: "Ajustes", href: "/settings", icon: "settings" },
 ];
 

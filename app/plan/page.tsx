@@ -58,7 +58,7 @@ export default async function PlanPage() {
               <strong>Construye tu propia comida</strong>
               <span>Elige ingredientes de tu inventario y comprueba los macros antes de registrarla.</span>
             </div>
-            <Link className="button" href="/meal-builder">Abrir compositor</Link>
+            <Link className="button" href="/macros?mealMode=ingredients#registrar-comida">Registrar desde inventario</Link>
           </div>
         </header>
 
