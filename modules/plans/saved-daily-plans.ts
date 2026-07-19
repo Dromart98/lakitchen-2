@@ -8,6 +8,8 @@ import {
 } from "@/modules/plans/daily-plan-ai";
 import { RECIPE_MAX_INGREDIENTS } from "@/modules/recipes/recipe-limits";
 
+const planDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
 const maxMinutesSchema = z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60)]);
 
 const nutritionSchema = z.object({
@@ -54,6 +56,7 @@ const successPlanSchema = z.object({
 });
 
 export const saveDailyPlanRequestSchema = z.object({
+  plan_date: planDateSchema,
   priority_mode: z.enum(DAILY_PLAN_PRIORITY_MODES),
   max_minutes_per_meal: maxMinutesSchema,
   plan: successPlanSchema,
@@ -63,7 +66,7 @@ export type SaveDailyPlanRequest = z.infer<typeof saveDailyPlanRequestSchema>;
 
 export type SaveDailyPlanResult =
   | { status: "success"; code: "saved" | "already-saved"; planId: string }
-  | { status: "error"; code: "invalid-input" | "unauthenticated" | "profile-required" | "inventory-changed" | "save-failed" | "unexpected-error" };
+  | { status: "error"; code: "invalid-input" | "invalid-plan-date" | "date-occupied" | "unauthenticated" | "profile-required" | "inventory-changed" | "save-failed" | "unexpected-error" };
 
 export const cookSavedDailyPlanMealRequestSchema = z.object({
   plan_id: z.string().uuid(),

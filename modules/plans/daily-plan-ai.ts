@@ -18,7 +18,10 @@ export const DAILY_PLAN_MAX_MINUTES = [15, 30, 45, 60] as const;
 
 type DailyPlanMaxMinutes = (typeof DAILY_PLAN_MAX_MINUTES)[number];
 
+const planDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
 export const dailyPlanPublicRequestSchema = z.object({
+  plan_date: planDateSchema,
   priority_mode: z.enum(DAILY_PLAN_PRIORITY_MODES),
   max_minutes_per_meal: z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60)]),
 }).strict();
@@ -263,13 +266,14 @@ export function buildUsableDailyPlanInventoryItems<T extends DailyPlanInventoryS
   return getDailyPlanInventoryReadiness(items, todayKey).usable;
 }
 
-export function buildDailyPlanInputText(request: DailyPlanPublicRequest, target: DailyPlanTarget, inventoryItems: DailyPlanInventoryItem[], todayKey: string) {
-  const urgentIds = request.priority_mode === "expiration" ? [...getUrgentRecipeAiInventoryItemIds(inventoryItems, todayKey)].sort() : [];
+export function buildDailyPlanInputText(request: DailyPlanPublicRequest, target: DailyPlanTarget, inventoryItems: DailyPlanInventoryItem[], referenceDate: string) {
+  const urgentIds = request.priority_mode === "expiration" ? [...getUrgentRecipeAiInventoryItemIds(inventoryItems, referenceDate)].sort() : [];
   return JSON.stringify({
     language: "es",
+    plan_date: request.plan_date,
     priority_mode: request.priority_mode,
     target,
-    expiration_context: request.priority_mode === "expiration" ? { today_key: todayKey, urgent_inventory_item_ids: urgentIds } : undefined,
+    expiration_context: request.priority_mode === "expiration" ? { reference_date: referenceDate, urgent_inventory_item_ids: urgentIds } : undefined,
     constraints: {
       meal_types: DAILY_PLAN_MEAL_TYPES,
       exact_meal_count: 4,
@@ -283,7 +287,7 @@ export function buildDailyPlanInputText(request: DailyPlanPublicRequest, target:
   });
 }
 
-export function validateDailyPlanProviderOutput(request: DailyPlanPublicRequest, inventoryItems: DailyPlanInventoryItem[], output: unknown, todayKey: string): DailyPlanGenerationResult {
+export function validateDailyPlanProviderOutput(request: DailyPlanPublicRequest, inventoryItems: DailyPlanInventoryItem[], output: unknown, referenceDate: string): DailyPlanGenerationResult {
   const parsed = dailyPlanProviderResponseSchema.safeParse(output);
   if (!parsed.success) return { status: "error", code: "invalid-ai-response" };
   if (parsed.data.status === "error") return { status: "error", code: "invalid-ai-response" };
@@ -292,7 +296,7 @@ export function validateDailyPlanProviderOutput(request: DailyPlanPublicRequest,
   const inventoryById = new Map(inventoryItems.map((item) => [item.id, item]));
   const mealTypes = new Set<DailyPlanMealType>();
   const titles = new Set<string>();
-  const urgentIds = getUrgentRecipeAiInventoryItemIds(inventoryItems, todayKey);
+  const urgentIds = getUrgentRecipeAiInventoryItemIds(inventoryItems, referenceDate);
   let usesUrgent = false;
   const dailyUsed = new Map<string, number>();
 
@@ -315,7 +319,7 @@ export function validateDailyPlanProviderOutput(request: DailyPlanPublicRequest,
       if (normalizeName(ingredient.name) !== normalizeName(item.name)) return { status: "error", code: "invalid-ai-response" };
       if (ingredient.unit !== item.unit) return { status: "error", code: "invalid-ai-response" };
       if (!Number.isFinite(ingredient.quantity) || ingredient.quantity <= 0 || ingredient.quantity > item.quantity) return { status: "error", code: "invalid-ai-response" };
-      if (item.expires_at && getInventoryExpirationDayDifference(item.expires_at, todayKey) < 0) return { status: "error", code: "invalid-ai-response" };
+      if (item.expires_at && getInventoryExpirationDayDifference(item.expires_at, referenceDate) < 0) return { status: "error", code: "invalid-ai-response" };
       if (!isCompatibleUnitAndBasis(item.unit, item.nutrition_basis)) return { status: "error", code: "invalid-ai-response" };
       dailyUsed.set(item.id, (dailyUsed.get(item.id) ?? 0) + ingredient.quantity);
       if (urgentIds.has(item.id)) usesUrgent = true;

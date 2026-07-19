@@ -15,7 +15,7 @@ import {
   type DailyPlanPublicRequest,
 } from "@/modules/plans/daily-plan-ai";
 
-const request: DailyPlanPublicRequest = { priority_mode: "balanced", max_minutes_per_meal: 30 };
+const request: DailyPlanPublicRequest = { plan_date: "2026-07-15", priority_mode: "balanced", max_minutes_per_meal: 30 };
 const todayKey = "2026-07-15";
 
 const inventory: DailyPlanInventoryItem[] = [
@@ -140,7 +140,7 @@ describe("daily plan AI", () => {
     const noUrgent = validOutput();
     noUrgent.meals[0].ingredients = [{ inventory_item_id: "oats", name: "Avena", quantity: 60, unit: "g" }];
     noUrgent.meals[2].ingredients = [{ inventory_item_id: "apple", name: "Manzana", quantity: 1, unit: "ud" }];
-    expect(validateDailyPlanProviderOutput({ priority_mode: "expiration", max_minutes_per_meal: 30 }, inventory, noUrgent, todayKey)).toEqual({ status: "error", code: "invalid-ai-response" });
+    expect(validateDailyPlanProviderOutput({ plan_date: "2026-07-15", priority_mode: "expiration", max_minutes_per_meal: 30 }, inventory, noUrgent, todayKey)).toEqual({ status: "error", code: "invalid-ai-response" });
   });
 
   it("calculates nutrition deterministically from inventory", () => {
@@ -156,7 +156,7 @@ describe("daily plan AI", () => {
   });
 
   it("builds a minimal OpenAI payload and evaluates fit", () => {
-    const payload = JSON.parse(buildDailyPlanInputText({ priority_mode: "expiration", max_minutes_per_meal: 45 }, { calories: 2000, protein_g: 120, carbs_g: 220, fat_g: 60 }, inventory, todayKey));
+    const payload = JSON.parse(buildDailyPlanInputText({ plan_date: "2026-07-15", priority_mode: "expiration", max_minutes_per_meal: 45 }, { calories: 2000, protein_g: 120, carbs_g: 220, fat_g: 60 }, inventory, todayKey));
     expect(payload.target).toEqual({ calories: 2000, protein_g: 120, carbs_g: 220, fat_g: 60 });
     expect(payload.inventory[0]).toEqual(expect.objectContaining({ id: expect.any(String), name: expect.any(String), quantity: expect.any(Number), unit: expect.any(String), expires_at: expect.anything(), category: expect.anything(), nutrition_basis: expect.any(String), calories: expect.any(Number), protein_g: expect.any(Number), carbs_g: expect.any(Number), fat_g: expect.any(Number) }));
     expect(payload.user_id).toBeUndefined();
@@ -180,13 +180,13 @@ describe("generateDailyPlanWithOpenAi", () => {
   });
 
   it("sends the server expiration context in expiration mode", async () => {
-    const expirationRequest: DailyPlanPublicRequest = { priority_mode: "expiration", max_minutes_per_meal: 30 };
+    const expirationRequest: DailyPlanPublicRequest = { plan_date: "2026-07-15", priority_mode: "expiration", max_minutes_per_meal: 30 };
     const fetchImpl = vi.fn(() => response(200, completed(validOutput())));
     await expect(generateDailyPlanWithOpenAi(expirationRequest, { calories: 2000, protein_g: 120, carbs_g: 220, fat_g: 60 }, inventory, todayKey, { apiKey: "key", fetchImpl })).resolves.toMatchObject({ status: "success" });
     const firstCall = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     const body = JSON.parse(String(firstCall[1].body));
     const providerInput = JSON.parse(body.input[1].content);
-    expect(providerInput.expiration_context).toEqual({ today_key: todayKey, urgent_inventory_item_ids: ["yogurt"] });
+    expect(providerInput.expiration_context).toEqual({ reference_date: todayKey, urgent_inventory_item_ids: ["yogurt"] });
   });
 
   it.each([[408, "provider-timeout"], [429, "provider-error"], [500, "provider-error"], [503, "provider-error"]] as const)("maps HTTP %s to %s", async (status, code) => {
