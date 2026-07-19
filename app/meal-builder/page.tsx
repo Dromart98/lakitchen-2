@@ -12,10 +12,10 @@ import {
   type RepeatedMealBuilderMeal,
   type RepeatedMealBuilderSnapshot,
 } from "@/modules/meals/meal-builder";
+import { isValidUuid } from "@/modules/meals/meal-validation";
 
 export const dynamic = "force-dynamic";
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REPEAT_MEAL_LOAD_ERROR = "No se pudo cargar esta comida para repetirla.";
 
 type InventoryItemsQueryResult = {
@@ -67,7 +67,7 @@ export default async function MealBuilderPage({ searchParams }: MealBuilderPageP
   let repeatMealLoaded = false;
 
   if (repeatMeal) {
-    if (!UUID_PATTERN.test(repeatMeal)) {
+    if (!isValidUuid(repeatMeal)) {
       repeatMealMessage = "El enlace para repetir esta comida no es válido.";
     } else {
       const { data: meal, error: mealError } = await (supabase as any)

@@ -22,8 +22,12 @@ export type MealValidationError =
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_MEAL_NAME_LENGTH = 120;
 
-export function isMealLogId(value: unknown): value is string {
+export function isValidUuid(value: unknown): value is string {
   return typeof value === "string" && UUID_PATTERN.test(value);
+}
+
+export function isMealLogId(value: unknown): value is string {
+  return isValidUuid(value);
 }
 
 export function validateMealName(value: unknown): { value: string } | { error: MealValidationError } {

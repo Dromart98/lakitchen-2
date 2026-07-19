@@ -6,15 +6,13 @@ import { redirect } from "next/navigation";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isMealType } from "@/modules/meals/meal-types";
-import { resolveMealBuilderReturnPath, type MealBuilderReturnPath } from "@/modules/meals/meal-builder";
+import {
+  parseMealBuilderConsumptionLines,
+  resolveMealBuilderReturnPath,
+  type MealBuilderReturnPath,
+} from "@/modules/meals/meal-builder";
 
 const MEAL_BUILDER_PATH = "/meal-builder";
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
-
-type MealBuilderPayloadLine = {
-  item_id: unknown;
-  consumed_quantity: unknown;
-};
 
 function redirectWithMealError(errorCode: string, returnPath: MealBuilderReturnPath): never {
   const mode = returnPath === "/macros" ? "mealMode=ingredients&" : "";
@@ -22,43 +20,10 @@ function redirectWithMealError(errorCode: string, returnPath: MealBuilderReturnP
 }
 
 function parseMealBuilderLines(rawLines: FormDataEntryValue | null, returnPath: MealBuilderReturnPath) {
-  if (typeof rawLines !== "string") redirectWithMealError("invalid-lines-json", returnPath);
+  const result = parseMealBuilderConsumptionLines(rawLines);
+  if ("error" in result) redirectWithMealError(result.error, returnPath);
 
-  let parsedLines: unknown;
-
-  try {
-    parsedLines = JSON.parse(rawLines);
-  } catch {
-    redirectWithMealError("invalid-lines-json", returnPath);
-  }
-
-  if (!Array.isArray(parsedLines)) redirectWithMealError("invalid-lines-json", returnPath);
-  if (parsedLines.length < 1) redirectWithMealError("invalid-lines", returnPath);
-  if (parsedLines.length > 10) redirectWithMealError("too-many-products", returnPath);
-
-  const seenItemIds = new Set<string>();
-
-  return parsedLines.map((line) => {
-    if (!line || typeof line !== "object" || Array.isArray(line)) redirectWithMealError("invalid-lines-json", returnPath);
-
-    const { item_id: itemId, consumed_quantity: consumedQuantity } = line as MealBuilderPayloadLine;
-
-    if (typeof itemId !== "string" || !UUID_PATTERN.test(itemId)) {
-      redirectWithMealError("product-not-found", returnPath);
-    }
-
-    if (seenItemIds.has(itemId)) redirectWithMealError("duplicate-product", returnPath);
-    seenItemIds.add(itemId);
-
-    const quantity = Number(consumedQuantity);
-
-    if (!Number.isFinite(quantity) || quantity <= 0) redirectWithMealError("invalid-quantity", returnPath);
-
-    return {
-      item_id: itemId,
-      consumed_quantity: quantity,
-    };
-  });
+  return result.lines;
 }
 
 function getSafeMealBuilderError(error: { code?: string; message: string }) {
