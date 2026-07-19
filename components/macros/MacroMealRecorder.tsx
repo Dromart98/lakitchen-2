@@ -6,17 +6,20 @@ import { addMealLogAction } from "@/app/dashboard/actions";
 import { PhotoAiMealEstimator } from "@/components/macros/PhotoAiMealEstimator";
 import { TextAiMealEstimator } from "@/components/macros/TextAiMealEstimator";
 import { InventoryMealBuilder } from "@/components/meals/InventoryMealBuilder";
+import type { MacroMealMode } from "@/modules/meals/macro-meal-mode";
 import type { MealBuilderInventoryItem } from "@/modules/meals/meal-builder";
 import { MEAL_TYPE_LABELS, MEAL_TYPES } from "@/modules/meals/meal-types";
 
-type MealMode = "manual" | "text-ai" | "photo-ai" | "ingredients";
-
 type MacroMealRecorderProps = {
   items: MealBuilderInventoryItem[];
-  initialMode?: MealMode;
+  initialMode?: MacroMealMode;
   inventoryUnavailable?: boolean;
   manualErrorMessage?: string | null;
   manualSuccessMessage?: string | null;
+  textAiErrorMessage?: string | null;
+  textAiSuccessMessage?: string | null;
+  photoAiErrorMessage?: string | null;
+  photoAiSuccessMessage?: string | null;
   ingredientErrorMessage?: string | null;
   ingredientSuccessMessage?: string | null;
 };
@@ -27,16 +30,20 @@ export function MacroMealRecorder({
   inventoryUnavailable = false,
   manualErrorMessage,
   manualSuccessMessage,
+  textAiErrorMessage,
+  textAiSuccessMessage,
+  photoAiErrorMessage,
+  photoAiSuccessMessage,
   ingredientErrorMessage,
   ingredientSuccessMessage,
 }: MacroMealRecorderProps) {
-  const [mode, setMode] = useState<MealMode>(initialMode);
+  const [mode, setMode] = useState<MacroMealMode>(initialMode);
   const manualTab = useRef<HTMLButtonElement>(null);
   const textAiTab = useRef<HTMLButtonElement>(null);
   const photoAiTab = useRef<HTMLButtonElement>(null);
   const ingredientsTab = useRef<HTMLButtonElement>(null);
 
-  function handleTabKey(event: KeyboardEvent<HTMLButtonElement>, nextMode: MealMode) {
+  function handleTabKey(event: KeyboardEvent<HTMLButtonElement>, nextMode: MacroMealMode) {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
     setMode(nextMode);
@@ -81,9 +88,13 @@ export function MacroMealRecorder({
         </form>
       </div>
 
-      <div id="meal-panel-text-ai" className="macros-mode-panel" role="region" aria-labelledby="meal-mode-text-ai" hidden={mode !== "text-ai"}><TextAiMealEstimator /></div>
+      <div id="meal-panel-text-ai" className="macros-mode-panel" role="region" aria-labelledby="meal-mode-text-ai" hidden={mode !== "text-ai"}>
+        <TextAiMealEstimator errorMessage={textAiErrorMessage} successMessage={textAiSuccessMessage} />
+      </div>
 
-      <div id="meal-panel-photo-ai" className="macros-mode-panel" role="region" aria-labelledby="meal-mode-photo-ai" hidden={mode !== "photo-ai"}><PhotoAiMealEstimator /></div>
+      <div id="meal-panel-photo-ai" className="macros-mode-panel" role="region" aria-labelledby="meal-mode-photo-ai" hidden={mode !== "photo-ai"}>
+        <PhotoAiMealEstimator errorMessage={photoAiErrorMessage} successMessage={photoAiSuccessMessage} />
+      </div>
 
       <div id="meal-panel-ingredients" className="macros-mode-panel macros-mode-panel--ingredients" role="region" aria-labelledby="meal-mode-ingredients" hidden={mode !== "ingredients"}>
         {ingredientErrorMessage ? <p className="auth-message error" role="alert">{ingredientErrorMessage}</p> : null}
