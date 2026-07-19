@@ -15,6 +15,7 @@ import {
 import { isMealType } from "@/modules/meals/meal-types";
 import { estimateInventoryNutritionWithOpenAi } from "@/lib/openai/inventory-nutrition";
 import { parseInventoryNutritionAiInput, type InventoryNutritionAiEstimate, type InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
+import { toVoiceInventoryBatchSaveInput } from "@/modules/inventory/voice-inventory-batch-save";
 
 type InventoryLocation = "pantry" | "fridge" | "freezer";
 type InventoryUnit = "ud" | "g" | "kg" | "ml" | "l";
@@ -446,4 +447,28 @@ export async function estimateVoiceInventoryBatchAction(text: string) {
   if (!apiKey) return { status: "error" as const, code: "not-configured" as const, message: "La estimación con IA no está configurada todavía." };
   const { generateVoiceInventoryBatch } = await import("@/lib/openai/voice-inventory-batch-generation");
   return generateVoiceInventoryBatch(input, { apiKey, model: process.env.OPENAI_VOICE_INVENTORY_BATCH_MODEL || undefined });
+}
+
+export type SaveVoiceInventoryBatchResult =
+  | { status: "success"; outcome: "saved" | "already-saved"; insertedCount: number; message: string }
+  | { status: "error"; code: "invalid-input" | "invalid-batch-payload" | "submission-conflict" | "save-failed"; message: string };
+
+export async function saveVoiceInventoryBatchAction(submissionId: string, items: unknown): Promise<SaveVoiceInventoryBatchResult> {
+  const parsed = toVoiceInventoryBatchSaveInput(submissionId, items);
+  if (!parsed.success) return { status: "error", code: "invalid-input", message: "Revisa los productos antes de añadirlos al inventario." };
+
+  const supabase = await createClient();
+  await requireAuthenticatedUser(supabase, "voice inventory batch save");
+  const { data, error } = await (supabase as any).rpc("save_voice_inventory_batch", {
+    p_submission_id: parsed.data.submissionId,
+    p_items: parsed.data.items,
+  }) as { data: { status: "saved" | "already-saved"; inserted_count: number }[] | null; error: { code?: string; message?: string } | null };
+  if (error) {
+    const code = error.message === "submission-conflict" ? "submission-conflict" : error.message === "invalid-batch-payload" ? "invalid-batch-payload" : "save-failed";
+    return { status: "error", code, message: code === "submission-conflict" ? "Este envío ya se utilizó con productos distintos." : code === "invalid-batch-payload" ? "Revisa los productos antes de añadirlos al inventario." : "No se pudieron añadir los productos. Inténtalo de nuevo." };
+  }
+  const result = data?.[0];
+  if (!result || !["saved", "already-saved"].includes(result.status) || !Number.isInteger(result.inserted_count)) return { status: "error", code: "save-failed", message: "No se pudieron añadir los productos. Inténtalo de nuevo." };
+  revalidatePath(INVENTORY_PATH);
+  return { status: "success", outcome: result.status, insertedCount: result.inserted_count, message: `Se añadieron ${result.inserted_count} productos al inventario.` };
 }
