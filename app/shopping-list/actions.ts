@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { estimateInventoryNutritionWithOpenAi } from "@/lib/openai/inventory-nutrition";
 import { generateVoiceShoppingBatch } from "@/lib/openai/voice-shopping-batch-generation";
 import { parseVoiceShoppingBatchInput, type VoiceShoppingBatchResult } from "@/modules/shopping/voice-shopping-batch";
+import { toVoiceShoppingBatchSaveInput } from "@/modules/shopping/voice-shopping-batch-save";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -26,6 +27,7 @@ const shoppingListTransferRevalidationPaths = [
   "/recipes",
   "/meal-builder",
 ] as const;
+const SHOPPING_LIST_PATH = "/shopping-list";
 
 function isShoppingListUnit(value: string): value is ShoppingListUnit {
   return shoppingListUnits.includes(value as ShoppingListUnit);
@@ -43,6 +45,52 @@ function revalidateShoppingListTransferPaths() {
   for (const path of shoppingListTransferRevalidationPaths) {
     revalidatePath(path);
   }
+}
+
+export type SaveVoiceShoppingBatchResult =
+  | { status: "success"; outcome: "saved" | "already-saved"; insertedCount: number; message: string }
+  | { status: "error"; code: "invalid-input" | "invalid-batch-payload" | "submission-conflict" | "save-failed"; message: string };
+
+export async function saveVoiceShoppingBatchAction(
+  submissionId: string,
+  items: unknown,
+): Promise<SaveVoiceShoppingBatchResult> {
+  const parsed = toVoiceShoppingBatchSaveInput(submissionId, items);
+  if (!parsed.success) {
+    return { status: "error", code: "invalid-input", message: "Revisa los productos antes de añadirlos a la lista de compra." };
+  }
+
+  const supabase = await createClient();
+  await requireAuthenticatedUser(supabase, "voice shopping batch save");
+  const { data, error } = await (supabase as any).rpc("save_voice_shopping_batch", {
+    p_submission_id: parsed.data.submissionId,
+    p_items: parsed.data.items,
+  }) as { data: { status: "saved" | "already-saved"; inserted_count: number }[] | null; error: { message?: string } | null };
+
+  if (error) {
+    const code = error.message === "submission-conflict"
+      ? "submission-conflict"
+      : error.message === "invalid-batch-payload"
+        ? "invalid-batch-payload"
+        : "save-failed";
+    return {
+      status: "error",
+      code,
+      message: code === "submission-conflict"
+        ? "Este envío ya se utilizó con productos distintos."
+        : code === "invalid-batch-payload"
+          ? "Revisa los productos antes de añadirlos a la lista de compra."
+          : "No se pudieron añadir los productos. Inténtalo de nuevo.",
+    };
+  }
+
+  const result = data?.[0];
+  if (!result || !["saved", "already-saved"].includes(result.status) || !Number.isInteger(result.inserted_count)) {
+    return { status: "error", code: "save-failed", message: "No se pudieron añadir los productos. Inténtalo de nuevo." };
+  }
+
+  revalidatePath(SHOPPING_LIST_PATH);
+  return { status: "success", outcome: result.status, insertedCount: result.inserted_count, message: `Se añadieron ${result.inserted_count} productos a la lista de compra.` };
 }
 
 function getOptionalExpirationDate(formData: FormData) {

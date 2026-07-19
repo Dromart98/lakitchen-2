@@ -22,7 +22,7 @@ describe("voice shopping UI boundaries", () => {
   });
 
   it("invalidates pending analysis when the text is cleared", () => {
-    expect(inputSource).toContain("disabled={pending}");
+    expect(inputSource).toContain("disabled={pending || saving}");
     expect(inputSource).toContain('requestVersion.current += 1;');
     expect(inputSource).toContain('setText("");');
     expect(inputSource).toContain("setItems([]);");
@@ -30,16 +30,15 @@ describe("voice shopping UI boundaries", () => {
     expect(inputSource).toContain("if (version !== requestVersion.current) return;");
 
     const clearButton = inputSource.match(
-      /<button type="button" onClick=\{clear\}>\s*Borrar texto\s*<\/button>/,
+      /<button type="button" onClick=\{clear\} disabled=\{saving\}>\s*Borrar texto\s*<\/button>/,
     );
     expect(clearButton).not.toBeNull();
-    expect(clearButton?.[0]).not.toContain("disabled={pending}");
   });
 
   it("keeps dictation and analysis blocked while a request is pending", () => {
-    expect(inputSource).toContain("disabled={!supported || pending}");
-    expect(inputSource).toContain("disabled={pending || !text.trim()}");
-    expect(inputSource).toContain("if (!Constructor || pending) return;");
-    expect(inputSource).toContain("if (pending || !text.trim()) return;");
+    expect(inputSource).toContain("disabled={!supported || pending || saving}");
+    expect(inputSource).toContain("disabled={pending || saving || !text.trim()}");
+    expect(inputSource).toContain("if (!Constructor || pending || saving) return;");
+    expect(inputSource).toContain("if (pending || saving || !text.trim()) return;");
   });
 });
