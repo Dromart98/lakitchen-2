@@ -45,6 +45,7 @@ function getGoal(profile: ProfileRow | null): MacroTotals | null {
 
 function getMessage(code: string | undefined, success: boolean) {
   if (success && code === "meal-created") return "Comida registrada correctamente.";
+  if (success && code === "meal-consumed-logged") return "Comida registrada y productos descontados correctamente.";
   if (!success && code === "meal-name-required") return "Escribe un nombre para la comida.";
   if (!success && code === "meal-name-too-long") return "El nombre de la comida no puede superar los 120 caracteres.";
   if (!success && code === "invalid-macros") return "Los macros deben ser números enteros de 0 o más.";
@@ -87,7 +88,7 @@ export default async function MacrosPage({ searchParams }: { searchParams?: Prom
       .select("calories, protein_g, carbs_g, fat_g")
       .eq("user_id", user.id).eq("consumed_on", today) as Promise<{ data: MealRow[] | null; error: { message: string } | null }>,
     (supabase as any).from("inventory_items")
-      .select("id, name, quantity, unit, nutrition_basis, calories, protein_g, carbs_g, fat_g")
+      .select("id, name, quantity, unit, category, nutrition_basis, calories, protein_g, carbs_g, fat_g")
       .eq("user_id", user.id)
       .gt("quantity", 0)
       .order("name", { ascending: true }) as Promise<{ data: MealBuilderInventoryItem[] | null; error: { message: string } | null }>,

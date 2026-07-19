@@ -55,6 +55,7 @@ export type MealBuilderInventoryItem = {
   name: string;
   quantity: number;
   unit: string;
+  category?: string | null;
   nutrition_basis: InventoryNutritionBasis | null;
   calories: number | null;
   protein_g: number | null;
