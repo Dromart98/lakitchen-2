@@ -32,3 +32,125 @@ jobs:
 
       - name: Test
         run: npm test
+
+  export-inventory-double-submit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out target branch
+        uses: actions/checkout@v5
+        with:
+          ref: codex/prevent-inventory-double-submit
+
+      - name: Apply validated patch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          page_path = Path("app/inventory/page.tsx")
+          page = page_path.read_text(encoding="utf-8")
+          import_anchor = 'import Link from "next/link";\n'
+          pending_import = 'import { PendingSubmitButton } from "@/components/forms/PendingSubmitButton";\n'
+          if pending_import not in page:
+              if import_anchor not in page:
+                  raise SystemExit("inventory import anchor not found")
+              page = page.replace(import_anchor, import_anchor + pending_import, 1)
+
+          old_button = '''              <button className="button" type="submit">
+                Guardar producto
+              </button>'''
+          new_button = '''              <PendingSubmitButton
+                className="button"
+                idleLabel="Guardar producto"
+                pendingLabel="Guardando…"
+              />'''
+          if old_button not in page:
+              raise SystemExit("plain inventory submit button not found")
+          page = page.replace(old_button, new_button, 1)
+          page_path.write_text(page, encoding="utf-8")
+
+          ux_path = Path("tests/unit/inventory-ux-cleanup.test.ts")
+          ux = ux_path.read_text(encoding="utf-8")
+          old_assertion = '    expect(inventoryPage).toMatch(/<button className="button" type="submit">\\s+Guardar producto\\s+<\\/button>/);'
+          new_assertions = '''    expect(inventoryPage).toContain("<PendingSubmitButton");
+    expect(inventoryPage).toContain('idleLabel="Guardar producto"');
+    expect(inventoryPage).toContain('pendingLabel="Guardando…"');'''
+          if old_assertion not in ux:
+              raise SystemExit("legacy inventory submit assertion not found")
+          ux = ux.replace(old_assertion, new_assertions, 1)
+          ux_path.write_text(ux, encoding="utf-8")
+
+          test_path = Path("tests/unit/inventory-pending-submit.test.ts")
+          test_path.write_text('''import { readFileSync } from "node:fs";
+
+import { describe, expect, it } from "vitest";
+
+const inventoryPage = readFileSync("app/inventory/page.tsx", "utf8");
+
+function getInventoryAddFormSource() {
+  const start = inventoryPage.indexOf(
+    '<form action={addInventoryItemAction} className="meal-log-form">',
+  );
+  const end = inventoryPage.indexOf("</form>", start);
+
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(end).toBeGreaterThan(start);
+
+  return inventoryPage.slice(start, end + "</form>".length);
+}
+
+describe("inventory pending submit", () => {
+  it("uses the shared pending submit control in the manual add form", () => {
+    const addForm = getInventoryAddFormSource();
+
+    expect(inventoryPage).toContain(
+      'import { PendingSubmitButton } from "@/components/forms/PendingSubmitButton";',
+    );
+    expect(addForm).toContain("action={addInventoryItemAction}");
+    expect(addForm).toContain("<PendingSubmitButton");
+    expect(addForm).toContain('className="button"');
+    expect(addForm).toContain('idleLabel="Guardar producto"');
+    expect(addForm).toContain('pendingLabel="Guardando…"');
+    expect(addForm).not.toMatch(
+      /<button className="button" type="submit">\\s+Guardar producto\\s+<\\/button>/,
+    );
+  });
+
+  it("keeps the pending control isolated from inventory editing", () => {
+    const addForm = getInventoryAddFormSource();
+
+    expect(addForm.match(/<PendingSubmitButton/g) ?? []).toHaveLength(1);
+    expect(inventoryPage).toContain("Guardar cambios");
+    expect(inventoryPage).toMatch(
+      /<button className="button" type="submit">\\s+Guardar cambios\\s+<\\/button>/,
+    );
+  });
+});
+''', encoding="utf-8")
+          PY
+
+      - name: Validate focused tests
+        run: |
+          npm ci
+          npx vitest run tests/unit/inventory-pending-submit.test.ts tests/unit/inventory-ux-cleanup.test.ts
+          git diff --check
+
+      - name: Build export archive
+        run: |
+          rm -rf /tmp/inventory-double-submit-export
+          mkdir -p /tmp/inventory-double-submit-export/app/inventory
+          mkdir -p /tmp/inventory-double-submit-export/tests/unit
+          cp app/inventory/page.tsx /tmp/inventory-double-submit-export/app/inventory/page.tsx
+          cp tests/unit/inventory-pending-submit.test.ts /tmp/inventory-double-submit-export/tests/unit/inventory-pending-submit.test.ts
+          cp tests/unit/inventory-ux-cleanup.test.ts /tmp/inventory-double-submit-export/tests/unit/inventory-ux-cleanup.test.ts
+          tar -C /tmp -czf inventory-double-submit-export.tar.gz inventory-double-submit-export
+          sha256sum inventory-double-submit-export.tar.gz
+
+      - name: Upload export archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: inventory-double-submit-export
+          path: inventory-double-submit-export.tar.gz
+          if-no-files-found: error
+          retention-days: 1
