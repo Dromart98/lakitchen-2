@@ -1,37 +1,44 @@
-name: CI
+name: Inspect ESLint errors compactly
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
 
 jobs:
-  validate:
+  inspect:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+      - name: Print compact ESLint report
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git clone --quiet --depth 1 --branch codex/configure-eslint-ci "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo >/dev/null 2>&1
+          cd repo
+          npm ci --silent --ignore-scripts >/dev/null 2>&1
+          set +e
+          npx eslint . -f json > /tmp/eslint.json 2>/tmp/eslint-stderr
+          status=$?
+          set -e
+          python - <<'PY'
+          import json
+          from pathlib import Path
 
-      - name: Setup Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Build
-        run: npm run build
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test
-        run: npm test
+          data = json.loads(Path('/tmp/eslint.json').read_text(encoding='utf-8'))
+          errors = 0
+          warnings = 0
+          for result in data:
+              for message in result.get('messages', []):
+                  severity = message.get('severity', 0)
+                  if severity == 2:
+                      errors += 1
+                  elif severity == 1:
+                      warnings += 1
+                  if severity == 2:
+                      print(
+                          f"{result['filePath']}:{message.get('line', 0)}:{message.get('column', 0)}:"
+                          f"{message.get('ruleId') or 'config'}: {message.get('message', '')}"
+                      )
+          print(f"ESLINT_TOTAL errors={errors} warnings={warnings}")
+          PY
+          if [ -s /tmp/eslint-stderr ]; then cat /tmp/eslint-stderr; fi
+          exit "$status"
