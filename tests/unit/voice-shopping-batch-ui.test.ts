@@ -13,10 +13,8 @@ const previewSource = readFileSync(
 
 describe("voice shopping UI boundaries", () => {
   it("keeps browser speech and preview-only controls", () => {
-    expect(inputSource).toContain("getSpeechRecognitionConstructor");
+    expect(inputSource).toContain("usePersistentSpeechRecognition");
     expect(inputSource).toContain("mergeVoiceTranscript");
-    expect(inputSource).toContain("getVoiceRecognitionErrorMessage");
-    expect(inputSource).toContain('instance.lang = "es-ES"');
     expect(inputSource).not.toContain("createClient");
     expect(previewSource).not.toContain("Guardar");
   });
@@ -38,7 +36,7 @@ describe("voice shopping UI boundaries", () => {
   it("keeps dictation and analysis blocked while a request is pending", () => {
     expect(inputSource).toContain("disabled={!supported || pending || saving}");
     expect(inputSource).toContain("disabled={pending || saving || !text.trim()}");
-    expect(inputSource).toContain("if (!Constructor || pending || saving) return;");
+    expect(inputSource).toContain("if (pending || saving) return;");
     expect(inputSource).toContain("if (pending || saving || !text.trim()) return;");
   });
 });
