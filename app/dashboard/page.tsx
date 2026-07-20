@@ -55,21 +55,21 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "dashboard");
 
-  const { data: profile, error } = await (supabase as any)
+  const { data: profile, error } = await supabase
     .from("user_nutrition_profiles")
     .select("target_calories, target_protein_g, target_carbs_g, target_fat_g")
     .eq("user_id", user.id)
     .maybeSingle() as { data: NutritionProfileTargetsRow | null; error: { message: string } | null };
 
   const today = new Date().toISOString().slice(0, 10);
-  const { data: mealLogs, error: mealLogsError } = await (supabase as any)
+  const { data: mealLogs, error: mealLogsError } = await supabase
     .from("daily_meal_logs")
     .select("id, name, calories, protein_g, carbs_g, fat_g, created_at, meal_type")
     .eq("user_id", user.id)
     .eq("consumed_on", today)
     .order("created_at", { ascending: false }) as { data: DailyMealLogRow[] | null; error: { message: string } | null };
 
-  const { data: inventoryData, error: inventoryError } = await (supabase as any)
+  const { data: inventoryData, error: inventoryError } = await supabase
     .from("inventory_items")
     .select("id, name, location, category, nutrition_basis, calories, protein_g, carbs_g, fat_g, quantity, unit, expires_at, created_at")
     .eq("user_id", user.id)

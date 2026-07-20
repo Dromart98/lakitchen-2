@@ -46,7 +46,7 @@ export default async function EditMealLogPage({
   const user = await requireAuthenticatedUser(supabase, "dashboard meal edit");
   const today = new Date().toISOString().slice(0, 10);
 
-  const { data: meal, error } = await (supabase as any)
+  const { data: meal, error } = await supabase
     .from("daily_meal_logs")
     .select("id, name, meal_type, calories, protein_g, carbs_g, fat_g")
     .eq("id", id)
