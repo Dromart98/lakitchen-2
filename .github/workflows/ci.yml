@@ -5,9 +5,15 @@ on:
 
 jobs:
   export:
+    strategy:
+      fail-fast: false
+      matrix:
+        chunk: [0, 1, 2, 3, 4, 5, 6, 7]
     runs-on: ubuntu-latest
     steps:
-      - name: Export validated inventory patch
+      - name: Export validated inventory patch chunk
         env:
           GH_TOKEN: ${{ github.token }}
+          CHUNK_INDEX: ${{ matrix.chunk }}
+          CHUNK_COUNT: 8
         run: gh api "repos/${{ github.repository }}/contents/.github/scripts/export_inventory_patch.py?ref=${{ github.event.pull_request.head.sha }}" --jq .content | base64 --decode | python
