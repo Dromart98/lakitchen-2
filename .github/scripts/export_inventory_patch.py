@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import base64
+import gzip
 import hashlib
 import json
 import os
-import tarfile
-import tempfile
-from pathlib import Path
 from urllib.request import Request, urlopen
 
 REPOSITORY = "Dromart98/lakitchen-2"
@@ -102,29 +100,32 @@ describe("inventory pending submit", () => {
 });
 '''
 
-with tempfile.TemporaryDirectory() as temporary_directory:
-    temporary_path = Path(temporary_directory)
-    export_root = temporary_path / "inventory-double-submit-export"
-    files = {
-        "app/inventory/page.tsx": page,
-        "tests/unit/inventory-pending-submit.test.ts": focused_test,
-        "tests/unit/inventory-ux-cleanup.test.ts": ux_test,
-    }
-    for relative_path, content in files.items():
-        target = export_root / relative_path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
-
-    archive_path = temporary_path / "inventory-double-submit-export.tar.gz"
-    with tarfile.open(archive_path, "w:gz") as archive:
-        archive.add(export_root, arcname=export_root.name)
-
-    archive_bytes = archive_path.read_bytes()
-    print(
-        "INVENTORY_EXPORT="
-        + str(len(archive_bytes))
-        + ":"
-        + hashlib.sha256(archive_bytes).hexdigest()
-        + ":"
-        + base64.b64encode(archive_bytes).decode("ascii")
-    )
+files = {
+    "app/inventory/page.tsx": page,
+    "tests/unit/inventory-pending-submit.test.ts": focused_test,
+    "tests/unit/inventory-ux-cleanup.test.ts": ux_test,
+}
+payload = json.dumps(
+    files,
+    ensure_ascii=False,
+    sort_keys=True,
+    separators=(",", ":"),
+).encode("utf-8")
+archive_bytes = gzip.compress(payload, mtime=0)
+encoded = base64.b64encode(archive_bytes).decode("ascii")
+chunk_count = int(os.environ["CHUNK_COUNT"])
+chunk_index = int(os.environ["CHUNK_INDEX"])
+chunk_size = (len(encoded) + chunk_count - 1) // chunk_count
+chunk = encoded[chunk_index * chunk_size : (chunk_index + 1) * chunk_size]
+print(
+    "INVENTORY_EXPORT_CHUNK="
+    + str(chunk_index)
+    + ":"
+    + str(chunk_count)
+    + ":"
+    + str(len(archive_bytes))
+    + ":"
+    + hashlib.sha256(archive_bytes).hexdigest()
+    + ":"
+    + chunk
+)
