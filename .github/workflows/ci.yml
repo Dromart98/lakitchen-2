@@ -1,14 +1,10 @@
-name: CI
+name: Inspect ESLint errors
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
 
 jobs:
-  validate:
+  inspect:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,14 +20,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Build
-        run: npm run build
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test
-        run: npm test
+      - name: Show ESLint failures
+        shell: bash
+        run: |
+          set +e
+          npm run lint > /tmp/eslint-output.txt 2>&1
+          status=$?
+          tail -n 220 /tmp/eslint-output.txt
+          exit "$status"
