@@ -76,7 +76,7 @@ export async function updateMealLogAction(formData: FormData) {
   const user = await requireAuthenticatedUser(supabase, "dashboard meal update");
   const today = new Date().toISOString().slice(0, 10);
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from("daily_meal_logs")
     .update({
       name,
@@ -117,7 +117,7 @@ export async function deleteMealLogAction(formData: FormData) {
   const user = await requireAuthenticatedUser(supabase, "dashboard meal deletion");
   const consumedOn = new Date().toISOString().slice(0, 10);
 
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from("daily_meal_logs")
     .delete()
     .eq("id", id)
