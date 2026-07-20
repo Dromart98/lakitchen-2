@@ -2,7 +2,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -16,9 +16,12 @@
     "zod": "3.25.67"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
     "@types/node": "24.0.3",
     "@types/react": "19.1.8",
     "@types/react-dom": "19.1.6",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "15.3.8",
     "prisma": "6.10.1",
     "typescript": "5.8.3",
     "vitest": "3.2.4"
