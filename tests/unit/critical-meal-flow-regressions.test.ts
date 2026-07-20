@@ -64,7 +64,7 @@ describe("critical meal flow regression contracts", () => {
     expect(preview).toContain("Registrar solo macros");
     expect(preview).toContain('action={addMealLogAction}');
     expect(reconciliation).toContain('action={consumeAiMealInventoryAction}');
-    expect(macrosActions).toContain('rpc("consume_meal_builder_items_and_log_meal"');
+    expect(macrosActions).toContain('rpc("consume_ai_meal_inventory_and_log_meal"');
     expect(macrosActions).not.toContain("addMealLogAction");
     expect(macrosActions).not.toContain('from("daily_meal_logs")');
     expect(macrosActions).not.toContain('from("daily_meal_log_items")');

@@ -7,9 +7,19 @@ import { parseMealBuilderConsumptionLines } from "@/modules/meals/meal-builder";
 import { estimateTextMealWithOpenAi } from "@/lib/openai/text-meal-estimation";
 import { estimatePhotoMealWithOpenAi } from "@/lib/openai/photo-meal-estimation";
 import { photoMealContextSchema, validatePhotoMealFile } from "@/modules/meals/photo-meal-ai";
-import { getAuthenticatedUser, requireAuthenticatedUser } from "@/lib/supabase/auth";
+import { getAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { textMealRequestSchema, type TextMealEstimationResult } from "@/modules/meals/text-meal-ai";
+import { isValidUuid } from "@/modules/meals/meal-validation";
+
+type AiMealInventoryRpcClient = {
+  rpc: (functionName: "consume_ai_meal_inventory_and_log_meal", args: {
+    p_submission_id: string;
+    p_meal_name: string;
+    p_meal_type: string;
+    p_lines: { item_id: string; consumed_quantity: number }[];
+  }) => Promise<{ error: { code?: string; message: string } | null }>;
+};
 export async function estimateTextMealAction(input: unknown): Promise<TextMealEstimationResult> { const request = textMealRequestSchema.safeParse(input); if (!request.success) return { status: "error", code: "invalid-input" }; try { const supabase = await createClient(); const user = await getAuthenticatedUser(supabase, "text meal estimation"); if (!user) return { status: "error", code: "unauthenticated" }; const apiKey = process.env.OPENAI_API_KEY; if (!apiKey) return { status: "error", code: "missing-api-key" }; return estimateTextMealWithOpenAi(request.data.description, { apiKey, model: process.env.OPENAI_TEXT_MEAL_MODEL }); } catch { return { status: "error", code: "unexpected-error" }; } }
 
 export async function estimatePhotoMealAction(formData: FormData): Promise<TextMealEstimationResult> {
@@ -38,11 +48,14 @@ function aiDestination(mode: "text-ai" | "photo-ai", kind: "mealError" | "mealSu
   return `/macros?mealMode=${mode}&${kind}=${encodeURIComponent(code)}#registrar-comida`;
 }
 function aiConsumptionError(error: { code?: string; message: string }) {
-  if (error.code === "P0002" || error.message === "Inventory item not found") return "product-not-found";
-  if (error.code === "23505" || error.message === "Duplicate meal builder item") return "duplicate-product";
-  if (error.code === "22003" || error.message === "Quantity exceeds available stock") return "quantity-too-high";
-  if (error.message === "Incomplete inventory nutrition") return "incomplete-nutrition";
-  if (error.message === "Incompatible inventory nutrition unit") return "incompatible-unit";
+  if (error.code === "28000" || error.message === "not-authenticated") return "unauthenticated";
+  if (error.code === "P0002" || error.message === "product-not-found") return "product-not-found";
+  if (error.code === "42501" || error.message === "product-not-owned") return "product-not-owned";
+  if (error.code === "23505" || error.message === "duplicate-product") return "duplicate-product";
+  if (error.code === "22003" || error.message === "quantity-insufficient") return "quantity-too-high";
+  if (error.message === "incompatible-unit") return "incompatible-unit";
+  if (error.message === "submission-conflict") return "submission-conflict";
+  if (error.code === "22023" || error.message === "invalid-payload") return "invalid-payload";
   return "consume-failed";
 }
 export async function consumeAiMealInventoryAction(formData: FormData) {
@@ -52,10 +65,14 @@ export async function consumeAiMealInventoryAction(formData: FormData) {
   const name = String(formData.get("meal_name") ?? "").trim(); const type = String(formData.get("meal_type") ?? "").trim();
   if (!name || name.length > 120) redirect(aiDestination(mode, "mealError", "invalid-name"));
   if (!isMealType(type)) redirect(aiDestination(mode, "mealError", "invalid-meal-type"));
+  const submissionId = formData.get("submission_id");
+  if (!isValidUuid(submissionId)) redirect(aiDestination(mode, "mealError", "invalid-payload"));
   const parsed = parseMealBuilderConsumptionLines(formData.get("lines"));
   if ("error" in parsed) redirect(aiDestination(mode, "mealError", parsed.error));
-  const supabase = await createClient(); await requireAuthenticatedUser(supabase, "AI meal inventory consumption");
-  const { error } = await (supabase as any).rpc("consume_meal_builder_items_and_log_meal", { p_meal_name: name, p_meal_type: type, p_lines: parsed.lines });
+  const supabase = await createClient();
+  if (!await getAuthenticatedUser(supabase, "AI meal inventory consumption")) redirect(aiDestination(mode, "mealError", "unauthenticated"));
+  const aiMealClient = supabase as unknown as AiMealInventoryRpcClient;
+  const { error } = await aiMealClient.rpc("consume_ai_meal_inventory_and_log_meal", { p_submission_id: submissionId, p_meal_name: name, p_meal_type: type, p_lines: parsed.lines });
   if (error) redirect(aiDestination(mode, "mealError", aiConsumptionError(error)));
   ["/macros", "/inventory", "/dashboard", "/meal-history", "/weekly-summary"].forEach((path) => revalidatePath(path));
   redirect(aiDestination(mode, "mealSuccess", "meal-consumed-logged"));
