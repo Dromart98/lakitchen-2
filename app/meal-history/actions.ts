@@ -60,7 +60,7 @@ export async function repeatMealLogTodayAction(formData: FormData) {
     "repeat meal log today",
   );
 
-  const { data: sourceMeal, error: sourceMealError } = await (supabase as any)
+  const { data: sourceMeal, error: sourceMealError } = await supabase
     .from("daily_meal_logs")
     .select("id, name, meal_type, calories, protein_g, carbs_g, fat_g, consumed_on")
     .eq("id", id)
