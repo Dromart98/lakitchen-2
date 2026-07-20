@@ -18,11 +18,15 @@ const MEAL_BUILDER_ERROR_MESSAGES: Record<string, string> = {
   "invalid-lines": "Añade al menos un producto válido a la comida.",
   "too-many-products": "La comida no puede contener más de veinte productos.",
   "duplicate-product": "No puedes registrar el mismo producto más de una vez en la misma comida.",
+  "product-not-owned": "Uno de los productos no pertenece a tu inventario.",
   "product-not-found": "Uno de los productos ya no está disponible en tu inventario.",
   "invalid-quantity": "Revisa las cantidades de los productos.",
   "quantity-too-high": "Una cantidad supera el stock disponible actual.",
   "incomplete-nutrition": "Uno de los productos no tiene nutrición completa.",
   "incompatible-unit": "Uno de los productos tiene una unidad incompatible con su base nutricional.",
+  "invalid-payload": "Los datos de la comida no son válidos. Revisa la selección e inténtalo de nuevo.",
+  "submission-conflict": "Esta confirmación ya se usó con datos distintos. Genera una nueva estimación e inténtalo de nuevo.",
+  unauthenticated: "Tu sesión ha caducado. Vuelve a iniciar sesión.",
   "consume-failed": "No se pudo registrar la comida. Inténtalo de nuevo.",
 };
 
