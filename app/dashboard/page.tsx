@@ -178,6 +178,9 @@ export default async function DashboardPage() {
           <Link className="button dashboard-action-button dashboard-action-button--primary" href="/macros?mealMode=ingredients#registrar-comida">
             Registrar comida
           </Link>
+          <Link className="button dashboard-action-button" href="/inventory">
+            Revisar inventario
+          </Link>
           <Link className="button dashboard-action-button" href="/recipes?mode=all">
             Ver recetas
           </Link>

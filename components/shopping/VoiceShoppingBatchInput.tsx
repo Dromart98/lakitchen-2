@@ -171,10 +171,10 @@ export function VoiceShoppingBatchInput() {
 
   return (
     <details className="shopping-list-add">
-      <summary>Añadir varios por voz</summary>
+      <summary>Añadir por voz</summary>
 
       <div className="shopping-list-add__heading">
-        <h3>Añadir varios por voz</h3>
+        <h3>Añadir por voz</h3>
         <p>Dicta o escribe una lista completa para revisarla antes de añadir nada.</p>
       </div>
 
