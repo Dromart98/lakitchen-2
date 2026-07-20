@@ -1,10 +1,12 @@
--- The AI reconciliation form is retryable.  Keep its idempotency record private:
+-- The AI reconciliation form is retryable. Keep its idempotency record private:
 -- callers can only reach it through the narrowly scoped authenticated RPC below.
 create table public.ai_meal_inventory_submissions (
   user_id uuid not null references auth.users(id) on delete cascade,
   submission_id uuid not null,
   payload_hash text not null,
-  meal_log_id uuid not null references public.daily_meal_logs(id) on delete cascade,
+  -- Deliberately no foreign key to daily_meal_logs: deleting a meal must not remove
+  -- the idempotency record and allow the same submission to consume stock again.
+  meal_log_id uuid not null,
   created_at timestamptz not null default now(),
   primary key (user_id, submission_id)
 );
@@ -38,6 +40,8 @@ declare
   v_factor numeric;
   v_meal_id uuid;
   v_line_count integer;
+  v_updated_count integer;
+  v_deleted_count integer;
   v_total_calories numeric := 0;
   v_total_protein numeric := 0;
   v_total_carbs numeric := 0;
@@ -111,10 +115,24 @@ begin
   returning id into v_meal_id;
   insert into public.daily_meal_log_items (meal_log_id, user_id, source_inventory_item_id, product_name, consumed_quantity, unit, nutrition_basis, calories, protein_g, carbs_g, fat_g)
   select v_meal_id, v_user_id, item_id, product_name, consumed_quantity, unit, nutrition_basis, calories, protein_g, carbs_g, fat_g from pg_temp.ai_meal_snapshots;
+
+  -- Never update an inventory row to zero: inventory_items enforces quantity > 0.
   update public.inventory_items inventory set quantity = snapshot.available_quantity - snapshot.consumed_quantity
-  from pg_temp.ai_meal_snapshots snapshot where inventory.id = snapshot.item_id and inventory.user_id = v_user_id;
-  if (select count(*) from pg_temp.ai_meal_snapshots) <> (select count(*) from public.inventory_items where id in (select item_id from pg_temp.ai_meal_snapshots) and user_id = v_user_id) then raise exception using errcode = 'P0001', message = 'inventory-mutation-failed'; end if;
-  delete from public.inventory_items where user_id = v_user_id and quantity = 0 and id in (select item_id from pg_temp.ai_meal_snapshots);
+  from pg_temp.ai_meal_snapshots snapshot
+  where inventory.id = snapshot.item_id and inventory.user_id = v_user_id
+    and snapshot.available_quantity > snapshot.consumed_quantity;
+  get diagnostics v_updated_count = row_count;
+
+  delete from public.inventory_items inventory
+  using pg_temp.ai_meal_snapshots snapshot
+  where inventory.id = snapshot.item_id and inventory.user_id = v_user_id
+    and snapshot.available_quantity = snapshot.consumed_quantity;
+  get diagnostics v_deleted_count = row_count;
+
+  if v_updated_count + v_deleted_count <> v_line_count then
+    raise exception using errcode = 'P0001', message = 'inventory-mutation-failed';
+  end if;
+
   insert into public.ai_meal_inventory_submissions (user_id, submission_id, payload_hash, meal_log_id) values (v_user_id, p_submission_id, v_hash, v_meal_id);
   return v_meal_id;
 end;
