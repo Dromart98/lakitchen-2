@@ -1,4 +1,4 @@
-import type { ActivityLevel, Goal, MacroGoals, MacroProfileInput, Sex } from "./nutrition.types";
+import type { ActivityLevel, Goal, MacroGoals, MacroProfileInput } from "./nutrition.types";
 
 const activityMultipliers: Record<ActivityLevel, number> = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
 const goalAdjustments: Record<Goal, number> = { fat_loss: 0.85, maintenance: 1, muscle_gain: 1.1 };

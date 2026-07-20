@@ -3,8 +3,6 @@ import { planDateKeySchema } from "@/modules/plans/plan-date";
 
 import { getInventoryExpirationDayDifference } from "@/modules/inventory/inventory-expiration";
 import { hasCompleteInventoryNutritionValues, isInventoryNutritionBasis, type InventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
-import { type MealType } from "@/modules/meals/meal-types";
-import { type MacroTotals } from "@/modules/nutrition/nutrition.types";
 import { buildRecipeAiNutritionAllocations } from "@/modules/recipes/recipe-ai-nutrition";
 import { getUrgentRecipeAiInventoryItemIds } from "@/modules/recipes/recipe-ai-urgency";
 import { RECIPE_MAX_INGREDIENTS } from "@/modules/recipes/recipe-limits";
@@ -16,10 +14,6 @@ export type DailyPlanMealType = (typeof DAILY_PLAN_MEAL_TYPES)[number];
 export type DailyPlanPriorityMode = "balanced" | "expiration";
 export const DAILY_PLAN_PRIORITY_MODES = ["balanced", "expiration"] as const;
 export const DAILY_PLAN_MAX_MINUTES = [15, 30, 45, 60] as const;
-
-type DailyPlanMaxMinutes = (typeof DAILY_PLAN_MAX_MINUTES)[number];
-
-
 
 export const dailyPlanPublicRequestSchema = z.object({
   plan_date: planDateKeySchema,

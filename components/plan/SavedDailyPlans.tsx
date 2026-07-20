@@ -5,7 +5,6 @@ import type { DailyPlanNutrition } from "@/modules/plans/daily-plan-ai";
 import {
   canCookSavedPlanOnDate,
   formatPlanDateLabel,
-  getPlanDateOptions,
 } from "@/modules/plans/plan-date";
 import {
   groupSavedDailyPlansForAgenda,
