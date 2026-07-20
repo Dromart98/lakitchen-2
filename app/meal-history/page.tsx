@@ -65,7 +65,7 @@ export default async function MealHistoryPage({ searchParams }: { searchParams?:
   const mealErrorMessage = getMealErrorMessage(resolvedSearchParams?.mealError);
   const isPastMeal = isPastMealHistoryDate(selectedDate, today);
 
-  const { data: mealLogs, error: mealLogsError } = await (supabase as any)
+  const { data: mealLogs, error: mealLogsError } = await supabase
     .from("daily_meal_logs")
     .select("id, name, meal_type, calories, protein_g, carbs_g, fat_g, created_at, consumed_on")
     .eq("user_id", user.id)
@@ -82,7 +82,7 @@ export default async function MealHistoryPage({ searchParams }: { searchParams?:
   let mealItemsError = false;
 
   if (mealIds.length > 0) {
-    const { data: mealItems, error } = await (supabase as any)
+    const { data: mealItems, error } = await supabase
       .from("daily_meal_log_items")
       .select("id, meal_log_id, source_inventory_item_id, product_name, consumed_quantity, unit, nutrition_basis, calories, protein_g, carbs_g, fat_g, created_at")
       .in("meal_log_id", mealIds)
