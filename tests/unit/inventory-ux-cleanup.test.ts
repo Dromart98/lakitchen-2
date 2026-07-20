@@ -55,7 +55,8 @@ describe("inventory add-product labels", () => {
     expect(inventoryAddCta).toContain('type="button"');
     expect(inventoryAddCta).toContain(">\n      Añadir producto\n    <");
     expect(inventoryPage).toContain("<strong>Nuevo producto</strong>");
-    expect(inventoryPage).toMatch(/<button className="button" type="submit">\s+Guardar producto\s+<\/button>/);
+    expect(inventoryPage).toContain("<PendingSubmitButton");
+    expect(inventoryPage).toContain('idleLabel="Guardar producto"');
     expect(inventoryPage).toContain("action={addInventoryItemAction}");
   });
 });
