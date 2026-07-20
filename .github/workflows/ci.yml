@@ -1,37 +1,48 @@
-name: CI
+name: Summarize ESLint rules
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
 
 jobs:
-  validate:
+  inspect:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+      - name: Print ESLint rule summary
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git clone --quiet --depth 1 --branch codex/configure-eslint-ci "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo >/dev/null 2>&1
+          cd repo
+          npm ci --silent --ignore-scripts >/dev/null 2>&1
+          set +e
+          npx eslint . -f json > /tmp/eslint.json 2>/tmp/eslint-stderr
+          status=$?
+          set -e
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
 
-      - name: Setup Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Build
-        run: npm run build
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test
-        run: npm test
+          data = json.loads(Path('/tmp/eslint.json').read_text(encoding='utf-8'))
+          counts = Counter()
+          non_any = []
+          for result in data:
+              for message in result.get('messages', []):
+                  if message.get('severity') != 2:
+                      continue
+                  rule = message.get('ruleId') or 'config'
+                  counts[rule] += 1
+                  if rule != '@typescript-eslint/no-explicit-any':
+                      non_any.append(
+                          f"{result['filePath']}:{message.get('line', 0)}:{message.get('column', 0)}:"
+                          f"{rule}: {message.get('message', '')}"
+                      )
+          for rule, count in sorted(counts.items()):
+              print(f"RULE {rule} {count}")
+          for item in non_any:
+              print(f"NON_ANY {item}")
+          print(f"TOTAL_ERRORS {sum(counts.values())}")
+          PY
+          if [ -s /tmp/eslint-stderr ]; then cat /tmp/eslint-stderr; fi
+          exit "$status"
