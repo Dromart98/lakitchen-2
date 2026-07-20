@@ -6433,6 +6433,12 @@ h3 {
 .voice-dictation-details { display: grid; gap: 6px; }
 .voice-dictation-details p { margin: 0; }
 .voice-status, .voice-interim { color: var(--muted); }
+.voice-recording-indicator { align-items: center; background: color-mix(in srgb, var(--brand-primary) 14%, var(--card)); border: 1px solid color-mix(in srgb, var(--brand-primary) 45%, var(--border)); border-radius: 10px; color: var(--text); display: flex; gap: 10px; line-height: 1.4; margin: 0; padding: 10px 12px; }
+.voice-recording-indicator strong { color: var(--brand-primary-strong); margin-right: 4px; }
+.voice-recording-indicator__dot { animation: voice-recording-pulse 2.2s ease-in-out infinite; background: var(--brand-accent); border-radius: 999px; box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-accent) 40%, transparent); flex: 0 0 auto; height: 10px; width: 10px; }
+button[data-listening="true"] { border-color: var(--brand-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-accent) 24%, transparent); }
+@keyframes voice-recording-pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--brand-accent) 0%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .voice-recording-indicator__dot { animation: none; } }
 .voice-interim { overflow-wrap: anywhere; }
 .voice-error { color: var(--danger); }
 .voice-compatibility { color: var(--muted); }
