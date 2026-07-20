@@ -12,7 +12,8 @@
   --brand-primary: #657433;
   --brand-primary-strong: #3f4925;
   --brand-accent: #d8784a;
-  --brand-background: #f7f5ef;
+  --app-background: #f4f0e6;
+  --brand-background: var(--app-background);
   --brand-foreground: #202318;
   --brand-logo-light: #657433;
   --brand-logo-dark: #fffdf8;
@@ -29,14 +30,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 12% 8%, rgba(34, 197, 94, 0.18), transparent 30%),
-    radial-gradient(
-      circle at 92% 12%,
-      rgba(99, 102, 241, 0.16),
-      transparent 28%
-    ),
-    linear-gradient(135deg, #f8fafc 0%, #eef7f1 48%, #eef2ff 100%);
+  background: var(--app-background);
   color: var(--text);
   font-family:
     Inter,
@@ -466,28 +460,14 @@ h3 {
   --brand-primary: #9caf68;
   --brand-primary-strong: #b9c984;
   --brand-accent: #df845b;
-  --brand-background: #0b1220;
+  --app-background: #101a1b;
+  --brand-background: var(--app-background);
   --brand-foreground: #f5f1e8;
   --brand-logo-light: #9caf68;
   --brand-logo-dark: #c0cf8b;
   --border: #2d3c52;
   --ring: #c0cf8b;
   --shadow: 0 24px 60px rgba(2, 6, 23, 0.48);
-}
-
-[data-theme="dark"] body {
-  background:
-    radial-gradient(
-      circle at 12% 8%,
-      rgba(156, 175, 104, 0.12),
-      transparent 30%
-    ),
-    radial-gradient(
-      circle at 92% 12%,
-      rgba(223, 132, 91, 0.1),
-      transparent 28%
-    ),
-    linear-gradient(135deg, #0b1220 0%, #101a2a 50%, #151f30 100%);
 }
 
 [data-theme="dark"] .card,

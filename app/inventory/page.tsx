@@ -834,7 +834,7 @@ export default async function InventoryPage({
               </Link>
             </div>
             <details className="inventory-action">
-              <summary>Añadir varios por voz</summary>
+              <summary>Añadir por voz</summary>
               <VoiceInventoryBatchInput />
             </details>
             <form action={addInventoryItemAction} className="meal-log-form">
