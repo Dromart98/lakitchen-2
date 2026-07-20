@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PendingSubmitButton } from "@/components/forms/PendingSubmitButton";
 import { AppShell } from "@/components/layout/AppShell";
 
 import { InventoryConsumeForm } from "@/components/inventory/InventoryConsumeForm";
@@ -1032,9 +1033,11 @@ export default async function InventoryPage({
               <BarcodeCatalogControls
                 lookupAction={lookupBarcodeProductAction}
               />
-              <button className="button" type="submit">
-                Guardar producto
-              </button>
+              <PendingSubmitButton
+                className="button"
+                idleLabel="Guardar producto"
+                pendingLabel="Guardando…"
+              />
             </form>
           </div>
         </details>
