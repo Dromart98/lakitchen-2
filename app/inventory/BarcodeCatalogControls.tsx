@@ -101,6 +101,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
   const streamRef = useRef<MediaStream | null>(null);
   const loopRef = useRef<number | null>(null);
   const scanningRef = useRef(false);
+  const scannerRequestRef = useRef(0);
   const lastAutofillRef = useRef<BarcodeAutofillState | null>(null);
 
   function clearPreviousAutofill() {
@@ -135,6 +136,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
   }
 
   function stopScanner() {
+    scannerRequestRef.current += 1;
     scanningRef.current = false;
     if (loopRef.current !== null) {
       window.cancelAnimationFrame(loopRef.current);
@@ -180,6 +182,8 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
       return;
     }
 
+    const requestId = scannerRequestRef.current + 1;
+    scannerRequestRef.current = requestId;
     setScannerError(null);
     setMessage("Cámara activa. Enfoca el código de barras.");
     setIsScanning(true);
@@ -187,6 +191,12 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+
+      if (!scanningRef.current || scannerRequestRef.current !== requestId) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
       streamRef.current = stream;
 
       if (!videoRef.current) {
@@ -196,6 +206,12 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
 
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
+
+      if (!scanningRef.current || scannerRequestRef.current !== requestId) {
+        stopScanner();
+        return;
+      }
+
       const detector = new BarcodeDetector({ formats: ["ean_8", "ean_13", "upc_a", "itf"] });
 
       const scan = async () => {
@@ -222,6 +238,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
 
       loopRef.current = window.requestAnimationFrame(scan);
     } catch {
+      if (!scanningRef.current || scannerRequestRef.current !== requestId) return;
       setScannerError("No se pudo acceder a la cámara. Revisa los permisos o introduce el código manualmente.");
       setMessage("No se pudo acceder a la cámara. Revisa los permisos o introduce el código manualmente.");
       stopScanner();
