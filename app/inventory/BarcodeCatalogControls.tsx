@@ -17,6 +17,14 @@ type BarcodeCatalogControlsProps = {
   lookupAction: BarcodeLookupAction;
 };
 
+type FocusModeCapabilities = MediaTrackCapabilities & {
+  focusMode?: string[];
+};
+
+type FocusModeConstraints = MediaTrackConstraints & {
+  advanced: Array<MediaTrackConstraintSet & { focusMode: string }>;
+};
+
 type AutofillFieldState = {
   id: string;
   appliedValue: string;
@@ -48,6 +56,7 @@ type ExternalLookupResult =
   | { status: "invalid" | "error"; message: string };
 
 const unsupportedScannerMessage = "Tu navegador no permite escanear directamente. Introduce el código manualmente.";
+const scannerIdleMessage = "Introduce o escanea un código para buscarlo en tu catálogo personal y en Open Food Facts.";
 const autofillFieldIds = INVENTORY_BARCODE_AUTOFILL_FIELD_IDS;
 
 function getInputElement(id: string): HTMLInputElement | HTMLSelectElement | null {
@@ -92,7 +101,7 @@ function getAutofillValues(product: ExternalBarcodeProduct): Record<(typeof auto
 
 export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsProps) {
   const [barcode, setBarcode] = useState("");
-  const [message, setMessage] = useState("Introduce o escanea un código para buscarlo en tu catálogo personal y en Open Food Facts.");
+  const [message, setMessage] = useState(scannerIdleMessage);
   const [isPending, startTransition] = useTransition();
   const [isScanning, setIsScanning] = useState(false);
   const [scannerError, setScannerError] = useState<string | null>(null);
@@ -135,31 +144,59 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
     );
   }
 
-  function stopScanner() {
+  function cleanupScanner({ resetStatus = true }: { resetStatus?: boolean } = {}) {
     scannerRequestRef.current += 1;
     scanningRef.current = false;
+
     if (loopRef.current !== null) {
       window.cancelAnimationFrame(loopRef.current);
       loopRef.current = null;
     }
+
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+
     if (videoRef.current) videoRef.current.srcObject = null;
+
     setIsScanning(false);
+    setScannerError(null);
+    if (resetStatus) setMessage(scannerIdleMessage);
   }
 
-  useEffect(() => () => stopScanner(), []);
+  async function configureAutofocus(track: MediaStreamTrack) {
+    if (!track.getCapabilities || !track.applyConstraints) return;
+
+    const capabilities = track.getCapabilities() as FocusModeCapabilities;
+    const focusModes = capabilities.focusMode;
+    if (!Array.isArray(focusModes)) return;
+
+    const focusMode = focusModes.includes("continuous")
+      ? "continuous"
+      : focusModes.includes("auto")
+        ? "auto"
+        : null;
+    if (!focusMode) return;
+
+    try {
+      const focusConstraints: FocusModeConstraints = { advanced: [{ focusMode }] };
+      await track.applyConstraints(focusConstraints);
+    } catch {
+      // El enfoque es opcional: el stream y el lector siguen siendo utilizables.
+    }
+  }
+
+  useEffect(() => () => cleanupScanner(), []);
 
   useEffect(() => {
     const details = controlsRef.current?.closest("details");
     if (!details) return;
 
-    const stopScannerWhenClosed = () => {
-      if (!details.open) stopScanner();
+    const cleanupScannerWhenClosed = () => {
+      if (!details.open) cleanupScanner();
     };
 
-    details.addEventListener("toggle", stopScannerWhenClosed);
-    return () => details.removeEventListener("toggle", stopScannerWhenClosed);
+    details.addEventListener("toggle", cleanupScannerWhenClosed);
+    return () => details.removeEventListener("toggle", cleanupScannerWhenClosed);
   }, []);
 
   function updateBarcode(nextBarcode: string) {
@@ -173,7 +210,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
   }
 
   async function startScanner() {
-    if (isScanning || scanningRef.current) return;
+    if (scanningRef.current) return;
 
     const BarcodeDetector = getBarcodeDetector();
     if (!BarcodeDetector || !navigator.mediaDevices?.getUserMedia) {
@@ -182,15 +219,23 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
       return;
     }
 
+    cleanupScanner({ resetStatus: false });
     const requestId = scannerRequestRef.current + 1;
     scannerRequestRef.current = requestId;
     setScannerError(null);
-    setMessage("Cámara activa. Enfoca el código de barras.");
+    setMessage("Iniciando cámara...");
     setIsScanning(true);
     scanningRef.current = true;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
 
       if (!scanningRef.current || scannerRequestRef.current !== requestId) {
         stream.getTracks().forEach((track) => track.stop());
@@ -198,50 +243,58 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
       }
 
       streamRef.current = stream;
-
-      if (!videoRef.current) {
-        stopScanner();
+      const video = videoRef.current;
+      if (!video) {
+        cleanupScanner();
         return;
       }
 
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play();
+      video.srcObject = stream;
+      await video.play();
 
       if (!scanningRef.current || scannerRequestRef.current !== requestId) {
-        stopScanner();
+        cleanupScanner();
         return;
       }
+
+      setMessage("Cámara activa. Enfoca el código de barras.");
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) await configureAutofocus(videoTrack);
+
+      if (!scanningRef.current || scannerRequestRef.current !== requestId) return;
 
       const detector = new BarcodeDetector({ formats: ["ean_8", "ean_13", "upc_a", "itf"] });
 
       const scan = async () => {
-        if (!scanningRef.current || !videoRef.current) return;
+        if (!scanningRef.current || scannerRequestRef.current !== requestId || !videoRef.current) return;
 
         try {
           const codes = await detector.detect(videoRef.current);
-          const detected = codes[0]?.rawValue;
+          if (!scanningRef.current || scannerRequestRef.current !== requestId) return;
 
+          const detected = codes[0]?.rawValue;
           if (detected) {
             applyBarcode(detected);
+            cleanupScanner({ resetStatus: false });
             setMessage("Código detectado. Revisa el valor y busca el producto.");
-            stopScanner();
             return;
           }
 
           loopRef.current = window.requestAnimationFrame(scan);
         } catch {
+          if (!scanningRef.current || scannerRequestRef.current !== requestId) return;
+          cleanupScanner({ resetStatus: false });
           setScannerError("No se pudo leer el código. Inténtalo de nuevo o introdúcelo manualmente.");
           setMessage("No se pudo leer el código. Inténtalo de nuevo o introdúcelo manualmente.");
-          stopScanner();
         }
       };
 
       loopRef.current = window.requestAnimationFrame(scan);
     } catch {
       if (!scanningRef.current || scannerRequestRef.current !== requestId) return;
+      cleanupScanner({ resetStatus: false });
       setScannerError("No se pudo acceder a la cámara. Revisa los permisos o introduce el código manualmente.");
       setMessage("No se pudo acceder a la cámara. Revisa los permisos o introduce el código manualmente.");
-      stopScanner();
     }
   }
 
@@ -330,7 +383,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
             <video className="barcode-scanner__video" ref={videoRef} playsInline muted />
           </div>
           <div className="barcode-scanner__actions">
-            <button type="button" onClick={stopScanner}>Cerrar escáner</button>
+            <button type="button" onClick={() => cleanupScanner()}>Cerrar escáner</button>
           </div>
         </div>
       ) : null}
