@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { getRestoredBarcodeAutofillValue, normalizeBarcodeInput } from "@/modules/barcodes/barcode";
+import { getCameraChoices, getFocusConfiguration, getPreferredCameraId, normalizeFocusPoint, type CameraChoice } from "@/modules/barcodes/camera";
 import { INVENTORY_ADD_FORM_FIELD_IDS, INVENTORY_BARCODE_AUTOFILL_FIELD_IDS } from "@/modules/inventory/inventory-form-fields";
 import type { lookupBarcodeProductAction } from "./actions";
 
@@ -19,11 +20,17 @@ type BarcodeCatalogControlsProps = {
 
 type FocusModeCapabilities = MediaTrackCapabilities & {
   focusMode?: string[];
+  focusDistance?: { min?: number; max?: number };
+  pointsOfInterest?: unknown;
 };
 
-type FocusModeConstraints = MediaTrackConstraints & {
-  advanced: Array<MediaTrackConstraintSet & { focusMode: string }>;
+type FocusModeConstraintSet = MediaTrackConstraintSet & {
+  focusMode?: string;
+  focusDistance?: number;
+  pointsOfInterest?: Array<{ x: number; y: number }>;
 };
+
+type FocusModeConstraints = MediaTrackConstraints & { advanced: FocusModeConstraintSet[] };
 
 type AutofillFieldState = {
   id: string;
@@ -105,6 +112,8 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
   const [isPending, startTransition] = useTransition();
   const [isScanning, setIsScanning] = useState(false);
   const [scannerError, setScannerError] = useState<string | null>(null);
+  const [cameraChoices, setCameraChoices] = useState<CameraChoice[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<HTMLElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -167,21 +176,53 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
     if (!track.getCapabilities || !track.applyConstraints) return;
 
     const capabilities = track.getCapabilities() as FocusModeCapabilities;
-    const focusModes = capabilities.focusMode;
-    if (!Array.isArray(focusModes)) return;
-
-    const focusMode = focusModes.includes("continuous")
-      ? "continuous"
-      : focusModes.includes("auto")
-        ? "auto"
-        : null;
-    if (!focusMode) return;
+    const configuration = getFocusConfiguration(capabilities.focusMode, capabilities.focusDistance);
+    if (!configuration) return;
 
     try {
-      const focusConstraints: FocusModeConstraints = { advanced: [{ focusMode }] };
+      const focusConstraints: FocusModeConstraints = {
+        advanced: [configuration.mode === "manual"
+          ? { focusMode: configuration.mode, focusDistance: configuration.distance }
+          : { focusMode: configuration.mode }],
+      };
       await track.applyConstraints(focusConstraints);
+      track.getSettings();
     } catch {
       // El enfoque es opcional: el stream y el lector siguen siendo utilizables.
+    }
+  }
+
+  async function loadCameraChoices(activeDeviceId: string, requestId: number) {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    const choices = getCameraChoices(await navigator.mediaDevices.enumerateDevices());
+    if (!scanningRef.current || scannerRequestRef.current !== requestId) return;
+
+    setCameraChoices(choices);
+    const preferredCameraId = getPreferredCameraId(choices);
+    if (preferredCameraId && preferredCameraId !== activeDeviceId) {
+      setSelectedCameraId(preferredCameraId);
+      cleanupScanner({ resetStatus: false });
+      void startScanner(preferredCameraId);
+      return;
+    }
+    setSelectedCameraId(activeDeviceId || preferredCameraId);
+  }
+
+  async function focusCamera(clientX?: number, clientY?: number) {
+    const track = streamRef.current?.getVideoTracks()[0];
+    const video = videoRef.current;
+    if (!track || !video || !scanningRef.current) return;
+
+    const capabilities = track.getCapabilities?.() as FocusModeCapabilities | undefined;
+    const point = normalizeFocusPoint(clientX ?? video.getBoundingClientRect().left + video.getBoundingClientRect().width / 2, clientY ?? video.getBoundingClientRect().top + video.getBoundingClientRect().height / 2, video.getBoundingClientRect());
+    try {
+      if (capabilities?.pointsOfInterest) {
+        await track.applyConstraints?.({ advanced: [{ pointsOfInterest: [point] }] } as FocusModeConstraints);
+      } else if (capabilities?.focusMode?.includes("auto")) {
+        await track.applyConstraints?.({ advanced: [{ focusMode: "auto" }] } as FocusModeConstraints);
+      }
+    } catch {
+      // El enfoque manual es opcional y no interrumpe el lector.
     }
   }
 
@@ -209,7 +250,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
     updateBarcode(normalizeBarcodeInput(rawValue));
   }
 
-  async function startScanner() {
+  async function startScanner(cameraDeviceId = selectedCameraId) {
     if (scanningRef.current) return;
 
     const BarcodeDetector = getBarcodeDetector();
@@ -228,14 +269,18 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
     scanningRef.current = true;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      });
+      const videoConstraints: MediaTrackConstraints = cameraDeviceId
+        ? { deviceId: { exact: cameraDeviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+        : { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } };
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: cameraDeviceId ? { deviceId: { exact: cameraDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } : { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
+      }
 
       if (!scanningRef.current || scannerRequestRef.current !== requestId) {
         stream.getTracks().forEach((track) => track.stop());
@@ -259,7 +304,10 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
 
       setMessage("Cámara activa. Enfoca el código de barras.");
       const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) await configureAutofocus(videoTrack);
+      if (videoTrack) {
+        await configureAutofocus(videoTrack);
+        await loadCameraChoices(videoTrack.getSettings().deviceId ?? cameraDeviceId ?? "", requestId);
+      }
 
       if (!scanningRef.current || scannerRequestRef.current !== requestId) return;
 
@@ -372,7 +420,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
         </button>
       </div>
       <div className="barcode-lookup__actions">
-        <button type="button" onClick={startScanner} disabled={isScanning}>
+        <button type="button" onClick={() => void startScanner()} disabled={isScanning}>
           Escanear código
         </button>
       </div>
@@ -380,9 +428,18 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
         <div className="barcode-scanner">
           <p>Enfoca el código dentro del marco y mantén el producto estable.</p>
           <div className="barcode-scanner__frame">
-            <video className="barcode-scanner__video" ref={videoRef} playsInline muted />
+            <video className="barcode-scanner__video" ref={videoRef} playsInline muted onClick={(event) => void focusCamera(event.clientX, event.clientY)} />
           </div>
+          {cameraChoices.length > 1 ? (
+            <label className="field" htmlFor="barcode-camera-choice">
+              <span>Cámara</span>
+              <select id="barcode-camera-choice" value={selectedCameraId ?? ""} onChange={(event) => { setSelectedCameraId(event.target.value); cleanupScanner({ resetStatus: false }); void startScanner(event.target.value); }}>
+                {cameraChoices.map((camera) => <option key={camera.deviceId} value={camera.deviceId}>{camera.label}</option>)}
+              </select>
+            </label>
+          ) : null}
           <div className="barcode-scanner__actions">
+            <button type="button" onClick={() => void focusCamera()}>Intentar enfocar</button>
             <button type="button" onClick={() => cleanupScanner()}>Cerrar escáner</button>
           </div>
         </div>
