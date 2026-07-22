@@ -104,6 +104,15 @@ describe("food state expectations", () => {
     ["Pasta", "raw"],
     ["Arroz", "raw"],
     ["Brócoli", "raw"],
+    ["Arroz basmati", "raw"],
+    ["Arroz integral", "raw"],
+    ["Arroz cocido", "cooked"],
+    ["Arroz hervido", "cooked"],
+    ["Arroz frito", "cooked"],
+    ["Pollo asado", "cooked"],
+    ["Garbanzos cocidos", "cooked"],
+    ["Jamón", "processed"],
+    ["Queso", "processed"],
   ] as const)("applies food state priority for %s", (name, state) => {
     expect(getInventoryNutritionFoodStateExpectation(name)?.state).toBe(state);
   });
@@ -165,6 +174,7 @@ describe("food state expectations", () => {
     "Bocadillo de pollo",
     "Wrap de pollo",
     "Arroz con pollo",
+    "Ensalada de arroz",
     "Pollo con arroz",
     "Lentejas con chorizo",
     "Puré de papas",

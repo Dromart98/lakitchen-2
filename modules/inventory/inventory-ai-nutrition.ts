@@ -170,7 +170,7 @@ export function detectExplicitInventoryFoodState(
 ): "raw" | "cooked" | "processed" | null {
   const normalizedName = normalizeForFoodStateDetection(name);
   const processed = ["en conserva", "embutido", "embutida", "fiambre", "precocinado", "precocinada", "preparado", "preparada"];
-  const cooked = ["cocido", "cocida", "asado", "asada", "a la plancha", "plancha", "hervido", "hervida", "horneado", "horneada", "frito", "frita"];
+  const cooked = ["cocido", "cocida", "cocidos", "cocidas", "asado", "asada", "asados", "asadas", "a la plancha", "plancha", "hervido", "hervida", "hervidos", "hervidas", "horneado", "horneada", "horneados", "horneadas", "frito", "frita", "fritos", "fritas"];
   const raw = ["crudo", "cruda", "sin cocinar"];
 
   if (processed.some((phrase) => containsFoodStatePhrase(normalizedName, phrase))) return "processed";
@@ -247,14 +247,20 @@ export function detectInventoryCheeseVariant(
   return null;
 }
 
+/** Shared default-state vocabulary for deterministic detection and AI prompts. */
+export const INVENTORY_DEFAULT_RAW_FOODS = ["pechuga de pollo", "pechuga de pavo", "carne de ternera", "carne picada", "pollo", "pavo", "ternera", "cerdo", "solomillo", "solomillos", "merluza", "salmón", "salmon", "tilapia", "bacalao", "pescado", "gambas", "langostinos", "pasta", "macarrones", "espaguetis", "arroz", "quinoa", "cuscús", "cuscus", "avena", "lentejas", "garbanzos", "alubias", "brócoli", "brocoli", "espinacas", "calabacín", "calabacin", "zanahoria", "pimiento", "cebolla", "papa", "papas", "patata", "patatas", "huevo", "huevos"] as const;
+
+export function buildInventoryDefaultRawFoodPromptInstruction() {
+  return `Ingredientes básicos sin preparación explícita (${INVENTORY_DEFAULT_RAW_FOODS.join(", ")}): clasifícalos como raw y utiliza valores del alimento sin cocinar. Una preparación explícita prevalece; no supongas que arroz, pasta o legumbres están cocinados.`;
+}
+
 function detectDefaultRawInventoryFood(name: string) {
   const normalizedName = normalizePrimaryInventoryProductName(name);
   const excluded = ["leche", "yogur", "pan", "salsa", "mayonesa", "pizza", "tortilla", "croquetas", "ensalada", "comida casera", "plato preparado", "atun", "pasta fresca", "pasta con", "pasta de"];
   if (excluded.some((phrase) => containsFoodStatePhrase(normalizedName, phrase))) return null;
   if (isCompoundInventoryDishName(normalizedName)) return null;
 
-  const rawFoods = ["pechuga de pollo", "pechuga de pavo", "carne de ternera", "carne picada", "pollo", "pavo", "ternera", "cerdo", "solomillo", "solomillos", "merluza", "salmón", "salmon", "tilapia", "bacalao", "pescado", "gambas", "langostinos", "pasta", "macarrones", "espaguetis", "arroz", "quinoa", "cuscús", "cuscus", "avena", "lentejas", "garbanzos", "alubias", "brócoli", "brocoli", "espinacas", "calabacín", "calabacin", "zanahoria", "pimiento", "cebolla", "papa", "papas", "patata", "patatas", "huevo", "huevos"];
-  const matched = rawFoods.find((phrase) => isPrimaryDefaultRawFood(normalizedName, phrase));
+  const matched = INVENTORY_DEFAULT_RAW_FOODS.find((phrase) => isPrimaryDefaultRawFood(normalizedName, phrase));
   return matched ? "Alimento sin cocinar" : null;
 }
 

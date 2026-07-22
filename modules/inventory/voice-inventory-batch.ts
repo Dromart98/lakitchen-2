@@ -20,11 +20,12 @@ export const VoiceInventoryDraftItemSchema = z.object({
   unit: z.enum(VOICE_INVENTORY_BATCH_UNITS).nullable(),
   location: z.enum(VOICE_INVENTORY_BATCH_LOCATIONS).nullable(),
   category: z.enum(INVENTORY_CATEGORIES).nullable(),
-  food_state: z.enum(["raw", "cooked", "processed", "unknown"]),
+  food_state: z.enum(["raw", "cooked", "processed", "not_applicable", "unknown"]),
   nutrition_basis: z.enum(["per_100g", "per_100ml", "per_unit"]).nullable(),
   calories: finiteNonNegative.nullable(), protein_g: finiteNonNegative.nullable(),
   carbs_g: finiteNonNegative.nullable(), fat_g: finiteNonNegative.nullable(),
   confidence: z.enum(["high", "medium", "low"]),
+  nutrition_assumptions: z.string().max(500),
   issues: z.array(z.enum(VOICE_INVENTORY_BATCH_ISSUES)).max(9),
 }).strict();
 export const VoiceInventoryBatchOutputSchema = z.object({ items: z.array(VoiceInventoryDraftItemSchema).min(1).max(VOICE_INVENTORY_BATCH_MAX_ITEMS) }).strict();
