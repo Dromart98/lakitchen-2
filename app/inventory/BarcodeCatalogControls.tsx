@@ -97,6 +97,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
   const [isScanning, setIsScanning] = useState(false);
   const [scannerError, setScannerError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const controlsRef = useRef<HTMLElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const loopRef = useRef<number | null>(null);
   const scanningRef = useRef(false);
@@ -146,6 +147,18 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
   }
 
   useEffect(() => () => stopScanner(), []);
+
+  useEffect(() => {
+    const details = controlsRef.current?.closest("details");
+    if (!details) return;
+
+    const stopScannerWhenClosed = () => {
+      if (!details.open) stopScanner();
+    };
+
+    details.addEventListener("toggle", stopScannerWhenClosed);
+    return () => details.removeEventListener("toggle", stopScannerWhenClosed);
+  }, []);
 
   function updateBarcode(nextBarcode: string) {
     clearPreviousAutofill();
@@ -264,7 +277,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
   }
 
   return (
-    <section className="barcode-lookup" aria-labelledby="barcode-lookup-heading">
+    <section ref={controlsRef} className="barcode-lookup" aria-labelledby="barcode-lookup-heading">
       <div className="barcode-lookup__heading">
         <span>Código de barras</span>
         <h3 id="barcode-lookup-heading">Busca o escanea el producto</h3>

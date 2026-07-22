@@ -1271,6 +1271,7 @@ h3 {
 
 .inventory-nutrition summary,
 .inventory-action summary,
+.inventory-filters > summary,
 .inventory-manage > summary,
 .inventory-add > summary {
   min-height: 44px;
@@ -1324,6 +1325,39 @@ h3 {
   flex: 1;
   background: var(--border);
   content: "";
+}
+
+.inventory-filters,
+.inventory-barcode {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.inventory-filters > summary,
+.inventory-barcode > summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--brand-dark);
+  cursor: pointer;
+}
+
+.inventory-filters > summary span:first-child,
+.inventory-barcode > summary span {
+  display: grid;
+  gap: 2px;
+}
+
+.inventory-filters > summary small,
+.inventory-barcode > summary small {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.inventory-barcode .barcode-lookup {
+  padding: 4px 0 14px;
 }
 
 .inventory-action__panel {
@@ -1395,6 +1429,7 @@ h3 {
 .inventory-delete-button:focus-visible,
 .inventory-nutrition summary:focus-visible,
 .inventory-action summary:focus-visible,
+.inventory-filters > summary:focus-visible,
 .inventory-manage > summary:focus-visible,
 .inventory-add > summary:focus-visible {
   outline: 3px solid var(--ring);
