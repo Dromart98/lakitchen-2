@@ -28,6 +28,7 @@ import {
   getInventoryExpirationAlertItems,
   getInventoryExpirationDayDifference,
 } from "@/modules/inventory/inventory-expiration";
+import { groupInventoryItems } from "@/modules/inventory/inventory-groups";
 import type {
   InventoryItemRecord,
   InventoryLocation,
@@ -41,12 +42,6 @@ import {
 } from "./actions";
 
 export const dynamic = "force-dynamic";
-
-type InventoryGroup = {
-  location: InventoryLocation;
-  label: string;
-  items: InventoryItemRecord[];
-};
 
 type InventoryExpirationFilter =
   | "all"
@@ -129,14 +124,6 @@ const inventorySuccessMessages: Record<string, string> = {
   "item-consumed-logged-completely":
     "Producto consumido y comida registrada correctamente.",
 };
-
-function groupInventoryItems(items: InventoryItemRecord[]): InventoryGroup[] {
-  return inventoryLocations.map((location) => ({
-    location,
-    label: locationLabels[location],
-    items: items.filter((item) => item.location === location),
-  }));
-}
 
 function isInventoryLocation(
   value: string | undefined,
@@ -240,7 +227,6 @@ export default async function InventoryPage({
       matchesExpirationFilter(item, selectedExpiration, todayKey)
     );
   });
-  const groupedItems = groupInventoryItems(filteredItems);
   const locationCounts = inventoryLocations.reduce<
     Record<InventoryLocation, number>
   >(
@@ -255,6 +241,7 @@ export default async function InventoryPage({
   const hasActiveFilters = Boolean(
     query || selectedLocation !== "all" || selectedExpiration !== "all",
   );
+  const groupedItems = groupInventoryItems(filteredItems, hasActiveFilters);
   const inventoryErrorMessage = resolvedSearchParams?.inventoryError
     ? inventoryErrorMessages[resolvedSearchParams.inventoryError]
     : null;
