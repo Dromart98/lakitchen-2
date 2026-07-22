@@ -39,6 +39,14 @@ describe("voice inventory batch provider", () => {
     expect(body.text.format.strict).toBe(true);
     expect(body.text.format.schema.properties.items.maxItems).toBe(VOICE_INVENTORY_BATCH_MAX_ITEMS);
   });
+  it("applies the shared validator's calibrated confidence to the draft", async () => {
+    const result = await generateVoiceInventoryBatch("un kilo de pollo", {
+      apiKey: "test-key",
+      fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: [readyItem] }) }),
+    });
+    expect(result.status).toBe("success");
+    if (result.status === "success") expect(result.items[0].confidence).toBe("medium");
+  });
   it("maps provider failures and derives missing field issues", async () => {
     const timeout = await generateVoiceInventoryBatch("pollo", { apiKey: "x", fetchImpl: async () => new Response("", { status: 408 }) });
     const rate = await generateVoiceInventoryBatch("pollo", { apiKey: "x", fetchImpl: async () => new Response("", { status: 429 }) });
