@@ -8,8 +8,8 @@ const controls = readFileSync(
   "utf8",
 );
 
-const cleanupScanner = controls.match(/  function cleanupScanner\([\s\S]*?\n  }\n\n  async function configureAutofocus/)?.[0];
-const startScanner = controls.match(/  async function startScanner\(\) \{[\s\S]*?\n  }\n\n  async function lookupOpenFoodFacts/)?.[0];
+const cleanupScanner = controls.match(/  function cleanupScanner\([\s\S]*?\n  }\n\n  async function configureAutofocus/)?.[0] ?? "";
+const startScanner = controls.match(/  async function startScanner\([\s\S]*?\n  }\n\n  async function lookupOpenFoodFacts/)?.[0] ?? "";
 
 describe("inventory barcode camera lifecycle", () => {
   it("uses one cleanup routine for close, manual stop, unmount, and terminal scanner errors", () => {
@@ -39,13 +39,36 @@ describe("inventory barcode camera lifecycle", () => {
 
   it("prefers a useful rear-camera stream and progressively configures supported autofocus", () => {
     expect(startScanner).toContain('facingMode: { ideal: "environment" }');
+    expect(startScanner).toContain("width: { ideal: 1920 }");
+    expect(startScanner).toContain("height: { ideal: 1080 }");
     expect(startScanner).toContain("width: { ideal: 1280 }");
     expect(startScanner).toContain("height: { ideal: 720 }");
     expect(startScanner).toContain("const videoTrack = stream.getVideoTracks()[0]");
-    expect(controls).toContain('focusModes.includes("continuous")');
-    expect(controls).toContain('focusModes.includes("auto")');
+    expect(controls).toContain("getFocusConfiguration(capabilities.focusMode, capabilities.focusDistance)");
     expect(controls).toContain("await track.applyConstraints(focusConstraints)");
     expect(controls).toContain("catch {\n      // El enfoque es opcional");
+  });
+
+  it("auto-selects only once, retains choices, and protects a manual camera selection", () => {
+    expect(controls).toContain("shouldAutoSelectPreferredCamera({");
+    expect(controls).toContain("hasManualSelection: hasManualCameraSelectionRef.current");
+    expect(controls).toContain("hasAutomaticallySelected: hasAutomaticallySelectedCameraRef.current");
+    expect(controls).toContain("hasAutomaticallySelectedCameraRef.current = true");
+    expect(controls).toContain('selection: "automatic"');
+    expect(controls).toContain('selection: "manual"');
+    expect(controls).toContain("resetCameraSelection: selection === \"initial\"");
+    expect(controls).toContain("setCameraChoices(choices)");
+    expect(controls).toContain("cameraChoices.length > 1");
+    expect(controls).toContain("deviceId: { exact: cameraDeviceId }");
+  });
+
+  it("offers non-disruptive touch focus with points of interest and auto fallback", () => {
+    expect(controls).toContain("normalizeFocusPoint(");
+    expect(controls).toContain("capabilities?.pointsOfInterest");
+    expect(controls).toContain("pointsOfInterest: [point]");
+    expect(controls).toContain('focusMode: "auto"');
+    expect(controls).toContain("Intentar enfocar");
+    expect(controls).toContain("onClick={(event) => void focusCamera(event.clientX, event.clientY)}");
   });
 
   it("keeps the manual barcode field and inventory form integration unchanged", () => {
