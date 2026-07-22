@@ -1,5 +1,6 @@
 import { INVENTORY_NUTRITION_AI_SYSTEM_PROMPT } from "@/lib/openai/inventory-nutrition";
-import { buildInventoryDefaultRawFoodPromptInstruction, validateInventoryNutritionAiOutput } from "@/modules/inventory/inventory-ai-nutrition";
+import { buildInventoryDefaultRawFoodPromptInstruction } from "@/modules/inventory/inventory-default-raw-prompt";
+import { validateInventoryNutritionAiOutput } from "@/modules/inventory/inventory-ai-nutrition";
 import { VoiceInventoryBatchOutputSchema, VOICE_INVENTORY_BATCH_MAX_ITEMS, type VoiceInventoryBatchResult, withDraftClientIds, getVoiceInventoryDraftStatus } from "@/modules/inventory/voice-inventory-batch";
 
 const endpoint = "https://api.openai.com/v1/responses";
