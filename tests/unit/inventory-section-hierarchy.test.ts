@@ -57,6 +57,17 @@ describe("inventory section hierarchy", () => {
     expect(barcodeControls).toContain("getTracks().forEach((track) => track.stop())");
   });
 
+  it("invalidates pending camera requests so a closed disclosure cannot restart the scanner", () => {
+    expect(barcodeControls).toContain("const scannerRequestRef = useRef(0)");
+    expect(barcodeControls).toContain("scannerRequestRef.current += 1");
+    expect(barcodeControls).toContain("const requestId = scannerRequestRef.current + 1");
+    expect(barcodeControls).toContain("scannerRequestRef.current !== requestId");
+    expect(barcodeControls).toContain("stream.getTracks().forEach((track) => track.stop())");
+    expect(barcodeControls.indexOf("scannerRequestRef.current !== requestId")).toBeLessThan(
+      barcodeControls.indexOf("streamRef.current = stream"),
+    );
+  });
+
   it("keeps the add CTA tied to the existing details and name field", () => {
     expect(addCta).toContain('getElementById("anadir-producto")');
     expect(addCta).toContain("details.open = true");
