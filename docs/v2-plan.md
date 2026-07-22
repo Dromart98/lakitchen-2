@@ -140,59 +140,35 @@ Regla para la V2: no borrar estos módulos en la preparación inicial, pero tamp
 - OAuth Google/Apple.
 - SaaS/pagos.
 
-## Próxima fase priorizada: estabilización de Inventario y Macros
+## Fase cerrada: estabilización de Inventario y Macros
 
-Esta fase debe ejecutarse mediante cambios pequeños, comprobables y separados. Primero se resolverán los fallos funcionales; después se reorganizará la pantalla de Inventario y, por último, se aplicará el pulido visual.
+**Estado: completada y auditada el 2026-07-22.** La auditoría de cierre se hizo sobre `main` en `990876a0824acd6954c357a24b95a1000471dffc`. Los cambios se mantuvieron en entregas pequeñas; los SHA indican el cambio que resolvió cada punto cuando se pudo identificar de forma fiable en el historial local.
 
-### P0 — Corrección funcional
+### Alcance completado
 
-1. **Corregir el dictado por voz de Inventario.**
-   - El flujo debe añadir realmente los productos confirmados al inventario.
-   - Validar persistencia, mensajes de éxito y tratamiento de errores antes de continuar con nuevas mejoras del dictado.
+| Estado | Entrega | Resultado verificable | Cambio de referencia |
+| --- | --- | --- | --- |
+| Completado | Persistencia de alta por voz | Los borradores revisados se validan, se guardan mediante `save_voice_inventory_batch`, son idempotentes por usuario y envío, y se refresca Inventario tras una respuesta correcta. | `3ee264d` (PR #180); persistencia atómica previa en `fd95511`/`b070428` |
+| Completado | Macros automáticos en alta por voz | La estimación entrega calorías y los tres macros; la vista previa permite revisarlos y no habilita el guardado hasta que el borrador sea válido. | `4734060` |
+| Completado | Estado crudo por defecto | Los alimentos básicos aplicables se interpretan como crudos; una preparación explícita tiene prioridad y platos compuestos o exclusiones no reciben esa inferencia. | `7767765`, `f1a99bf` |
+| Completado | Comidas del día en Macros | La página consulta solo `daily_meal_logs` del usuario autenticado y de la fecha UTC actual, y muestra estados de carga correcta, vacío y error al final de la pantalla. | `8d40295` |
+| Completado | Jerarquía de Inventario | «Tus productos» precede a las herramientas de alta; «Encuentra rápido» conserva formulario GET, parámetros `query`, `location` y `expiration`, y se abre cuando hay filtros activos. | `1987c37` (PR #185) |
+| Completado | Alta manual y código de barras | El guardado manual permanece antes del desplegable de código de barras y ambos siguen en el mismo formulario. Al cerrar el desplegable o desmontarlo se paran pistas, bucle y solicitudes pendientes de cámara. | `1987c37` (PR #185) |
+| Completado | Caducidad y densidad de tarjetas | Las fechas reales se mantienen; los productos sin fecha no generan etiqueta ni contenedor de caducidad. Las tarjetas de producto y gestión son más compactas. | `3da12bd` (PR #186), `e4f55b3` (PR #187) |
+| Completado | Texto IA y dictado | Se conservan exactamente los modos Solo macros, Texto IA, Foto y Desde inventario. Texto IA mantiene textarea y dictado, acumula transcripciones, limita a 2.000 caracteres y detiene reconocimiento al borrar, analizar, cambiar de modo o desmontar. | `d903e6c`, `0c9a85c`, `990876a` (PR #188) |
+| Completado | Registro y consumo de comidas | Los macros decimales se persisten con una decimal. El consumo desde reconciliación IA usa una RPC transaccional con bloqueo e idempotencia: repetir el mismo envío no vuelve a descontar inventario ni crea otra comida. | `3ab668d` (PR #177), `1a34f36` |
 
-### P1 — Funcionalidad principal
+### Cierre técnico de la auditoría
 
-2. **Añadir cálculo automático de macros al dictado por voz de Inventario.**
-   - Calcular o completar calorías, proteínas, carbohidratos y grasas antes del guardado.
-   - Permitir revisión del resultado antes de confirmar el alta cuando la estimación sea generada por IA.
+**Contratos comprobados.** Las pruebas focalizadas actuales cubren resultados de dominio (caducidad, validación de lotes, inferencia cruda, límites de texto y decimales), integración de acciones/RPC (alta por voz, consumo y registro idempotente) y contratos de UI. No se detectó una regresión funcional reproducible; por ello esta auditoría no modifica código de producto, RPC, migraciones ni estilos.
 
-3. **Mostrar las comidas registradas al final de la página de Macros.**
-   - El historial visible debe confirmar qué comidas se han registrado y sus macros.
-   - Debe actualizarse tras registrar una comida sin duplicar registros.
+**Calidad de pruebas.** Predominan las pruebas de contrato estructural en los componentes de App Router (lectura del código fuente para orden, atributos y cierres). Son útiles como protección económica de la jerarquía actual, pero son más frágiles que una prueba de navegador. Las pruebas de dominio, acciones y migraciones ejercen comportamiento y son la evidencia principal para validación, idempotencia, cálculo y fechas. No se eliminó ninguna prueba: no se confirmó duplicación ni una aserción contradictoria.
 
-### P1 — Reorganización de Inventario
+**Riesgos residuales y validación manual pendiente.** La suite unitaria no puede conceder permisos de cámara ni ejecutar el reconocimiento del navegador, ni ejecutar las RPC contra una instancia Supabase migrada. Antes de una entrega deben comprobarse manualmente: permisos y cierre de cámara en móvil, dictado prolongado y cambio de pestaña, guardado/reintento de un lote de voz y de una reconciliación con inventario real, y que el listado de comidas se actualice tras cada una de las cuatro vías de registro. También conviene verificar visualmente tema claro/oscuro y tamaños táctiles de las tarjetas compactas.
 
-4. **Hacer que “Tus productos” sea el contenido principal de la pantalla.**
-   - El listado del inventario debe aparecer antes que las herramientas secundarias.
+### Siguiente fase recomendada: validación operativa guiada de flujos cotidianos
 
-5. **Mover “Encuentra rápido” a un desplegable.**
-   - Debe permanecer accesible sin ocupar espacio vertical cuando no se utiliza.
-
-6. **Mover el lector de código de barras a un desplegable.**
-   - Mantener intacta su funcionalidad, permisos y flujo de guardado.
-
-7. **Subir el botón “Añadir al inventario”.**
-   - Colocarlo inmediatamente después de la opción de alta manual.
-   - Reducir la distancia necesaria para completar el flujo principal.
-
-### P2 — Optimización visual y densidad
-
-8. **Mostrar la fecha de caducidad únicamente cuando exista.**
-   - No mostrar el texto “Sin fecha de caducidad”.
-
-9. **Reducir el tamaño de las tarjetas de gestión y equivalentes.**
-   - Conservar legibilidad, accesibilidad, controles táctiles y jerarquía visual.
-   - Evitar que las herramientas secundarias dominen la pantalla.
-
-10. **Mejorar el cuadro de Texto IA / Dictado por voz.**
-    - Aumentar el área útil de escritura y dictado.
-    - Mejorar su presentación visual sin cambiar la lógica funcional.
-
-### Dependencias de ejecución
-
-- No implementar el cálculo automático de macros hasta confirmar que el dictado guarda productos correctamente.
-- No realizar el pulido visual final antes de fijar la nueva jerarquía y el orden de las secciones de Inventario.
-- Cada cambio debe conservar autenticación, RLS, inventario existente, cálculo de macros, navegación móvil y tema claro/oscuro.
+**No implementada en esta fase.** Priorizar una pasada manual reproducible, con datos de prueba y una instancia Supabase migrada, sobre Inventario y los cuatro modos de Macros. Debe registrar evidencia de los riesgos residuales anteriores y convertir únicamente incidencias reproducibles en pruebas de comportamiento. Tiene prioridad frente a nuevas capacidades de IA, recetas o automatizaciones porque valida los flujos diarios ya entregados (alta, consumo y registro) sin ampliar superficie funcional ni introducir complejidad prematura.
 
 ## Riesgos técnicos principales
 
