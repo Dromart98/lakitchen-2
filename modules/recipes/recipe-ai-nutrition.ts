@@ -19,6 +19,11 @@ export type RecipeAiNutritionInventoryItem = {
 
 export type RecipeAiSuggestionWithNutrition = RecipeAiSuggestion & {
   nutrition: RecipeNutritionEstimate;
+  calorieValidation?: {
+    status: "within-budget" | "adjusted" | "not-viable" | "unavailable";
+    remainingCalories: number | null;
+    toleranceCalories: number | null;
+  };
 };
 
 type BaseUnit = "g" | "ml" | "ud";

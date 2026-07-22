@@ -16,7 +16,7 @@ export type SaveGeneratedRecipeInput = {
 
 export type SaveGeneratedRecipeResult =
   | { status: "success"; code: "saved" | "already-saved"; recipeId: string }
-  | { status: "error"; code: "unauthenticated" | "invalid-input" | "recipe-stale" | "insufficient-stock" | "expired-item" | "save-failed" | "unexpected-error" };
+  | { status: "error"; code: "unauthenticated" | "invalid-input" | "recipe-stale" | "insufficient-stock" | "expired-item" | "calorie-budget-exceeded" | "save-failed" | "unexpected-error" };
 
 export type SavedAiRecipeInventoryItem = {
   id: string;
