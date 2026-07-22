@@ -40,7 +40,9 @@ describe("voice inventory batch provider", () => {
     expect(body.text.format.schema.properties.items.maxItems).toBe(VOICE_INVENTORY_BATCH_MAX_ITEMS);
     expect(body.input[0].content).toContain("arroz");
     expect(body.input[0].content).toContain("como raw");
-    expect(body.input[0].content).toContain("No supongas que arroz, pasta o legumbres están cocinados");
+    expect(body.input[0].content).toContain("No apliques esta regla a platos compuestos");
+    expect(body.input[0].content).toContain("pasta fresca");
+    expect(body.input[0].content).toContain("No supongas que arroz, pasta seca o legumbres secas están cocinados");
   });
   it("applies the shared validator's calibrated confidence to the draft", async () => {
     const result = await generateVoiceInventoryBatch("un kilo de pollo", {
