@@ -55,6 +55,6 @@ export function inventoryVoiceDefaultRawFoodsMatchDeterministicRules() {
   return INVENTORY_VOICE_DEFAULT_RAW_FOODS.every(
     (name) => getInventoryNutritionFoodStateExpectation(name)?.state === "raw",
   ) && INVENTORY_VOICE_DEFAULT_RAW_EXCLUSIONS.every(
-    (name) => getInventoryNutritionFoodStateExpectation(name) === null,
+    (name) => getInventoryNutritionFoodStateExpectation(name)?.state !== "raw",
   );
 }
