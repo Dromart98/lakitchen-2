@@ -5,7 +5,10 @@ import { MacroMealRecorder } from "@/components/macros/MacroMealRecorder";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getMacroModeMessages, resolveMacroMealMode } from "@/modules/meals/macro-meal-mode";
+import { formatMealLogItemNutritionValue } from "@/modules/meals/meal-log-items";
 import { remainingMacros, sumMacros } from "@/modules/meals/meal-summary";
+import { MEAL_TYPE_LABELS, normalizeMealType } from "@/modules/meals/meal-types";
+import { getTodayUtcDate } from "@/modules/meals/meal-date";
 import {
   createRepeatedMealBuilderDraft,
   getMealBuilderMessage,
@@ -27,6 +30,9 @@ type ProfileRow = {
 };
 
 type MealRow = {
+  id: string;
+  name: string;
+  meal_type: string | null;
   calories: number;
   protein_g: number;
   carbs_g: number;
@@ -77,15 +83,17 @@ function MacroRow({ label, consumed, goal, remaining, unit }: { label: string; c
 export default async function MacrosPage({ searchParams }: { searchParams?: Promise<{ mealError?: string; mealSuccess?: string; mealMode?: string; repeatMeal?: string }> }) {
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "macros page");
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayUtcDate();
 
   const [{ data: profile, error: profileError }, { data: meals, error: mealsError }, { data: inventoryItems, error: inventoryError }] = await Promise.all([
     (supabase as any).from("user_nutrition_profiles")
       .select("target_calories, target_protein_g, target_carbs_g, target_fat_g")
       .eq("user_id", user.id).maybeSingle() as Promise<{ data: ProfileRow | null; error: { message: string } | null }>,
     (supabase as any).from("daily_meal_logs")
-      .select("calories, protein_g, carbs_g, fat_g")
-      .eq("user_id", user.id).eq("consumed_on", today) as Promise<{ data: MealRow[] | null; error: { message: string } | null }>,
+      .select("id, name, meal_type, calories, protein_g, carbs_g, fat_g")
+      .eq("user_id", user.id)
+      .eq("consumed_on", today)
+      .order("created_at", { ascending: false }) as Promise<{ data: MealRow[] | null; error: { message: string } | null }>,
     (supabase as any).from("inventory_items")
       .select("id, name, quantity, unit, category, nutrition_basis, calories, protein_g, carbs_g, fat_g")
       .eq("user_id", user.id)
@@ -204,6 +212,32 @@ export default async function MacrosPage({ searchParams }: { searchParams?: Prom
             <Link className="button" href="/nutrition-profile">Calcular o editar objetivos</Link>
           </section>
         </div>
+
+        <section className="card macros-today-meals" aria-labelledby="macros-today-meals-title">
+          <div className="macros-today-meals__heading">
+            <h2 id="macros-today-meals-title">Comidas registradas hoy</h2>
+            {!mealsError ? <span>{(meals ?? []).length} {(meals ?? []).length === 1 ? "comida" : "comidas"}</span> : null}
+          </div>
+          {mealsError ? (
+            <p className="auth-message error" role="alert">No se pudieron cargar las comidas registradas hoy. Inténtalo de nuevo.</p>
+          ) : meals?.length ? (
+            <div className="macros-today-meals__list">
+              {meals.map((meal) => (
+                <article className="macros-today-meal" key={meal.id}>
+                  <div>
+                    <h3>{meal.name}</h3>
+                    <p>{MEAL_TYPE_LABELS[normalizeMealType(meal.meal_type)]}</p>
+                  </div>
+                  <p className="macros-today-meal__nutrition" aria-label={`Macronutrientes de ${meal.name}`}>
+                    {formatMealLogItemNutritionValue(meal.calories, 20)} kcal · P {formatMealLogItemNutritionValue(meal.protein_g, 20)} g · C {formatMealLogItemNutritionValue(meal.carbs_g, 20)} g · G {formatMealLogItemNutritionValue(meal.fat_g, 20)} g
+                  </p>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="muted">Todavía no has registrado ninguna comida hoy.</p>
+          )}
+        </section>
       </div>
     </AppShell>
   );
