@@ -35,14 +35,19 @@ export function getMealHistoryRepeatMode({
   return "none";
 }
 
-export function formatMealLogItemNutritionValue(value: number | string | null | undefined): string {
+export function formatMealLogItemNutritionValue(
+  value: number | string | null | undefined,
+  maximumFractionDigits = 1,
+): string {
   if (value === null || value === undefined || value === "") return "—";
 
   const numericValue = typeof value === "number" ? value : Number(value);
 
   if (!Number.isFinite(numericValue)) return "—";
 
-  return NUMBER_FORMATTER.format(numericValue);
+  if (maximumFractionDigits === 1) return NUMBER_FORMATTER.format(numericValue);
+
+  return new Intl.NumberFormat("es-ES", { maximumFractionDigits }).format(numericValue);
 }
 
 export function sortMealLogItems<T extends Pick<MealLogItemRecord, "product_name" | "source_inventory_item_id">>(items: readonly T[]): T[] {

@@ -21,6 +21,10 @@ describe("meal log item presentation helpers", () => {
     expect(formatMealLogItemNutritionValue(42.56)).toBe("42,6");
   });
 
+  it("can retain additional stored decimal places when a view needs them", () => {
+    expect(formatMealLogItemNutritionValue(42.5678, 20)).toBe("42,5678");
+  });
+
   it("hides NaN values", () => {
     expect(formatMealLogItemNutritionValue(Number.NaN)).toBe("—");
   });

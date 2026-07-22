@@ -1580,6 +1580,62 @@ h3 {
   font-weight: 900;
 }
 
+.macros-today-meals {
+  display: grid;
+  gap: 14px;
+}
+
+.macros-today-meals__heading,
+.macros-today-meal {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.macros-today-meals__heading h2,
+.macros-today-meal h3,
+.macros-today-meal p {
+  margin: 0;
+}
+
+.macros-today-meals__heading > span,
+.macros-today-meal > div > p {
+  color: var(--muted);
+}
+
+.macros-today-meals__list {
+  display: grid;
+  gap: 10px;
+}
+
+.macros-today-meal {
+  align-items: flex-start;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.macros-today-meal > div {
+  min-width: 0;
+}
+
+.macros-today-meal h3 {
+  overflow-wrap: anywhere;
+}
+
+.macros-today-meal > div > p {
+  margin-top: 3px;
+  font-size: 0.88rem;
+}
+
+.macros-today-meal__nutrition {
+  flex: 0 1 auto;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: right;
+}
+
 .plan-builder-link {
   display: flex;
   min-width: 0;
@@ -1624,6 +1680,18 @@ h3 {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
+  }
+}
+
+@media (max-width: 520px) {
+  .macros-today-meals__heading,
+  .macros-today-meal {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .macros-today-meal__nutrition {
+    text-align: left;
   }
 }
 

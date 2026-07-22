@@ -95,6 +95,7 @@ export async function repeatMealLogTodayAction(formData: FormData) {
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/macros");
   revalidatePath("/meal-history");
   revalidatePath("/weekly-summary");
   redirect("/dashboard?mealSuccess=meal-repeated");
