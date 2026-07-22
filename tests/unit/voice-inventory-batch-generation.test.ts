@@ -17,7 +17,7 @@ import { VOICE_INVENTORY_BATCH_MAX_ITEMS } from "@/modules/inventory/voice-inven
 const readyItem = {
   name: "Pollo", quantity: 1, unit: "kg", location: "freezer", category: "protein",
   food_state: "raw", nutrition_basis: "per_100g", calories: 120, protein_g: 22,
-  carbs_g: 0, fat_g: 3, confidence: "high", issues: [],
+  carbs_g: 0, fat_g: 3, confidence: "high", nutrition_assumptions: "Valores típicos por 100 g.", issues: [],
 };
 const completed = (value: unknown) => new Response(JSON.stringify(value), { status: 200 });
 
@@ -46,5 +46,29 @@ describe("voice inventory batch provider", () => {
     expect(timeout).toMatchObject({ status: "error", code: "timeout" });
     expect(rate).toMatchObject({ status: "error", code: "rate-limited" });
     expect(pending).toMatchObject({ status: "needs-clarification" });
+  });
+  it("enriches an entire batch in one structured provider call without multiplying macros", async () => {
+    let calls = 0;
+    const result = await generateVoiceInventoryBatch("Dos kilos de pollo al congelador, seis manzanas a la nevera y un litro de leche", {
+      apiKey: "test-key", fetchImpl: async () => {
+        calls += 1;
+        return completed({ status: "completed", output_text: JSON.stringify({ items: [
+          { ...readyItem, name: "Pechuga de pollo", quantity: 2, unit: "kg", location: "freezer", calories: 120, protein_g: 23, carbs_g: 0, fat_g: 2 },
+          { ...readyItem, name: "Manzana", quantity: 6, unit: "ud", location: "fridge", category: "fruit", food_state: "not_applicable", nutrition_basis: "per_unit", calories: 80, protein_g: 0.4, carbs_g: 21, fat_g: 0.3 },
+          { ...readyItem, name: "Leche", quantity: 1, unit: "l", location: "fridge", category: "dairy", food_state: "not_applicable", nutrition_basis: "per_100ml", calories: 46, protein_g: 3.2, carbs_g: 4.8, fat_g: 1.5 },
+        ] }) });
+      },
+    });
+    expect(calls).toBe(1);
+    expect(result).toMatchObject({ status: "success" });
+    if (result.status === "success") {
+      expect(result.items.map((item) => [item.quantity, item.unit, item.nutrition_basis, item.calories])).toEqual([[2, "kg", "per_100g", 120], [6, "ud", "per_unit", 80], [1, "l", "per_100ml", 46]]);
+      expect(result.items[0].issues).not.toContain("nutrition-incomplete");
+    }
+  });
+  it("keeps an unweighed package blocked instead of inventing nutrition", async () => {
+    const result = await generateVoiceInventoryBatch("Dos paquetes de pollo", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: [{ ...readyItem, name: "Pollo", quantity: null, unit: null, nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null, confidence: "low", food_state: "raw", nutrition_assumptions: "Falta el peso de cada paquete.", issues: ["package-size-missing", "nutrition-incomplete", "ambiguous-product"] }] }) }) });
+    expect(result).toMatchObject({ status: "needs-clarification" });
+    if (result.status === "needs-clarification") expect(result.items[0].issues).toEqual(expect.arrayContaining(["package-size-missing", "nutrition-incomplete"]));
   });
 });
