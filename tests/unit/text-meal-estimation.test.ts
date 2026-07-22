@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TEXT_MEAL_AI_MODEL_DEFAULT, TEXT_MEAL_SYSTEM_PROMPT, estimateTextMealWithOpenAi } from "@/lib/openai/text-meal-estimation";
 
-const success = { status: "success", suggested_name: "Comida", ingredients: [{ name: "Arroz", quantity: 150, unit: "g", preparation: "cocido", calories: 195, protein_g: 4, carbs_g: 42, fat_g: 0.5 }], assumptions: [], confidence: "medium", message: null };
+const success = { status: "success", suggested_name: "Comida", ingredients: [{ normalized_name: "Arroz".toLowerCase(), display_name: "Arroz", name: "Arroz", confidence: "medium" as const, quantity: 150, unit: "g", preparation: "cocido", calories: 195, protein_g: 4, carbs_g: 42, fat_g: 0.5 }], assumptions: [], confidence: "medium", message: null };
 const clarification = { status: "needs-clarification", suggested_name: null, ingredients: null, assumptions: null, confidence: null, message: "No puedo estimar cuánto arroz se consumió aproximadamente." };
 const response = (status: number, body: unknown) => ({ ok: status >= 200 && status < 300, status, json: async () => body }) as Response;
 const completed = (output: unknown) => response(200, { status: "completed", output_text: JSON.stringify(output) });
