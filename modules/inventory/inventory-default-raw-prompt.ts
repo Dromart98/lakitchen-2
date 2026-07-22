@@ -38,12 +38,23 @@ export const INVENTORY_VOICE_DEFAULT_RAW_FOODS = [
   "huevo",
 ] as const;
 
+export const INVENTORY_VOICE_DEFAULT_RAW_EXCLUSIONS = [
+  "pasta fresca",
+  "pasta con",
+  "pasta de",
+  "arroz con",
+  "ensalada de arroz",
+  "plato preparado",
+] as const;
+
 export function buildInventoryDefaultRawFoodPromptInstruction() {
-  return `Cuando el usuario no indique una preparación, trata estos ingredientes básicos como raw y usa valores del alimento sin cocinar: ${INVENTORY_VOICE_DEFAULT_RAW_FOODS.join(", ")}. Una preparación explícita como cocido, hervido, frito, asado o a la plancha prevalece. No supongas que arroz, pasta o legumbres están cocinados.`;
+  return `Cuando el usuario no indique una preparación, trata como raw únicamente ingredientes básicos simples o variedades simples de esta lista y usa valores del alimento sin cocinar: ${INVENTORY_VOICE_DEFAULT_RAW_FOODS.join(", ")}. No apliques esta regla a platos compuestos ni a estas exclusiones: ${INVENTORY_VOICE_DEFAULT_RAW_EXCLUSIONS.join(", ")}. Una preparación explícita como cocido, hervido, frito, asado o a la plancha prevalece. No supongas que arroz, pasta seca o legumbres secas están cocinados.`;
 }
 
 export function inventoryVoiceDefaultRawFoodsMatchDeterministicRules() {
   return INVENTORY_VOICE_DEFAULT_RAW_FOODS.every(
     (name) => getInventoryNutritionFoodStateExpectation(name)?.state === "raw",
+  ) && INVENTORY_VOICE_DEFAULT_RAW_EXCLUSIONS.every(
+    (name) => getInventoryNutritionFoodStateExpectation(name) === null,
   );
 }
