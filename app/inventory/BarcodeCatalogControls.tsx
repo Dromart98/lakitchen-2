@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { getRestoredBarcodeAutofillValue, normalizeBarcodeInput } from "@/modules/barcodes/barcode";
-import { getCameraChoices, getFocusConfiguration, getPreferredCameraId, normalizeFocusPoint, type CameraChoice } from "@/modules/barcodes/camera";
+import { getCameraChoices, getFocusConfiguration, getPreferredCameraId, normalizeFocusPoint, shouldAutoSelectPreferredCamera, type CameraChoice } from "@/modules/barcodes/camera";
 import { INVENTORY_ADD_FORM_FIELD_IDS, INVENTORY_BARCODE_AUTOFILL_FIELD_IDS } from "@/modules/inventory/inventory-form-fields";
 import type { lookupBarcodeProductAction } from "./actions";
 
@@ -31,6 +31,11 @@ type FocusModeConstraintSet = MediaTrackConstraintSet & {
 };
 
 type FocusModeConstraints = MediaTrackConstraints & { advanced: FocusModeConstraintSet[] };
+
+type ScannerStartOptions = {
+  cameraDeviceId?: string;
+  selection?: "initial" | "automatic" | "manual";
+};
 
 type AutofillFieldState = {
   id: string;
@@ -120,6 +125,8 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
   const loopRef = useRef<number | null>(null);
   const scanningRef = useRef(false);
   const scannerRequestRef = useRef(0);
+  const hasManualCameraSelectionRef = useRef(false);
+  const hasAutomaticallySelectedCameraRef = useRef(false);
   const lastAutofillRef = useRef<BarcodeAutofillState | null>(null);
 
   function clearPreviousAutofill() {
@@ -153,7 +160,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
     );
   }
 
-  function cleanupScanner({ resetStatus = true }: { resetStatus?: boolean } = {}) {
+  function cleanupScanner({ resetStatus = true, resetCameraSelection = true }: { resetStatus?: boolean; resetCameraSelection?: boolean } = {}) {
     scannerRequestRef.current += 1;
     scanningRef.current = false;
 
@@ -167,6 +174,10 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
 
     if (videoRef.current) videoRef.current.srcObject = null;
 
+    if (resetCameraSelection) {
+      hasManualCameraSelectionRef.current = false;
+      hasAutomaticallySelectedCameraRef.current = false;
+    }
     setIsScanning(false);
     setScannerError(null);
     if (resetStatus) setMessage(scannerIdleMessage);
@@ -199,10 +210,14 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
 
     setCameraChoices(choices);
     const preferredCameraId = getPreferredCameraId(choices);
-    if (preferredCameraId && preferredCameraId !== activeDeviceId) {
-      setSelectedCameraId(preferredCameraId);
-      cleanupScanner({ resetStatus: false });
-      void startScanner(preferredCameraId);
+    if (shouldAutoSelectPreferredCamera({
+      activeCameraId: activeDeviceId,
+      preferredCameraId,
+      hasManualSelection: hasManualCameraSelectionRef.current,
+      hasAutomaticallySelected: hasAutomaticallySelectedCameraRef.current,
+    })) {
+      hasAutomaticallySelectedCameraRef.current = true;
+      void startScanner({ cameraDeviceId: preferredCameraId ?? undefined, selection: "automatic" });
       return;
     }
     setSelectedCameraId(activeDeviceId || preferredCameraId);
@@ -250,8 +265,8 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
     updateBarcode(normalizeBarcodeInput(rawValue));
   }
 
-  async function startScanner(cameraDeviceId = selectedCameraId) {
-    if (scanningRef.current) return;
+  async function startScanner({ cameraDeviceId, selection = "initial" }: ScannerStartOptions = {}) {
+    if (scanningRef.current && selection === "initial") return;
 
     const BarcodeDetector = getBarcodeDetector();
     if (!BarcodeDetector || !navigator.mediaDevices?.getUserMedia) {
@@ -260,7 +275,8 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
       return;
     }
 
-    cleanupScanner({ resetStatus: false });
+    if (selection === "manual") hasManualCameraSelectionRef.current = true;
+    cleanupScanner({ resetStatus: false, resetCameraSelection: selection === "initial" });
     const requestId = scannerRequestRef.current + 1;
     scannerRequestRef.current = requestId;
     setScannerError(null);
@@ -433,7 +449,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
           {cameraChoices.length > 1 ? (
             <label className="field" htmlFor="barcode-camera-choice">
               <span>Cámara</span>
-              <select id="barcode-camera-choice" value={selectedCameraId ?? ""} onChange={(event) => { setSelectedCameraId(event.target.value); cleanupScanner({ resetStatus: false }); void startScanner(event.target.value); }}>
+              <select id="barcode-camera-choice" value={selectedCameraId ?? ""} onChange={(event) => void startScanner({ cameraDeviceId: event.target.value, selection: "manual" })}>
                 {cameraChoices.map((camera) => <option key={camera.deviceId} value={camera.deviceId}>{camera.label}</option>)}
               </select>
             </label>

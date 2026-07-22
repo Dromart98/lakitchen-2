@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getCameraChoices, getFocusConfiguration, getNearFocusDistance, getPreferredCameraId, normalizeFocusPoint } from "@/modules/barcodes/camera";
+import { getCameraChoices, getFocusConfiguration, getNearFocusDistance, getPreferredCameraId, normalizeFocusPoint, shouldAutoSelectPreferredCamera } from "@/modules/barcodes/camera";
 
 describe("barcode camera helpers", () => {
   it("prioritizes continuous, auto, then manual focus with a valid distance range", () => {
@@ -24,5 +24,12 @@ describe("barcode camera helpers", () => {
     ] as MediaDeviceInfo[]);
     expect(choices).toEqual([{ deviceId: "rear", label: "Back Camera" }, { deviceId: "front", label: "Cámara 2" }]);
     expect(getPreferredCameraId(choices)).toBe("rear");
+  });
+
+  it("only auto-selects a different preferred camera once and never over a manual choice", () => {
+    expect(shouldAutoSelectPreferredCamera({ activeCameraId: "front", preferredCameraId: "rear", hasManualSelection: false, hasAutomaticallySelected: false })).toBe(true);
+    expect(shouldAutoSelectPreferredCamera({ activeCameraId: "rear", preferredCameraId: "rear", hasManualSelection: false, hasAutomaticallySelected: false })).toBe(false);
+    expect(shouldAutoSelectPreferredCamera({ activeCameraId: "front", preferredCameraId: "rear", hasManualSelection: true, hasAutomaticallySelected: false })).toBe(false);
+    expect(shouldAutoSelectPreferredCamera({ activeCameraId: "front", preferredCameraId: "rear", hasManualSelection: false, hasAutomaticallySelected: true })).toBe(false);
   });
 });

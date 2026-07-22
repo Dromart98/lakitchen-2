@@ -59,3 +59,22 @@ export function getPreferredCameraId(choices: readonly CameraChoice[]): string |
   const rearCamera = choices.find((choice) => /back|rear|environment|trasera|posterior/i.test(choice.label));
   return rearCamera?.deviceId ?? choices[0]?.deviceId ?? null;
 }
+
+export function shouldAutoSelectPreferredCamera({
+  activeCameraId,
+  preferredCameraId,
+  hasManualSelection,
+  hasAutomaticallySelected,
+}: {
+  activeCameraId: string;
+  preferredCameraId: string | null;
+  hasManualSelection: boolean;
+  hasAutomaticallySelected: boolean;
+}): boolean {
+  return Boolean(
+    preferredCameraId
+    && preferredCameraId !== activeCameraId
+    && !hasManualSelection
+    && !hasAutomaticallySelected,
+  );
+}

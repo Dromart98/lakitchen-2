@@ -49,9 +49,14 @@ describe("inventory barcode camera lifecycle", () => {
     expect(controls).toContain("catch {\n      // El enfoque es opcional");
   });
 
-  it("only restarts for a different preferred camera and retains choices for the selector", () => {
-    expect(controls).toContain("if (preferredCameraId && preferredCameraId !== activeDeviceId)");
-    expect(controls).toContain("void startScanner(preferredCameraId)");
+  it("auto-selects only once, retains choices, and protects a manual camera selection", () => {
+    expect(controls).toContain("shouldAutoSelectPreferredCamera({");
+    expect(controls).toContain("hasManualSelection: hasManualCameraSelectionRef.current");
+    expect(controls).toContain("hasAutomaticallySelected: hasAutomaticallySelectedCameraRef.current");
+    expect(controls).toContain("hasAutomaticallySelectedCameraRef.current = true");
+    expect(controls).toContain('selection: "automatic"');
+    expect(controls).toContain('selection: "manual"');
+    expect(controls).toContain("resetCameraSelection: selection === \"initial\"");
     expect(controls).toContain("setCameraChoices(choices)");
     expect(controls).toContain("cameraChoices.length > 1");
     expect(controls).toContain("deviceId: { exact: cameraDeviceId }");
