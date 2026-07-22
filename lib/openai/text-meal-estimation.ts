@@ -2,7 +2,7 @@ import { TEXT_MEAL_JSON_SCHEMA, validateTextMealProviderOutput, type TextMealEst
 const OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
 export const TEXT_MEAL_AI_MODEL_DEFAULT = "gpt-5.6-terra";
 export const TEXT_MEAL_AI_TIMEOUT_MS = 20_000;
-export const TEXT_MEAL_SYSTEM_PROMPT = `Analiza descripciones de comidas en español y devuelve una estimación nutricional, no un registro de comida. Identifica únicamente los ingredientes mencionados, sus cantidades, unidades y preparación. No inventes ingredientes, aceite, salsas ni aderezos que no se hayan indicado.
+export const TEXT_MEAL_SYSTEM_PROMPT = `Analiza descripciones de comidas en español y devuelve una estimación nutricional, no un registro de comida. Identifica únicamente los ingredientes mencionados, sus cantidades, unidades y preparación. Para cada ingrediente devuelve normalized_name (nombre alimentario simple), display_name (texto claro para la persona), name (igual a display_name por compatibilidad) y confianza individual. No inventes ingredientes, aceite, salsas ni aderezos que no se hayan indicado.
 
 Las cantidades aproximadas son válidas: estima prudentemente "un tomate pequeño", "una manzana mediana", "un huevo L", lonchas, cucharadas, cucharaditas, latas, tazas y un plato normal. Declara cada equivalencia de peso o cantidad aproximada en assumptions y usa confianza medium o low; no la presentes como exacta.
 

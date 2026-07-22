@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { calculateTextMealTotals, textMealRequestSchema, validateTextMealProviderOutput } from "@/modules/meals/text-meal-ai";
 
-const ingredient = { name: "Pechuga de pollo", quantity: 240, unit: "g", preparation: "a la plancha", calories: 396, protein_g: 74.4, carbs_g: 0, fat_g: 8.6 };
+const ingredient = { normalized_name: "Pechuga de pollo".toLowerCase(), display_name: "Pechuga de pollo", name: "Pechuga de pollo", confidence: "medium" as const, quantity: 240, unit: "g", preparation: "a la plancha", calories: 396, protein_g: 74.4, carbs_g: 0, fat_g: 8.6 };
 const success = () => ({ status: "success", suggested_name: "Pollo con arroz", ingredients: [ingredient], assumptions: ["Se asumió cocinado sin salsa"], confidence: "high", message: null });
 const clarification = () => ({ status: "needs-clarification", suggested_name: null, ingredients: null, assumptions: null, confidence: null, message: "No puedo estimar cuánto arroz se consumió aproximadamente." });
 const rawChickenAndRice = () => ({ status: "success", suggested_name: "Pollo con arroz", ingredients: [
-  { name: "Pollo", quantity: 200, unit: "g", preparation: "crudo", calories: 220, protein_g: 46, carbs_g: 0, fat_g: 2.6 },
-  { name: "Arroz", quantity: 100, unit: "g", preparation: "crudo", calories: 360, protein_g: 7, carbs_g: 79, fat_g: 0.7 },
+  { normalized_name: "Pollo".toLowerCase(), display_name: "Pollo", name: "Pollo", confidence: "medium" as const, quantity: 200, unit: "g", preparation: "crudo", calories: 220, protein_g: 46, carbs_g: 0, fat_g: 2.6 },
+  { normalized_name: "Arroz".toLowerCase(), display_name: "Arroz", name: "Arroz", confidence: "medium" as const, quantity: 100, unit: "g", preparation: "crudo", calories: 360, protein_g: 7, carbs_g: 79, fat_g: 0.7 },
 ], assumptions: ["Se asumió pollo crudo al no indicarse preparación.", "Se asumió arroz crudo al no indicarse preparación."], confidence: "high", message: null });
 
 describe("text meal AI validation", () => {
@@ -16,12 +16,12 @@ describe("text meal AI validation", () => {
   it("accepts explicit quantities with the raw preparation default and recalculates their totals", () => {
     expect(validateTextMealProviderOutput(rawChickenAndRice())).toEqual(expect.objectContaining({
       status: "success",
-      ingredients: expect.arrayContaining([expect.objectContaining({ name: "Pollo", preparation: "crudo" }), expect.objectContaining({ name: "Arroz", preparation: "crudo" })]),
+      ingredients: expect.arrayContaining([expect.objectContaining({ normalized_name: "Pollo".toLowerCase(), display_name: "Pollo", name: "Pollo", confidence: "medium", preparation: "crudo" }), expect.objectContaining({ normalized_name: "Arroz".toLowerCase(), display_name: "Arroz", name: "Arroz", confidence: "medium", preparation: "crudo" })]),
       total: { calories: 580, protein_g: 53, carbs_g: 79, fat_g: 3.3 },
     }));
   });
   it("accepts normal approximate portions when their assumption and calibrated confidence are supplied", () => {
-    const tomato = { status: "success", suggested_name: "Tomate", ingredients: [{ name: "Tomate", quantity: 90, unit: "g", preparation: "crudo", calories: 16, protein_g: 0.8, carbs_g: 3.5, fat_g: 0.2 }], assumptions: ["Se estimó un tomate pequeño como aproximadamente 90 g y crudo."], confidence: "medium", message: null };
+    const tomato = { status: "success", suggested_name: "Tomate", ingredients: [{ normalized_name: "Tomate".toLowerCase(), display_name: "Tomate", name: "Tomate", confidence: "medium" as const, quantity: 90, unit: "g", preparation: "crudo", calories: 16, protein_g: 0.8, carbs_g: 3.5, fat_g: 0.2 }], assumptions: ["Se estimó un tomate pequeño como aproximadamente 90 g y crudo."], confidence: "medium", message: null };
     expect(validateTextMealProviderOutput(tomato)).toEqual(expect.objectContaining({ status: "success", confidence: "medium", assumptions: tomato.assumptions }));
   });
   it("preserves explicit cooked preparation over the raw default", () => {
@@ -31,7 +31,7 @@ describe("text meal AI validation", () => {
     expect(validateTextMealProviderOutput(cooked)).toEqual(expect.objectContaining({ status: "success", ingredients: expect.arrayContaining([expect.objectContaining({ preparation: "cocinado" }), expect.objectContaining({ preparation: "cocido" })]) }));
   });
   it("supports a reasonable egg and serrano ham estimate while retaining clarification for an unquantified meal", () => {
-    const eggAndHam = { status: "success", suggested_name: "Huevo con jamón serrano", ingredients: [{ name: "Huevo L", quantity: 1, unit: "unidad", preparation: "crudo", calories: 78, protein_g: 6.9, carbs_g: 0.4, fat_g: 5.3 }, { name: "Jamón serrano", quantity: 2, unit: "lonchas", preparation: null, calories: 54, protein_g: 8.4, carbs_g: 0, fat_g: 2.3 }], assumptions: ["Se estimó un huevo L como una unidad y dos lonchas normales de jamón serrano."], confidence: "medium", message: null };
+    const eggAndHam = { status: "success", suggested_name: "Huevo con jamón serrano", ingredients: [{ normalized_name: "Huevo L".toLowerCase(), display_name: "Huevo L", name: "Huevo L", confidence: "medium" as const, quantity: 1, unit: "unidad", preparation: "crudo", calories: 78, protein_g: 6.9, carbs_g: 0.4, fat_g: 5.3 }, { normalized_name: "Jamón serrano".toLowerCase(), display_name: "Jamón serrano", name: "Jamón serrano", confidence: "medium" as const, quantity: 2, unit: "lonchas", preparation: null, calories: 54, protein_g: 8.4, carbs_g: 0, fat_g: 2.3 }], assumptions: ["Se estimó un huevo L como una unidad y dos lonchas normales de jamón serrano."], confidence: "medium", message: null };
     expect(validateTextMealProviderOutput(eggAndHam).status).toBe("success");
     expect(validateTextMealProviderOutput({ ...clarification(), message: "Indica una cantidad aproximada de pollo o arroz para poder estimar pollo con arroz." })).toEqual({ status: "needs-clarification", message: "Indica una cantidad aproximada de pollo o arroz para poder estimar pollo con arroz." });
   });

@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { PHOTO_MEAL_AI_MODEL_DEFAULT, PHOTO_MEAL_SYSTEM_PROMPT, estimatePhotoMealWithOpenAi } from "@/lib/openai/photo-meal-estimation";
 import { validateTextMealProviderOutput } from "@/modules/meals/text-meal-ai";
 
-const chicken = { name: "Pechuga de pollo", quantity: 180, unit: "g", preparation: "cocinado", calories: 297, protein_g: 55.8, carbs_g: 0, fat_g: 6.5 };
-const rice = { name: "Arroz blanco", quantity: 150, unit: "g", preparation: "cocido", calories: 195, protein_g: 4, carbs_g: 42, fat_g: 0.5 };
+const chicken = { normalized_name: "Pechuga de pollo".toLowerCase(), display_name: "Pechuga de pollo", name: "Pechuga de pollo", confidence: "medium" as const, quantity: 180, unit: "g", preparation: "cocinado", calories: 297, protein_g: 55.8, carbs_g: 0, fat_g: 6.5 };
+const rice = { normalized_name: "Arroz blanco".toLowerCase(), display_name: "Arroz blanco", name: "Arroz blanco", confidence: "medium" as const, quantity: 150, unit: "g", preparation: "cocido", calories: 195, protein_g: 4, carbs_g: 42, fat_g: 0.5 };
 const success = { status: "success", suggested_name: "Pollo con arroz", ingredients: [chicken, rice], assumptions: ["Las cantidades de pollo y arroz se estimaron visualmente por la proporción que ocupan en el plato; son aproximadas.", "Se asumió pollo cocinado y arroz cocido por la apariencia de un plato servido."], confidence: "medium", message: null };
 const clarification = { status: "needs-clarification", suggested_name: null, ingredients: null, assumptions: null, confidence: null, message: "La imagen está demasiado borrosa para identificar alimentos con suficiente seguridad." };
 const response = (status: number, body: unknown) => ({ ok: status >= 200 && status < 300, status, json: async () => body }) as Response;
@@ -12,7 +12,7 @@ const completed = (value: unknown) => response(200, { status: "completed", outpu
 
 describe("photo meal prompt", () => {
   it("requires prudent visual estimates for a clear chicken-and-rice plate without an exact scale", () => {
-    expect(PHOTO_MEAL_SYSTEM_PROMPT).toContain("plato claro con pollo y arroz debe producir una estimación prudente");
+    expect(PHOTO_MEAL_SYSTEM_PROMPT).toContain("“arroz con pollo” debe producir arroz cocido y pollo cocinado como dos ingredientes independientes");
     expect(PHOTO_MEAL_SYSTEM_PROMPT).toContain("aunque no haya báscula");
     expect(PHOTO_MEAL_SYSTEM_PROMPT).toContain("proporción que ocupa cada alimento");
     expect(PHOTO_MEAL_SYSTEM_PROMPT).toContain("Declara en assumptions cada peso o cantidad estimado visualmente");
@@ -63,6 +63,14 @@ describe("photo meal OpenAI provider", () => {
     expect(result).toEqual({ status: "success", suggested_name: "Pollo con arroz", ingredients: [chicken, rice], total: { calories: 492, protein_g: 59.8, carbs_g: 42, fat_g: 7 }, assumptions: success.assumptions, confidence: "medium" });
   });
 
+  it("keeps a general dish name separate from normalized, independently estimated cooked ingredients", async () => {
+    const result = await estimatePhotoMealWithOpenAi("data:image/jpeg;base64,/9j/", "", { apiKey: "key", fetchImpl: async () => completed(success) });
+    expect(result).toMatchObject({ status: "success", suggested_name: "Pollo con arroz", ingredients: [
+      { normalized_name: "pechuga de pollo", display_name: "Pechuga de pollo", preparation: "cocinado", quantity: 180 },
+      { normalized_name: "arroz blanco", display_name: "Arroz blanco", preparation: "cocido", quantity: 150 },
+    ] });
+  });
+
   it("accepts clarification only as a valid structured outcome and rejects invalid provider responses", async () => {
     expect(await estimatePhotoMealWithOpenAi("data:image/jpeg;base64,/9j/", "", { apiKey: "key", fetchImpl: async () => completed(clarification) })).toEqual({ status: "needs-clarification", message: clarification.message });
     const invalids = [response(408, {}), response(500, {}), response(200, { status: "incomplete" }), response(200, { status: "completed", output: [{ content: [{ type: "refusal" }] }] }), response(200, { status: "completed" }), response(200, { status: "completed", output_text: "not json" }), completed({ ...success, message: "bad" }), completed({ ...clarification, ingredients: [chicken] })];
@@ -74,6 +82,8 @@ describe("photo meal structured output contract", () => {
   it("rejects negative macros, invalid units, and additional properties through the shared strict validator", () => {
     expect(validateTextMealProviderOutput({ ...success, ingredients: [{ ...chicken, protein_g: -1 }] })).toEqual({ status: "error", code: "invalid-ai-response" });
     expect(validateTextMealProviderOutput({ ...success, ingredients: [{ ...rice, unit: "bol" }] })).toEqual({ status: "error", code: "invalid-ai-response" });
+    expect(validateTextMealProviderOutput({ ...success, ingredients: [] })).toEqual({ status: "error", code: "invalid-ai-response" });
+    expect(validateTextMealProviderOutput({ ...success, ingredients: [{ ...rice, quantity: Number.NaN }] })).toEqual({ status: "error", code: "invalid-ai-response" });
     expect(validateTextMealProviderOutput({ ...success, extra: true })).toEqual({ status: "error", code: "invalid-ai-response" });
   });
 });
