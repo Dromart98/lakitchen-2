@@ -52,8 +52,8 @@ describe("inventory section hierarchy", () => {
   it("preserves the barcode form field and stops an active scanner when its disclosure closes", () => {
     expect(barcodeControls).toContain('name="barcode"');
     expect(barcodeControls).toContain('closest("details")');
-    expect(barcodeControls).toContain('details.addEventListener("toggle", stopScannerWhenClosed)');
-    expect(barcodeControls).toContain("if (!details.open) stopScanner()");
+    expect(barcodeControls).toContain('details.addEventListener("toggle", cleanupScannerWhenClosed)');
+    expect(barcodeControls).toContain("if (!details.open) cleanupScanner()");
     expect(barcodeControls).toContain("getTracks().forEach((track) => track.stop())");
   });
 
