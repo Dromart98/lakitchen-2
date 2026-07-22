@@ -61,6 +61,21 @@ describe("inventory add-product labels", () => {
   });
 });
 
+describe("inventory product expiration presentation", () => {
+  it("renders the existing expiration label only for products with an expiration date", () => {
+    const productCardStart = inventoryPage.indexOf('<li className="inventory-product"');
+    const productCardEnd = inventoryPage.indexOf("{!hasCompleteNutrition", productCardStart);
+    const productCard = inventoryPage.slice(productCardStart, productCardEnd);
+
+    expect(productCard).toContain("{item.expires_at ? (");
+    expect(productCard).toContain('<p className="inventory-product__expiration">');
+    expect(productCard).toContain("formatInventoryExpirationLabel(");
+    expect(productCard).toContain("item.expires_at,");
+    expect(productCard).not.toContain("Sin fecha de caducidad");
+    expect(productCard).toContain(") : null}");
+  });
+});
+
 describe("authenticated brand and card styling", () => {
   it("wraps the reusable logo in an accessible dashboard Link", () => {
     expect(appShell).toContain('import Link from "next/link"');

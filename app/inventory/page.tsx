@@ -497,12 +497,14 @@ export default async function InventoryPage({
                               <span className="inventory-category">
                                 {getInventoryCategoryLabel(item.category)}
                               </span>
-                              <p className="inventory-product__expiration">
-                                {formatInventoryExpirationLabel(
-                                  item.expires_at,
-                                  todayKey,
-                                )}
-                              </p>
+                              {item.expires_at ? (
+                                <p className="inventory-product__expiration">
+                                  {formatInventoryExpirationLabel(
+                                    item.expires_at,
+                                    todayKey,
+                                  )}
+                                </p>
+                              ) : null}
                             </div>
                             {!hasCompleteNutrition && hasValidItemId ? (
                               <InventoryNutritionCta
