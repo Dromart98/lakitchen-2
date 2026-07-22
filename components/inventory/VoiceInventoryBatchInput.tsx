@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import { estimateVoiceInventoryBatchAction, saveVoiceInventoryBatchAction } from "@/app/inventory/actions";
 import { usePersistentSpeechRecognition } from "@/components/voice/usePersistentSpeechRecognition";
@@ -11,6 +12,7 @@ import { mergeVoiceTranscript } from "@/modules/voice/browser-speech-recognition
 import { VoiceInventoryBatchPreview } from "./VoiceInventoryBatchPreview";
 
 export function VoiceInventoryBatchInput() {
+  const router = useRouter();
   const [text, setText] = useState("");
   const [items, setItems] = useState<VoiceInventoryDraftItem[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -80,6 +82,7 @@ export function VoiceInventoryBatchInput() {
       setText("");
       setSubmissionId(crypto.randomUUID());
       setMessage(result.message);
+      router.refresh();
     } catch {
       setMessage("No se pudieron añadir los productos. Inténtalo de nuevo.");
     } finally {
