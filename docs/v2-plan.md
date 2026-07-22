@@ -140,6 +140,60 @@ Regla para la V2: no borrar estos módulos en la preparación inicial, pero tamp
 - OAuth Google/Apple.
 - SaaS/pagos.
 
+## Próxima fase priorizada: estabilización de Inventario y Macros
+
+Esta fase debe ejecutarse mediante cambios pequeños, comprobables y separados. Primero se resolverán los fallos funcionales; después se reorganizará la pantalla de Inventario y, por último, se aplicará el pulido visual.
+
+### P0 — Corrección funcional
+
+1. **Corregir el dictado por voz de Inventario.**
+   - El flujo debe añadir realmente los productos confirmados al inventario.
+   - Validar persistencia, mensajes de éxito y tratamiento de errores antes de continuar con nuevas mejoras del dictado.
+
+### P1 — Funcionalidad principal
+
+2. **Añadir cálculo automático de macros al dictado por voz de Inventario.**
+   - Calcular o completar calorías, proteínas, carbohidratos y grasas antes del guardado.
+   - Permitir revisión del resultado antes de confirmar el alta cuando la estimación sea generada por IA.
+
+3. **Mostrar las comidas registradas al final de la página de Macros.**
+   - El historial visible debe confirmar qué comidas se han registrado y sus macros.
+   - Debe actualizarse tras registrar una comida sin duplicar registros.
+
+### P1 — Reorganización de Inventario
+
+4. **Hacer que “Tus productos” sea el contenido principal de la pantalla.**
+   - El listado del inventario debe aparecer antes que las herramientas secundarias.
+
+5. **Mover “Encuentra rápido” a un desplegable.**
+   - Debe permanecer accesible sin ocupar espacio vertical cuando no se utiliza.
+
+6. **Mover el lector de código de barras a un desplegable.**
+   - Mantener intacta su funcionalidad, permisos y flujo de guardado.
+
+7. **Subir el botón “Añadir al inventario”.**
+   - Colocarlo inmediatamente después de la opción de alta manual.
+   - Reducir la distancia necesaria para completar el flujo principal.
+
+### P2 — Optimización visual y densidad
+
+8. **Mostrar la fecha de caducidad únicamente cuando exista.**
+   - No mostrar el texto “Sin fecha de caducidad”.
+
+9. **Reducir el tamaño de las tarjetas de gestión y equivalentes.**
+   - Conservar legibilidad, accesibilidad, controles táctiles y jerarquía visual.
+   - Evitar que las herramientas secundarias dominen la pantalla.
+
+10. **Mejorar el cuadro de Texto IA / Dictado por voz.**
+    - Aumentar el área útil de escritura y dictado.
+    - Mejorar su presentación visual sin cambiar la lógica funcional.
+
+### Dependencias de ejecución
+
+- No implementar el cálculo automático de macros hasta confirmar que el dictado guarda productos correctamente.
+- No realizar el pulido visual final antes de fijar la nueva jerarquía y el orden de las secciones de Inventario.
+- Cada cambio debe conservar autenticación, RLS, inventario existente, cálculo de macros, navegación móvil y tema claro/oscuro.
+
 ## Riesgos técnicos principales
 
 1. **Mezclar Prisma y Supabase sin una decisión clara.**
