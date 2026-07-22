@@ -363,110 +363,109 @@ export default async function InventoryPage({
         ) : null}
 
         <section
-          className="inventory-section inventory-filters"
-          aria-labelledby="inventory-filters-title"
+          className="inventory-products"
+          aria-labelledby="inventory-products-title"
         >
           <div className="inventory-section__heading">
             <div>
-              <span className="inventory-section__kicker">
-                Encuentra rápido
-              </span>
-              <h2 id="inventory-filters-title">Buscar y filtrar</h2>
+              <span className="inventory-section__kicker">Por ubicación</span>
+              <h2 id="inventory-products-title">Tus productos</h2>
             </div>
-            {hasActiveFilters ? (
-              <span className="inventory-filter-status">Filtros activos</span>
-            ) : null}
+            <span className="inventory-count">
+              {filteredItems.length} visibles
+            </span>
           </div>
-          <form
-            action="/inventory"
-            method="get"
-            className="inventory-filter-form"
+          <details
+            className="inventory-filters"
+            open={hasActiveFilters}
           >
-            <label
-              className="field inventory-filter-form__search"
-              htmlFor="inventory-query"
-            >
-              <span>Buscar por nombre</span>
-              <input
-                id="inventory-query"
-                name="query"
-                type="search"
-                placeholder="Arroz"
-                defaultValue={query}
-              />
-            </label>
-            <label className="field" htmlFor="inventory-location-filter">
-              <span>Ubicación</span>
-              <select
-                id="inventory-location-filter"
-                name="location"
-                defaultValue={selectedLocation}
-              >
-                <option value="all">Todas</option>
-                {inventoryLocations.map((location) => (
-                  <option key={location} value={location}>
-                    {locationLabels[location]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field" htmlFor="inventory-expiration-filter">
-              <span>Caducidad</span>
-              <select
-                id="inventory-expiration-filter"
-                name="expiration"
-                defaultValue={selectedExpiration}
-              >
-                {expirationFilters.map((filter) => (
-                  <option key={filter.value} value={filter.value}>
-                    {filter.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="inventory-filter-form__actions">
-              <button className="inventory-button" type="submit">
-                Aplicar filtros
-              </button>
-              <Link className="inventory-text-link" href="/inventory">
-                Limpiar filtros
-              </Link>
-            </div>
-          </form>
-        </section>
-
-        {error ? (
-          <section className="inventory-empty" role="alert">
-            <h2>No se pudo cargar el inventario</h2>
-            <p>No se pudo cargar el inventario. Inténtalo de nuevo.</p>
-          </section>
-        ) : null}
-        {!error && items.length === 0 ? (
-          <section className="inventory-empty">
-            <h2>Tu inventario está vacío</h2>
-            <p>Abre el formulario y añade tu primer producto.</p>
-          </section>
-        ) : null}
-        {!error && items.length > 0 ? (
-          <section
-            className="inventory-products"
-            aria-labelledby="inventory-products-title"
-          >
-            <div className="inventory-section__heading">
-              <div>
-                <span className="inventory-section__kicker">Por ubicación</span>
-                <h2 id="inventory-products-title">Tus productos</h2>
-              </div>
-              <span className="inventory-count">
-                {filteredItems.length} visibles
+            <summary>
+              <span>
+                <strong>Encuentra rápido</strong>
+                <small>Busca y filtra tus productos</small>
               </span>
+              {hasActiveFilters ? (
+                <span className="inventory-filter-status">Filtros activos</span>
+              ) : null}
+            </summary>
+            <form
+              action="/inventory"
+              method="get"
+              className="inventory-filter-form"
+            >
+              <label
+                className="field inventory-filter-form__search"
+                htmlFor="inventory-query"
+              >
+                <span>Buscar por nombre</span>
+                <input
+                  id="inventory-query"
+                  name="query"
+                  type="search"
+                  placeholder="Arroz"
+                  defaultValue={query}
+                />
+              </label>
+              <label className="field" htmlFor="inventory-location-filter">
+                <span>Ubicación</span>
+                <select
+                  id="inventory-location-filter"
+                  name="location"
+                  defaultValue={selectedLocation}
+                >
+                  <option value="all">Todas</option>
+                  {inventoryLocations.map((location) => (
+                    <option key={location} value={location}>
+                      {locationLabels[location]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field" htmlFor="inventory-expiration-filter">
+                <span>Caducidad</span>
+                <select
+                  id="inventory-expiration-filter"
+                  name="expiration"
+                  defaultValue={selectedExpiration}
+                >
+                  {expirationFilters.map((filter) => (
+                    <option key={filter.value} value={filter.value}>
+                      {filter.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="inventory-filter-form__actions">
+                <button className="inventory-button" type="submit">
+                  Aplicar filtros
+                </button>
+                <Link className="inventory-text-link" href="/inventory">
+                  Limpiar filtros
+                </Link>
+              </div>
+            </form>
+          </details>
+
+          {error ? (
+            <div className="inventory-empty" role="alert">
+              <h3>No se pudo cargar el inventario</h3>
+              <p>No se pudo cargar el inventario. Inténtalo de nuevo.</p>
             </div>
-            {filteredItems.length === 0 ? (
+          ) : null}
+          {!error && items.length === 0 ? (
+            <div className="inventory-empty">
+              <h3>Tu inventario está vacío</h3>
+              <p>Abre el formulario y añade tu primer producto.</p>
+            </div>
+          ) : null}
+          {!error && items.length > 0 ? (
+            <>
+              {filteredItems.length === 0 ? (
               <p className="inventory-empty">
                 No hay productos que coincidan con estos filtros.
               </p>
             ) : null}
-            <div className="inventory-groups">
+              <div className="inventory-groups">
               {groupedItems.map((group) => (
                 <section
                   className="inventory-group"
@@ -809,9 +808,10 @@ export default async function InventoryPage({
                   )}
                 </section>
               ))}
-            </div>
-          </section>
-        ) : null}
+              </div>
+            </>
+          ) : null}
+        </section>
 
         <details
           className="inventory-add"
@@ -1027,17 +1027,22 @@ export default async function InventoryPage({
                   fatG: INVENTORY_ADD_FORM_FIELD_IDS.fatG,
                 }}
               />
-              <div className="inventory-barcode-divider">
-                <span>O utiliza un código de barras</span>
-              </div>
-              <BarcodeCatalogControls
-                lookupAction={lookupBarcodeProductAction}
-              />
               <PendingSubmitButton
                 className="button"
                 idleLabel="Guardar producto"
                 pendingLabel="Guardando…"
               />
+              <details className="inventory-action inventory-barcode">
+                <summary>
+                  <span>
+                    <strong>Usar código de barras</strong>
+                    <small>Busca o escanea un producto</small>
+                  </span>
+                </summary>
+                <BarcodeCatalogControls
+                  lookupAction={lookupBarcodeProductAction}
+                />
+              </details>
             </form>
           </div>
         </details>
