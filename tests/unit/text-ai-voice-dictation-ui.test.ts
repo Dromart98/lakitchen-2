@@ -17,15 +17,21 @@ describe("Text AI persistent voice dictation", () => {
   });
 
   it("exposes the active dictation state accessibly without replacing manual input", () => {
+    expect(estimator).toContain('className="text-ai-estimator"');
+    expect(estimator).toContain('<textarea');
     expect(estimator).toContain('"Dictar comida"');
     expect(estimator).toContain('"Detener dictado"');
     expect(estimator).toContain('aria-pressed={listening}');
     expect(estimator).toContain('aria-label={listening ? "Detener dictado" : "Iniciar dictado"}');
     expect(estimator).toContain('data-listening={listening ? "true" : "false"}');
     expect(estimator).toContain('className="voice-recording-indicator" role="status"');
+    expect(estimator).toContain('aria-live="polite" aria-atomic="true"');
     expect(estimator).toContain('<strong>Escuchando…</strong> Pulsa de nuevo para detener.');
     expect(estimator).toContain('disabled={!supported || state === "estimating"}');
     expect(estimator).toContain('Puedes escribir la comida manualmente.');
+    expect(estimator).toContain('className="text-ai-counter">{description.length}/2000');
+    expect(estimator).toContain('className="inventory-text-link"');
+    expect(estimator).toContain('Borrar texto');
   });
 
   it("stops recognition before analysis, clearing, descendant form submission and mode changes", () => {

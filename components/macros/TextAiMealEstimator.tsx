@@ -146,28 +146,32 @@ export function TextAiMealEstimator({
             maxLength={TEXT_AI_DESCRIPTION_MAX_LENGTH}
             placeholder="240 g de pollo, 150 g de arroz cocido y una cucharadita de aceite"
           />
+        </div>
+      </label>
+      <div className="text-ai-composer-actions">
+        <button
+          type="button"
+          className={`voice-dictation-button${listening ? " is-listening" : ""}`}
+          aria-pressed={listening}
+          aria-label={listening ? "Detener dictado" : "Iniciar dictado"}
+          data-listening={listening ? "true" : "false"}
+          onClick={listening ? () => stopListening() : startDictation}
+          disabled={!supported || state === "estimating"}
+        >
+          {listening ? "Detener dictado" : "Dictar comida"}
+        </button>
+        <div className="text-ai-secondary-controls">
+          <small className="text-ai-counter">{description.length}/2000</small>
           <button
             type="button"
-            className={`voice-dictation-button${listening ? " is-listening" : ""}`}
-            aria-pressed={listening}
-            aria-label={listening ? "Detener dictado" : "Iniciar dictado"}
-            data-listening={listening ? "true" : "false"}
-            onClick={listening ? () => stopListening() : startDictation}
-            disabled={!supported || state === "estimating"}
+            className="inventory-text-link"
+            onClick={clearDescription}
+            disabled={state === "estimating" || !description}
           >
-            {listening ? "Detener dictado" : "Dictar comida"}
+            Borrar texto
           </button>
         </div>
-        <small className="text-ai-counter">{description.length}/2000</small>
-      </label>
-      <button
-        type="button"
-        className="inventory-text-link"
-        onClick={clearDescription}
-        disabled={state === "estimating" || !description}
-      >
-        Borrar texto
-      </button>
+      </div>
       <div className="voice-dictation-details" aria-live="polite" aria-atomic="true">
         {listening ? (
           <div className="voice-recording-indicator" role="status" aria-live="polite" aria-atomic="true">
