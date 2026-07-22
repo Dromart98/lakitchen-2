@@ -22,7 +22,7 @@ const readyItem = {
 const completed = (value: unknown) => new Response(JSON.stringify(value), { status: 200 });
 
 describe("voice inventory batch provider", () => {
-  it("posts a strict, private structured request and accepts root output", async () => {
+  it("posts a strict, private structured request and includes the raw-default contract", async () => {
     let request: RequestInit | undefined;
     const result = await generateVoiceInventoryBatch("un kilo de pollo", {
       apiKey: "test-key", fetchImpl: async (_url, init) => {
@@ -38,6 +38,9 @@ describe("voice inventory batch provider", () => {
     expect(body.reasoning.effort).toBe("low");
     expect(body.text.format.strict).toBe(true);
     expect(body.text.format.schema.properties.items.maxItems).toBe(VOICE_INVENTORY_BATCH_MAX_ITEMS);
+    expect(body.input[0].content).toContain("arroz");
+    expect(body.input[0].content).toContain("como raw");
+    expect(body.input[0].content).toContain("No supongas que arroz, pasta o legumbres están cocinados");
   });
   it("applies the shared validator's calibrated confidence to the draft", async () => {
     const result = await generateVoiceInventoryBatch("un kilo de pollo", {
@@ -78,5 +81,16 @@ describe("voice inventory batch provider", () => {
     const result = await generateVoiceInventoryBatch("Dos paquetes de pollo", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: [{ ...readyItem, name: "Pollo", quantity: null, unit: null, nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null, confidence: "low", food_state: "raw", nutrition_assumptions: "Falta el peso de cada paquete.", issues: ["package-size-missing", "nutrition-incomplete", "ambiguous-product"] }] }) }) });
     expect(result).toMatchObject({ status: "needs-clarification" });
     if (result.status === "needs-clarification") expect(result.items[0].issues).toEqual(expect.arrayContaining(["package-size-missing", "nutrition-incomplete"]));
+  });
+  it("accepts unprepared rice as raw and rejects cooked rice values", async () => {
+    const rice = { ...readyItem, name: "Arroz", quantity: 1, unit: "kg", location: "pantry", category: "carbohydrate", food_state: "raw", nutrition_basis: "per_100g", calories: 360, protein_g: 7, carbs_g: 80, fat_g: 1 };
+    const success = await generateVoiceInventoryBatch("1 kg de arroz a la despensa", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: [rice] }) }) });
+    const rejected = await generateVoiceInventoryBatch("1 kg de arroz a la despensa", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: [{ ...rice, food_state: "cooked", calories: 130, carbs_g: 28 }] }) }) });
+    expect(success).toMatchObject({ status: "success", items: [expect.objectContaining({ food_state: "raw", nutrition_basis: "per_100g", calories: 360 })] });
+    expect(rejected).toMatchObject({ status: "error", code: "invalid-ai-response" });
+  });
+  it("preserves explicit cooked rice", async () => {
+    const result = await generateVoiceInventoryBatch("500 g de arroz cocido en la nevera", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: [{ ...readyItem, name: "Arroz cocido", quantity: 500, unit: "g", location: "fridge", category: "carbohydrate", food_state: "cooked", nutrition_basis: "per_100g", calories: 130, protein_g: 2.5, carbs_g: 28, fat_g: 0.3 }] }) }) });
+    expect(result).toMatchObject({ status: "success", items: [expect.objectContaining({ food_state: "cooked", nutrition_basis: "per_100g", calories: 130 })] });
   });
 });
