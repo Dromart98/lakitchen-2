@@ -168,7 +168,7 @@ Regla para la V2: no borrar estos módulos en la preparación inicial, pero tamp
 
 ### Siguiente fase recomendada: validación operativa guiada de flujos cotidianos
 
-**No implementada en esta fase.** Priorizar una pasada manual reproducible, con datos de prueba y una instancia Supabase migrada, sobre Inventario y los cuatro modos de Macros. Debe registrar evidencia de los riesgos residuales anteriores y convertir únicamente incidencias reproducibles en pruebas de comportamiento. Tiene prioridad frente a nuevas capacidades de IA, recetas o automatizaciones porque valida los flujos diarios ya entregados (alta, consumo y registro) sin ampliar superficie funcional ni introducir complejidad prematura.
+**Estado: bloqueada parcialmente el 2026-07-22.** La guía y el inventario del entorno están disponibles en [la validación operativa de Inventario y Macros](./operational-validation-inventory-macros.md). La comprobación automatizada disponible terminó correctamente, pero la pasada manual sigue pendiente de navegador, dispositivos de cámara/micrófono, usuario de prueba y una instancia Supabase migrada. Esta fase debe registrar evidencia de los riesgos residuales anteriores y convertir únicamente incidencias reproducibles en pruebas de comportamiento. Tiene prioridad frente a nuevas capacidades de IA, recetas o automatizaciones porque valida los flujos diarios ya entregados (alta, consumo y registro) sin ampliar superficie funcional ni introducir complejidad prematura.
 
 ## Riesgos técnicos principales
 
