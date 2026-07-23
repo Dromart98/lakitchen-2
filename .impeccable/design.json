@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-23T00:00:00.000Z",
+  "title": "Design System: LaKitchen",
+  "extensions": {
+    "colorMeta": {
+      "background": { "role": "neutral", "displayName": "Crema de aplicación", "canonical": "#f4f0e6", "tonalRamp": ["#202318", "#3f4925", "#657433", "#9caf68", "#c0cf8b", "#e8f5ee", "#f4f0e6", "#fffdf8"] },
+      "primary": { "role": "primary", "displayName": "Oliva de marca", "canonical": "#657433", "tonalRamp": ["#202318", "#3f4925", "#657433", "#9caf68", "#b9c984", "#c0cf8b", "#e8f5ee", "#fffdf8"] },
+      "accent": { "role": "tertiary", "displayName": "Terracota de acento", "canonical": "#d8784a", "tonalRamp": ["#4a2416", "#783b25", "#a95535", "#d8784a", "#df845b", "#edb49a", "#f8ddd0", "#fff5f0"] },
+      "text": { "role": "neutral", "displayName": "Tinta de lectura", "canonical": "#0f172a", "tonalRamp": ["#0b1220", "#0f172a", "#334155", "#64748b", "#aeb8c7", "#dbe4ee", "#f5f1e8", "#ffffff"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Titular de página", "purpose": "Titulares h1 de la aplicación." },
+      "headline": { "displayName": "Título de sección", "purpose": "Encabezados h2." },
+      "title": { "displayName": "Título de tarjeta", "purpose": "Encabezados h3 y grupos." },
+      "body": { "displayName": "Texto de interfaz", "purpose": "Contenido general y explicaciones." },
+      "label": { "displayName": "Etiqueta de control", "purpose": "Campos, botones y navegación." }
+    },
+    "shadows": [
+      { "name": "card-ambient", "value": "0 24px 60px rgba(15, 23, 42, 0.12)", "purpose": "Tarjetas en el tema claro." },
+      { "name": "card-ambient-dark", "value": "0 24px 60px rgba(2, 6, 23, 0.48)", "purpose": "Tarjetas en el tema oscuro." }
+    ],
+    "motion": [
+      { "name": "control-transition", "value": "0.15s ease", "purpose": "Cambios de color, sombra y transformación de controles." }
+    ],
+    "breakpoints": [
+      { "name": "compact", "value": "640px" },
+      { "name": "content-grid", "value": "700px" },
+      { "name": "navigation", "value": "760px" },
+      { "name": "wide-inventory", "value": "1040px" }
+    ]
+  },
+  "components": [],
+  "narrative": {
+    "northStar": "La cocina cotidiana ordenada",
+    "overview": "La implementación actual es limpia, sobria y práctica: una aplicación para volver varias veces al día, no una interfaz decorativa.",
+    "keyCharacteristics": ["Fondo crema y superficie clara, con oliva y terracota como identidad visible.", "Tarjetas generosas, controles táctiles y lectura por bloques.", "Navegación inferior fija en móvil y navegación en píldora en escritorio.", "Mensajes y estados integrados en los flujos de tarea."],
+    "rules": [
+      { "name": "The Token Theme Rule", "body": "Aplicar los colores mediante las variables existentes para que claro y oscuro sigan resolviéndose juntos.", "section": "colors" },
+      { "name": "The Mobile Task Rule", "body": "Mantener el orden de lectura lineal y los controles principales accesibles antes de distribuir secciones en columnas de escritorio.", "section": "layout" }
+    ],
+    "dos": ["Do conservar la jerarquía de fondo crema, superficies, oliva y terracota ya implementada, junto con los tokens de tema claro y oscuro.", "Do mantener objetivos táctiles de al menos 44px donde existen y campos de al menos 48px."],
+    "donts": ["Don't sustituir la identidad actual por una paleta, tipografía o sistema de componentes imaginado sin autorización de rediseño.", "Don't alterar la lógica de inventario, macros, recetas, planificación, voz, cámara o código de barras al realizar mejoras visuales."]
+  }
+}
