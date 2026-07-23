@@ -20,7 +20,7 @@ Mantener la automatización como un borrador controlado por la persona. Prioriza
 - Acumular resultados finales de la sesión actual; invalidar eventos y reinicios atrasados al detener, cancelar, analizar, limpiar o desmontar. Liberar reconocimiento y temporizadores de reinicio al cerrar o desmontar.
 - No truncar, descartar ni guardar productos silenciosamente. Antes de imponer un límite de texto o de artículos, comunicarlo, conservar el texto disponible y pedir que se divida la lista de forma explícita.
 - Analizar una lista completa en un borrador editable. Interpretar ubicaciones independientes en el mismo dictado: **nevera**, **congelador** y **despensa**; no aplicar una ubicación global que sobrescriba productos con ubicación explícita.
-- Mantener cada producto reconocido, incluso si su cantidad, unidad, ubicación, categoría o confianza es ambigua. Marcar la incertidumbre y requerir revisión o confirmación explícita antes de persistir datos incompletos.
+- Mantener cada producto reconocido, incluso si su cantidad, unidad, ubicación, categoría o interpretación es ambigua. Marcar el campo concreto que requiere revisión y pedir confirmación explícita antes de persistir datos incompletos. No mostrar porcentajes ni etiquetas de confianza.
 
 ## Cámara y códigos de barras
 
