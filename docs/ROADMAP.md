@@ -1,6 +1,6 @@
 # Roadmap estratégico de Lakitchenapp
 
-Última actualización: 22 de julio de 2026.
+Última actualización: 23 de julio de 2026.
 
 ## Principios de producto
 
@@ -24,6 +24,76 @@ Incluye:
 - Confirmar operaciones atómicas e idempotentes.
 - Validar cámara, código de barras, voz, formularios y estados vacíos.
 - No añadir módulos grandes hasta cerrar esta fase.
+
+### Mejoras confirmadas durante la validación de Inventario y Macros
+
+Estado ya cerrado:
+
+- La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
+
+Orden de implementación acordado:
+
+#### Bloque 1 — Contratos básicos de Inventario
+
+1. Hacer opcional la categoría nutricional al añadir o editar productos.
+   - Permitir `category = null` en formulario manual, edición, dictado, guardado por lote y productos recordados por código de barras.
+   - Eliminar `category-missing` como bloqueo de guardado.
+   - Mostrar “Sin categoría” cuando el producto no tenga una asignada.
+   - No modificar ubicación, cantidad, nutrición, RLS ni aislamiento por usuario.
+
+2. Resolver cantidades compuestas, envases y conversiones por unidad.
+   - Interpretar expresiones como “3 latas de atún de 143 g cada una”.
+   - Calcular automáticamente `3 × 143 g = 429 g` sin pedir al usuario que haga la suma.
+   - Guardar la cantidad útil para el usuario como unidades cuando corresponda y derivar macros por unidad a partir del peso.
+   - Interpretar expresiones como “6 tortillas que pesan 350 g en total” y calcular el peso por tortilla.
+   - Cuando solo se indiquen unidades, utilizar un peso medio conocido o recuperado del catálogo nutricional, manteniendo el resultado editable.
+   - Mostrar durante la revisión la conversión realizada, sin exponer niveles técnicos de confianza.
+
+#### Bloque 2 — Reconstrucción del dictado de Inventario
+
+3. Analizar listas extensas sin que un producto inválido rechace todo el lote.
+   - Separar extracción de productos y resolución nutricional.
+   - Conservar todos los productos identificables aunque uno necesite revisión.
+   - Resolver cada producto de forma independiente.
+   - Normalizar cantidades expresadas en español, como “medio kilo”, “medio litro” o “doscientos cincuenta gramos”.
+   - Aplicar una regla práctica y editable a especias o productos sin cantidad explícita.
+   - Mantener el máximo actual de 30 productos y el guardado atómico e idempotente.
+
+4. Reconocer secciones de ubicación dentro de un mismo dictado.
+   - Admitir frases como “en la nevera tengo…”, “en el congelador tengo…” y “en la despensa tengo…”.
+   - Heredar cada ubicación para todos los productos siguientes hasta encontrar otro encabezado de ubicación.
+   - Admitir comas, pausas, puntos, saltos de línea y sinónimos como frigorífico o refrigerador.
+   - Validar de forma determinista las ubicaciones detectadas después de la respuesta de IA.
+
+Casos obligatorios de validación del bloque de voz:
+
+- “En la nevera tengo pollo. En el congelador tengo pimiento. En la despensa tengo atún.”
+- “3 latas de atún de 143 gramos cada una.”
+- “6 tortillas de trigo integral.”
+- “6 tortillas de trigo integral que pesan 350 gramos en total.”
+- Lista extensa con tortillas, latas de atún, arroz, pasta de lenteja roja, aceite, vinagre, perejil, comino, canela, ajo molido y sal.
+- Un producto incompleto no debe impedir que el resto del lote aparezca en la revisión.
+
+#### Bloque 3 — Simplificación visual
+
+5. Colocar “Comidas registradas hoy” inmediatamente debajo de “Registrar comida” en Macros.
+   - Mantener “Objetivos diarios” como contenido secundario.
+   - En móvil, ordenar: registrar comida, comidas registradas y objetivos diarios.
+   - No modificar consultas, almacenamiento ni acciones de registro.
+
+6. Eliminar toda referencia visible a niveles de confianza.
+   - Quitar de la interfaz “confianza alta”, “confianza media”, “confianza baja”, porcentajes y etiquetas equivalentes.
+   - Sustituirlos por mensajes prácticos como “Estimación orientativa”, “Revisa estos valores” o “Faltan datos para identificar el producto”.
+   - Mantener la confianza únicamente como dato interno para validar, aceptar, solicitar revisión o rechazar resultados inseguros.
+   - Aplicar la limpieza a Inventario, dictado, Texto IA, Foto IA y cualquier otra pantalla que todavía exponga ese dato.
+
+Restricciones de ejecución:
+
+- Implementar cada bloque mediante cambios pequeños y comprobables.
+- No mezclar la recolocación visual de Macros con cambios del analizador de voz.
+- No eliminar validaciones internas al ocultar la confianza en la interfaz.
+- No romper atomicidad, idempotencia, persistencia, nutrición existente ni compatibilidad con productos ya guardados.
+- No añadir nuevas funciones de entrada antes de corregir listas extensas y cantidades compuestas.
 
 ## Fase 1 — Capa nutricional fiable y centralizada
 
@@ -288,15 +358,16 @@ Después de validar el uso real:
 ## Orden de ejecución acordado
 
 1. Terminar la validación funcional actual.
-2. Corregir todos los defectos encontrados.
-3. Implementar la capa nutricional centralizada.
-4. Añadir catálogo interno, unidades y estados de preparación.
-5. Reforzar observabilidad, caché, costes e idempotencia.
-6. Añadir pruebas E2E críticas y accesibilidad.
-7. Limpiar dependencias y actualizar documentación.
-8. Simplificar la UX completa.
-9. Añadir exportación, backups y soporte para conexión débil.
-10. Preparar hogares, planes y pagos solo cuando la versión estable lo justifique.
+2. Ejecutar los tres bloques de mejoras confirmadas de Inventario y Macros en el orden documentado.
+3. Corregir los demás defectos encontrados durante la validación.
+4. Implementar la capa nutricional centralizada.
+5. Añadir catálogo interno, unidades y estados de preparación.
+6. Reforzar observabilidad, caché, costes e idempotencia.
+7. Añadir pruebas E2E críticas y accesibilidad.
+8. Limpiar dependencias y actualizar documentación.
+9. Simplificar la UX completa.
+10. Añadir exportación, backups y soporte para conexión débil.
+11. Preparar hogares, planes y pagos solo cuando la versión estable lo justifique.
 
 ## Fuera de alcance por ahora
 
