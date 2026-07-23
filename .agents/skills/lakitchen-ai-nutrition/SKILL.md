@@ -11,10 +11,10 @@ Aplicar esta skill únicamente a los flujos nutricionales y de IA de LaKitchenap
 
 1. Leer `PRODUCT.md`, las restricciones de `AGENTS.md` aplicables y los módulos, acciones, rutas, migraciones y pruebas del flujo afectado.
 2. Trazar el dato desde su origen hasta la presentación: entrada, normalización, estado de alimento, base nutricional, cálculo, persistencia, respuesta y UI.
-3. Identificar si cada valor es **observado** (etiqueta, inventario, usuario), **calculado** (fórmula reproducible) o **inferido** (IA, foto, texto o equivalencia no confirmada). Conservar esa distinción en tipos, contratos y revisión de UI.
+3. Identificar si cada valor es **observado** (etiqueta, inventario, usuario), **calculado** (fórmula reproducible) o **inferido** (IA, foto, texto o equivalencia no confirmada). Conservar esa distinción en tipos, contratos y validación interna sin exponer etiquetas técnicas innecesarias en la interfaz.
 4. Reproducir o cubrir el defecto en la capa que posee la regla. Corregir esa capa y añadir o actualizar una prueba de la invariancia relevante.
 
-No revelar en la interfaz nombres técnicos de fuentes o proveedores, incluidos USDA FoodData Central, Open Food Facts o IA. Explicar el resultado, su carácter orientativo y la acción de revisión con lenguaje cotidiano.
+No revelar en la interfaz nombres técnicos de fuentes o proveedores, incluidos USDA FoodData Central, Open Food Facts o IA. Tampoco mostrar porcentajes, etiquetas o textos de confianza. Explicar únicamente el resultado, los supuestos relevantes y la acción de revisión con lenguaje cotidiano.
 
 ## Modelo nutricional y unidades
 
@@ -22,14 +22,14 @@ No revelar en la interfaz nombres técnicos de fuentes o proveedores, incluidos 
 - Normalizar las cantidades antes de calcular y permitir solo conversiones dimensionalmente compatibles: masa con `g`/`kg`, volumen con `ml`/`l` y conteo con `ud`/unidad. No convertir masa a volumen ni unidades a gramos sin un dato observado y explícito que lo permita.
 - Mantener la base de cada artículo de inventario junto con sus macros. Calcular totales mediante el factor de la base y redondear solo para mostrar; preservar precisión decimal en contratos, sumas y almacenamiento.
 - Separar cantidad disponible, cantidad consumida, cantidad de receta, total de receta y ración. Calcular `por ración = total de receta / raciones válidas`; no tratar una ración como el total.
-- Tratar el estado alimentario como dato semántico obligatorio cuando cambie la referencia: `raw`, `cooked`, `processed`, `not_applicable` o `unknown`. No usar valores de crudo para cocinado, ni valores de cocinado para crudo. Si no se puede resolver una diferencia material, pedir aclaración en lugar de adivinar.
+- Tratar el estado alimentario como dato semántico obligatorio cuando cambie la referencia: `raw`, `cooked`, `processed`, `not_applicable` o `unknown`. No usar valores de crudo para cocinado, ni valores de cocinado para crudo. Si no se puede resolver una diferencia material, mantenerla como pendiente de revisión en lugar de adivinar.
 
 ## Usar IA con límites estrictos
 
 - Usar IA solo para reconocer, normalizar o inferir información que no exista de forma determinista. Preferir datos observados del inventario, etiqueta o entrada confirmada y cálculos locales para macros, totales, raciones, consumo y presupuesto.
 - Hacer que la IA devuelva un esquema estructurado y estricto. Validar el JSON como datos no confiables en el servidor antes de persistirlo; rechazar propiedades inesperadas, números no finitos, negativos, bases incompatibles y estados o unidades no admitidos.
-- Exigir ingredientes separados, cantidades, unidades, preparación/estado, confianza y supuestos en estimaciones de texto, voz o foto. Marcar las cantidades visuales o domésticas como inferidas y revisables; no presentarlas como mediciones.
-- Pedir aclaración cuando una ambigüedad pueda cambiar materialmente los macros, la base o el estado. No inventar aceite, salsa, marca, receta, método de cocción, peso por unidad ni ingredientes no observados.
+- Exigir ingredientes separados, cantidades, unidades, preparación/estado y supuestos en estimaciones de texto, voz o foto. Marcar las cantidades visuales o domésticas como revisables; no presentarlas como mediciones ni mostrar niveles de confianza.
+- Cuando una ambigüedad pueda cambiar materialmente los macros, la base o el estado, conservar el dato como pendiente de revisión y no inventar aceite, salsa, marca, receta, método de cocción, peso por unidad ni ingredientes no observados.
 - Mantener separado el borrador de IA de la operación confirmada. La IA no debe afirmar que guardó una comida, cocinó una receta ni descontó inventario.
 
 ## Recetas, presupuesto y consumo
@@ -48,4 +48,4 @@ No revelar en la interfaz nombres técnicos de fuentes o proveedores, incluidos 
 - Confirmar que la IA no reemplaza una fuente o cálculo determinista disponible y que su salida se valida contra un esquema estricto.
 - Confirmar el presupuesto calórico antes de guardar o cocinar recetas.
 - Confirmar atomicidad, concurrencia e idempotencia de cualquier registro de comida o descuento de inventario repetible.
-- Confirmar que los textos visibles no exponen fuentes técnicas y conservan la revisión humana de estimaciones.
+- Confirmar que los textos visibles no exponen fuentes técnicas ni confianza y conservan una revisión humana sencilla de las estimaciones.
