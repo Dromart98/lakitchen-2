@@ -13,6 +13,7 @@ export default [
   {
     ignores: [
       ".next/**",
+      ".agents/skills/**",
       "out/**",
       "build/**",
       "next-env.d.ts",
