@@ -1,0 +1,4 @@
+interface:
+  display_name: "Nutrición IA LaKitchen"
+  short_description: "Flujos nutricionales fiables de LaKitchen"
+  default_prompt: "Usa $lakitchen-ai-nutrition para revisar este flujo nutricional de LaKitchen."
