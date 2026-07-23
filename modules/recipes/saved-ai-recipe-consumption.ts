@@ -21,6 +21,7 @@ export type SavedAiRecipeCookErrorCode =
   | "nutrition-unavailable"
   | "incompatible-unit"
   | "too-many-items"
+  | "calorie-budget-exceeded"
   | "consumption-conflict"
   | "unexpected-error";
 

@@ -78,7 +78,7 @@ export function RecipeAiGenerator() {
     if (savingRecipeTitle !== null || isPending) return;
 
     setSavingRecipeTitle(recipe.title);
-    const { nutrition: _nutrition, ...recipePayload } = recipe;
+    const { nutrition: _nutrition, calorieValidation: _calorieValidation, ...recipePayload } = recipe;
     const saveResult = await saveGeneratedRecipeAction({
       priority_mode: lastPriorityMode,
       recipe: recipePayload,
@@ -102,7 +102,7 @@ export function RecipeAiGenerator() {
     if (cookingRecipeTitle !== null || isPending || !recipe.nutrition.isComplete || !recipe.nutrition.total || !recipe.nutrition.perServing) return;
 
     setCookingRecipeTitle(recipe.title);
-    const { nutrition: _nutrition, ...recipePayload } = recipe;
+    const { nutrition: _nutrition, calorieValidation: _calorieValidation, ...recipePayload } = recipe;
     const cookResult = await cookGeneratedRecipeAndLogMealAction({
       meal_type: selectedMealTypes[recipe.title] ?? "lunch",
       recipe: recipePayload,
@@ -121,6 +121,7 @@ export function RecipeAiGenerator() {
       "insufficient-stock": "Ya no hay suficiente cantidad de algún producto.",
       "expired-item": "La receta contiene un producto caducado.",
       "incomplete-nutrition": "Completa los datos nutricionales del inventario antes de cocinar y registrar esta receta.",
+      "calorie-budget-exceeded": "Esta receta supera las calorías que te quedan hoy. Genera otra opción.",
     };
 
     setResult({ status: "needs-clarification", message: messageByCode[cookResult.code] ?? "No se pudo cocinar y registrar la receta." });
@@ -194,6 +195,8 @@ export function RecipeAiGenerator() {
               <h3>{recipe.title}</h3>
               <p>{recipe.description}</p>
               <p className="recipes-card__meta">{recipe.estimated_minutes} minutos · {recipe.servings} ración{recipe.servings === 1 ? "" : "es"}</p>
+              {recipe.calorieValidation?.remainingCalories !== null && recipe.calorieValidation ? <p className="muted">Te quedan {formatNutritionValue(recipe.calorieValidation.remainingCalories)} kcal hoy.</p> : <p className="muted">No podemos validar esta receta contra un objetivo diario hasta que completes tu perfil nutricional.</p>}
+              {recipe.calorieValidation?.status === "adjusted" ? <p className="recipe-ai__error" role="status">Esta receta supera las calorías que te quedan hoy. Hemos ajustado la ración o puedes generar otra opción.</p> : null}
               <details className="recipes-card__details">
                 <summary>Ingredientes</summary>
                 <ul>{recipe.ingredients.map((ingredient) => (

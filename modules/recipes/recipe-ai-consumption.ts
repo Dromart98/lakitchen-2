@@ -13,6 +13,7 @@ export type RecipeAiCookErrorCode =
   | "incomplete-nutrition"
   | "incompatible-unit"
   | "too-many-items"
+  | "calorie-budget-exceeded"
   | "consume-failed"
   | "unexpected-error";
 

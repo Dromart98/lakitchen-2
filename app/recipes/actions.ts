@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { generateRecipesWithOpenAi } from "@/lib/openai/recipe-generation";
-import { buildRecipeAiNutritionAllocations, enrichRecipeAiSuggestionsWithNutrition } from "@/modules/recipes/recipe-ai-nutrition";
+import { buildRecipeAiNutritionAllocations } from "@/modules/recipes/recipe-ai-nutrition";
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
 import { isMealType } from "@/modules/meals/meal-types";
 import { buildRecipeConsumptionLines } from "@/modules/recipes/recipe-consumption";
@@ -53,6 +53,8 @@ import {
   type SavedAiRecipeInventoryItem as SavedAiRecipeCookInventoryItem,
 } from "@/modules/recipes/saved-ai-recipe-consumption";
 import { buildRecipeMealName, scaleRecipeToServings } from "@/modules/recipes/recipe-servings";
+import { buildRecipeCalorieBudget, isRecipeServingWithinCalorieBudget, validateAndAdjustAiRecipeCalories, type RecipeCalorieBudget } from "@/modules/recipes/recipe-calorie-budget";
+import { getTodayUtcDate } from "@/modules/meals/meal-date";
 
 const RECIPES_PATH = "/recipes";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -72,6 +74,25 @@ type SupabaseRecipeClient = {
   from(table: string): SupabaseQueryBuilder;
   rpc(functionName: string, parameters: Record<string, unknown>): Promise<unknown>;
 };
+
+type RecipeBudgetQuery = {
+  select(columns: string): RecipeBudgetQuery;
+  eq(column: string, value: string): RecipeBudgetQuery;
+  maybeSingle(): Promise<unknown>;
+};
+
+type RecipeBudgetClient = { from(table: string): RecipeBudgetQuery };
+
+async function loadRecipeCalorieBudget(client: RecipeBudgetClient, userId: string): Promise<RecipeCalorieBudget | null> {
+  const today = getTodayUtcDate();
+  const [profileResult, mealsResult] = await Promise.all([
+    client.from("user_nutrition_profiles").select("target_calories").eq("user_id", userId).maybeSingle() as Promise<{ data: { target_calories: number | null } | null; error: { message: string } | null }>,
+    client.from("daily_meal_logs").select("calories").eq("user_id", userId).eq("consumed_on", today) as unknown as Promise<{ data: { calories: number | null }[] | null; error: { message: string } | null }>,
+  ]);
+  if (profileResult.error || mealsResult.error) return null;
+  const consumedCalories = (mealsResult.data ?? []).reduce((sum, meal) => sum + (Number.isFinite(meal.calories) ? meal.calories ?? 0 : 0), 0);
+  return buildRecipeCalorieBudget(profileResult.data?.target_calories ?? null, consumedCalories);
+}
 
 function buildRecipesPath(mode: string, params: Record<string, string>): string {
   const searchParams = new URLSearchParams({ mode, ...params });
@@ -159,6 +180,11 @@ export async function cookRecipeAndLogMealAction(formData: FormData) {
   const nutrition = estimateRecipeNutrition(allocations, match.recipe.servings);
   if (!nutrition.isComplete || !nutrition.total || !nutrition.perServing) {
     redirectWithRecipeError(mode, "incomplete-nutrition");
+  }
+
+  const budget = await loadRecipeCalorieBudget(recipeClient as unknown as RecipeBudgetClient, user.id);
+  if (budget && !isRecipeServingWithinCalorieBudget(nutrition.perServing.calories, budget)) {
+    redirectWithRecipeError(mode, "calorie-budget-exceeded");
   }
 
   const consumptionLines = buildRecipeConsumptionLines(allocations, inventoryItems);
@@ -260,9 +286,18 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
       ? sortRecipeAiSuggestionsByUrgency(result.recipes, inventoryItems, todayKey)
       : result.recipes;
 
+    const budget = await loadRecipeCalorieBudget(recipeClient as unknown as RecipeBudgetClient, user.id);
+    const validatedRecipes = recipes
+      .map((recipe) => validateAndAdjustAiRecipeCalories(recipe, inventoryItems, budget))
+      .filter((recipe) => recipe.calorieValidation.status !== "not-viable");
+
+    if (validatedRecipes.length === 0 && budget) {
+      return { status: "needs-clarification", message: "Esta receta supera las calorías que te quedan hoy. Hemos ajustado la ración o puedes generar otra opción." };
+    }
+
     return {
       status: "success",
-      recipes: enrichRecipeAiSuggestionsWithNutrition(recipes, inventoryItems),
+      recipes: validatedRecipes,
     };
   } catch {
     return { status: "error", code: "unexpected-error" };
@@ -303,7 +338,7 @@ export async function saveGeneratedRecipeAction(input: unknown): Promise<SaveGen
   const recipeClient = supabase as unknown as SaveGeneratedRecipeSupabaseClient;
   const { data, error } = await recipeClient
     .from("inventory_items")
-    .select("id, name, quantity, unit, expires_at")
+    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g")
     .eq("user_id", user.id)
     .in("id", inventoryItemIds)
     .gt("quantity", 0) as { data: SavedAiRecipeInventoryItem[] | null; error: { message: string } | null };
@@ -315,6 +350,11 @@ export async function saveGeneratedRecipeAction(input: unknown): Promise<SaveGen
 
   const validationError = validateSavedAiRecipeInventory(request.recipe, data ?? [], getCurrentInventoryExpirationDateKey());
   if (validationError) return { status: "error", code: validationError };
+
+  const budget = await loadRecipeCalorieBudget(recipeClient as unknown as RecipeBudgetClient, user.id);
+  const nutritionInventory = data ?? [];
+  const nutrition = validateAndAdjustAiRecipeCalories(request.recipe, nutritionInventory, budget);
+  if (budget && nutrition.nutrition.isComplete && nutrition.calorieValidation.status === "not-viable") return { status: "error", code: "calorie-budget-exceeded" };
 
   const fingerprint = createSavedAiRecipeFingerprint(request.recipe);
 
@@ -448,6 +488,12 @@ export async function cookSavedAiRecipeAndLogMealAction(input: unknown): Promise
 
   const planResult = buildSavedAiRecipeCookPlan(recipe, inventoryItems, request.meal_type);
   if (!planResult.ok) return { status: "error", code: planResult.code };
+  const budget = await loadRecipeCalorieBudget(recipeClient as unknown as RecipeBudgetClient, user.id);
+  const recipeNutrition = buildSavedAiRecipeCookPlan(recipe, inventoryItems, request.meal_type);
+  if (budget && recipeNutrition.ok) {
+    const suggestion = { title: recipe.title, description: recipe.description, estimated_minutes: recipe.estimated_minutes, servings: recipe.servings, ingredients: recipe.ingredients.map(({ inventory_item_id, name, quantity, unit }) => ({ inventory_item_id, name, quantity, unit })), steps: recipe.steps };
+    if (!isRecipeServingWithinCalorieBudget(validateAndAdjustAiRecipeCalories(suggestion, inventoryItems, budget).nutrition.perServing?.calories ?? Infinity, budget)) return { status: "error", code: "calorie-budget-exceeded" };
+  }
 
   const { error: consumeError } = await recipeClient.rpc("consume_meal_builder_items_and_log_meal", {
     p_meal_name: planResult.plan.mealName,
@@ -523,6 +569,8 @@ export async function cookGeneratedRecipeAndLogMealAction(input: unknown): Promi
   if (!nutrition.isComplete || !nutrition.total || !nutrition.perServing) {
     return { status: "error", code: "incomplete-nutrition" };
   }
+  const budget = await loadRecipeCalorieBudget(recipeClient as unknown as RecipeBudgetClient, user.id);
+  if (budget && !isRecipeServingWithinCalorieBudget(nutrition.perServing.calories, budget)) return { status: "error", code: "calorie-budget-exceeded" };
 
   const consumptionLines = buildRecipeConsumptionLines(allocations, inventoryItems);
   if (!consumptionLines.ok) return { status: "error", code: mapRecipeConsumptionError(consumptionLines) };

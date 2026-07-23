@@ -18,6 +18,7 @@ const ERROR_MESSAGES: Record<SavedAiRecipeCookErrorCode, string> = {
   "nutrition-unavailable": "Falta información nutricional para registrar esta comida.",
   "incompatible-unit": "No se pudo cocinar la receta.",
   "too-many-items": "Esta receta supera el máximo de 20 ingredientes permitido.",
+  "calorie-budget-exceeded": "Esta receta supera las calorías que te quedan hoy. Genera otra opción.",
   "consumption-conflict": "No se pudo cocinar la receta.",
   "unexpected-error": "No se pudo cocinar la receta.",
 };

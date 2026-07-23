@@ -20,6 +20,8 @@ import {
 import type { RecipeNutritionEstimate } from "@/modules/recipes/recipe-nutrition";
 import { buildRecipeMatchWithServingOptions, filterRecipeMatchesWithServingOptions, getMaxUrgentItemCountForCookableServings } from "@/modules/recipes/recipe-servings";
 import { toSavedAiRecipe, type SavedAiRecipe } from "@/modules/recipes/saved-ai-recipes";
+import { buildRecipeCalorieBudget, isRecipeServingWithinCalorieBudget } from "@/modules/recipes/recipe-calorie-budget";
+import { getTodayUtcDate } from "@/modules/meals/meal-date";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +31,14 @@ type RecipeTemplateRow = Omit<RecipeTemplate, "instructions" | "recipe_ingredien
   instructions: unknown;
   recipe_ingredients: RecipeIngredient[] | null;
 };
+
+type RecipesPageBudgetQuery = {
+  select(columns: string): RecipesPageBudgetQuery;
+  eq(column: string, value: string): RecipesPageBudgetQuery;
+  maybeSingle(): Promise<unknown>;
+};
+
+type RecipesPageBudgetClient = { from(table: string): RecipesPageBudgetQuery };
 
 const filterLinks: { mode: RecipeFilterMode; label: string }[] = [
   { mode: "all", label: "Todas" },
@@ -49,6 +59,7 @@ const recipeErrorMessages: Record<string, string> = {
   "incompatible-nutrition-unit": "Algún producto tiene una unidad nutricional incompatible.",
   "consume-failed": "No se pudo registrar la receta.",
   "invalid-servings": "Selecciona un número válido de raciones.",
+  "calorie-budget-exceeded": "Esta receta supera las calorías que te quedan hoy. Elige otra opción.",
 };
 
 const ingredientStatusMessages = {
@@ -106,6 +117,13 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
   const recipeSuccessMessage = resolvedSearchParams?.recipeSuccess ? recipeSuccessMessages[resolvedSearchParams.recipeSuccess] : null;
   const recipeErrorMessage = resolvedSearchParams?.recipeError ? recipeErrorMessages[resolvedSearchParams.recipeError] : null;
   const todayKey = getCurrentInventoryExpirationDateKey();
+  const today = getTodayUtcDate();
+
+  const [{ data: profileData, error: profileError }, { data: todayMealsData, error: todayMealsError }] = await Promise.all([
+    (supabase as unknown as RecipesPageBudgetClient).from("user_nutrition_profiles").select("target_calories").eq("user_id", user.id).maybeSingle() as Promise<{ data: { target_calories: number | null } | null; error: { message: string } | null }>,
+    (supabase as unknown as RecipesPageBudgetClient).from("daily_meal_logs").select("calories").eq("user_id", user.id).eq("consumed_on", today) as unknown as Promise<{ data: { calories: number | null }[] | null; error: { message: string } | null }>,
+  ]);
+  const calorieBudget = profileError || todayMealsError ? null : buildRecipeCalorieBudget(profileData?.target_calories ?? null, (todayMealsData ?? []).reduce((sum, meal) => sum + (meal.calories ?? 0), 0));
 
   const { data: inventoryData, error: inventoryError } = await (supabase as any)
     .from("inventory_items")
@@ -165,6 +183,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
             <Link className="button recipes-secondary-action" href="/inventory">Gestionar inventario</Link>
           </div>
         </header>
+        {calorieBudget ? <p className="muted">Te quedan {formatNutritionValue(calorieBudget.remainingCalories)} kcal hoy. Las recetas se validan por ración.</p> : <p className="muted">Completa tu perfil nutricional para validar las recetas contra tus calorías restantes.</p>}
         <div className="recipes-messages">
           {recipeSuccessMessage ? <p className="recipes-message recipes-message--success" role="status">{recipeSuccessMessage}</p> : null}
           {recipeErrorMessage ? <p className="recipes-message recipes-message--error" role="alert">{recipeErrorMessage}</p> : null}
@@ -200,6 +219,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
 
           <div className="recipes-grid">
           {matches.map(({ match, servingOptions, maxCookableServings, loggableServingOptions }) => {
+          const budgetedServingOptions = loggableServingOptions.filter((option) => !calorieBudget || isRecipeServingWithinCalorieBudget(option.nutrition!.perServing!.calories, calorieBudget));
           const hasCookableButUnloggableServings = servingOptions.some((option) => option.canCookNow && !option.canLog);
           const urgentItemCount = getMaxUrgentItemCountForCookableServings(servingOptions);
 
@@ -219,11 +239,11 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
             {match.recipe.prep_minutes <= 15 ? <p className="recipes-badge">Lista en 15 minutos.</p> : null}
             </div>
 
-            {loggableServingOptions.length > 0 ? (
+            {budgetedServingOptions.length > 0 ? (
               <section className="recipes-card__nutrition">
                 <h4>Nutrición estimada</h4>
                 <ul>
-                  {loggableServingOptions.map((option) => (
+                  {budgetedServingOptions.map((option) => (
                     <li key={option.servings}>
                       {option.servings} ración{option.servings === 1 ? "" : "es"}: {formatNutritionLine(option.nutrition!.total!)}
                     </li>
@@ -232,20 +252,20 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
                 <p>Estimación basada en los valores nutricionales guardados en tu inventario.</p>
               </section>
             ) : maxCookableServings > 0 ? (
-              <p className="muted">Puedes preparar esta receta, pero faltan datos nutricionales en alguno de los productos necesarios para registrarla.</p>
+              <p className="muted">{calorieBudget && loggableServingOptions.length > 0 ? "Esta receta supera las calorías que te quedan hoy. Elige otra opción." : "Puedes preparar esta receta, pero faltan datos nutricionales en alguno de los productos necesarios para registrarla."}</p>
             ) : null}
 
-            {hasCookableButUnloggableServings && loggableServingOptions.length > 0 ? (
+            {hasCookableButUnloggableServings && budgetedServingOptions.length > 0 ? (
               <p className="muted">Algunas cantidades no están disponibles para registrar porque requieren productos sin datos nutricionales completos.</p>
             ) : null}
 
-            {loggableServingOptions.length > 0 ? (
+            {budgetedServingOptions.length > 0 ? (
               <form className="recipes-card__form" action={cookRecipeAndLogMealAction}>
                 <input type="hidden" name="recipe_id" value={match.recipe.id} />
                 <input type="hidden" name="mode" value={mode} />
                 <label htmlFor={`servings-${match.recipe.id}`}>Raciones a preparar</label>
                 <select id={`servings-${match.recipe.id}`} name="servings" defaultValue="1">
-                  {loggableServingOptions.map((option) => (
+                  {budgetedServingOptions.map((option) => (
                     <option key={option.servings} value={option.servings}>{option.servings} ración{option.servings === 1 ? "" : "es"}</option>
                   ))}
                 </select>
