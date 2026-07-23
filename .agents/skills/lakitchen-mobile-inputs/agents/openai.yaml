@@ -1,0 +1,4 @@
+interface:
+  display_name: "Entradas móviles LaKitchen"
+  short_description: "Voz, cámara y formularios móviles seguros"
+  default_prompt: "Use $lakitchen-mobile-inputs to improve a LaKitchen mobile voice or camera flow safely."
