@@ -119,9 +119,9 @@ export function InventoryNutritionAiControls({
   return (
     <div id={controlId} className="meal-log-form" aria-live="polite">
       <button id={buttonId} className="button" type="button" onClick={handleClick} disabled={isPending}>
-        {isPending ? "Calculando..." : awaitingOverwriteConfirmation ? "Sustituir valores con IA" : "Calcular macros con IA"}
+        {isPending ? "Calculando..." : awaitingOverwriteConfirmation ? "Sustituir valores" : "Calcular macros"}
       </button>
-      <p className="muted">La IA ofrece una estimación que puede contener errores. Revísala antes de guardar.</p>
+      <p className="muted">Los valores son orientativos. Revísalos antes de guardar.</p>
       {message ? (
         <div className={message.tone === "error" ? "auth-message error" : "auth-message success"} role={message.tone === "error" ? "alert" : "status"}>
           <p>{message.text}</p>

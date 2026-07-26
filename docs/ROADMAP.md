@@ -32,7 +32,7 @@ Estado ya cerrado:
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
 - **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
 
-Siguiente tarea: **Fase 1.1 — Sistema híbrido de fuentes.**
+Siguiente tarea: **Fase 1.2 — Catálogo nutricional interno**, necesario para integrar el dictado por lotes sin consultas externas ingenuas.
 
 Orden de implementación acordado:
 
@@ -103,6 +103,8 @@ Restricciones de ejecución:
 Prioridad: crítica.
 
 ### 1.1 Sistema híbrido de fuentes
+
+**Estado: Preparada.** La resolución híbrida del servidor ya se usa en el cálculo manual y en códigos de barras. El dictado por lotes permanece como borrador inferido hasta que 1.2 aporte catálogo/caché: consultar hasta 30 alimentos por dictado añadiría latencia, duplicación y riesgo de límites de proveedor. La activación de datos genéricos requiere configurar `USDA_FDC_API_KEY` exclusivamente en el servidor.
 
 Orden recomendado:
 
