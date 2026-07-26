@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { INVENTORY_CATEGORIES, INVENTORY_CATEGORY_LABELS, type InventoryCategory } from "@/modules/inventory/inventory-categories";
+import { INVENTORY_CATEGORIES, INVENTORY_CATEGORY_LABELS, getInventoryCategoryLabel, type InventoryCategory } from "@/modules/inventory/inventory-categories";
 import { INVENTORY_NUTRITION_BASIS_LABELS, NUTRITION_BASES, type InventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
 import { deleteRememberedBarcodeProductAction, updateRememberedBarcodeProductAction } from "./actions";
 
@@ -16,7 +16,7 @@ type RememberedBarcodeProduct = {
   default_quantity: number;
   default_unit: "ud" | "g" | "kg" | "ml" | "l";
   default_location: "pantry" | "fridge" | "freezer" | null;
-  default_category: InventoryCategory;
+  default_category: InventoryCategory | null;
   nutrition_basis: InventoryNutritionBasis | null;
   calories: number | null;
   protein_g: number | null;
@@ -137,7 +137,7 @@ export default async function RememberedBarcodeProductsPage({
                     <h2>{product.name}</h2>
                     <p className="barcode-product__code">Código {product.barcode}</p>
                   </div>
-                  <span className="barcode-product__badge">{INVENTORY_CATEGORY_LABELS[product.default_category]}</span>
+                  <span className="barcode-product__badge">{getInventoryCategoryLabel(product.default_category)}</span>
                 </header>
 
                 <dl className="barcode-product__metadata">
@@ -180,7 +180,8 @@ export default async function RememberedBarcodeProductsPage({
                         </label>
                         <label className="field" htmlFor={`barcode-category-${product.id}`}>
                           <span>Categoría</span>
-                          <select id={`barcode-category-${product.id}`} name="default_category" required defaultValue={product.default_category}>
+                          <select id={`barcode-category-${product.id}`} name="default_category" defaultValue={product.default_category ?? ""}>
+                            <option value="">Sin categoría</option>
                             {INVENTORY_CATEGORIES.map((category) => (<option key={category} value={category}>{INVENTORY_CATEGORY_LABELS[category]}</option>))}
                           </select>
                         </label>

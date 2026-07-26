@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { validateBarcodeInput } from "@/modules/barcodes/barcode";
 import { createClient } from "@/lib/supabase/server";
-import { isInventoryCategory } from "@/modules/inventory/inventory-categories";
+import { validateOptionalInventoryCategory, type InventoryCategory } from "@/modules/inventory/inventory-categories";
 import {
   hasInventoryNutritionValues,
   isInventoryNutritionBasis,
@@ -83,7 +83,7 @@ function isInventoryUnit(value: string): value is InventoryUnit {
 
 type BarcodeProductLookupResult =
   | { status: "invalid"; message: string }
-  | { status: "found"; product: { barcode: string; name: string; default_quantity: number; default_unit: InventoryUnit; default_location: InventoryLocation | null; category: string; nutrition_basis?: string; calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null } }
+  | { status: "found"; product: { barcode: string; name: string; default_quantity: number; default_unit: InventoryUnit; default_location: InventoryLocation | null; category: InventoryCategory | null; nutrition_basis?: string; calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null } }
   | { status: "unknown"; barcode: string; message: string }
   | { status: "error"; message: string };
 
@@ -103,7 +103,7 @@ export async function lookupBarcodeProductAction(rawBarcode: string): Promise<Ba
     .eq("user_id", user.id)
     .eq("barcode", validation.barcode)
     .maybeSingle() as {
-      data: { barcode: string; name: string; default_quantity: number; default_unit: InventoryUnit; default_location: InventoryLocation | null; default_category: string; nutrition_basis?: string; calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null } | null;
+      data: { barcode: string; name: string; default_quantity: number; default_unit: InventoryUnit; default_location: InventoryLocation | null; default_category: InventoryCategory | null; nutrition_basis?: string; calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null } | null;
       error: { message: string } | null;
     };
 
@@ -187,14 +187,14 @@ function getValidatedInventoryFields(formData: FormData) {
   const location = String(formData.get("location") ?? "");
   const quantity = Number(formData.get("quantity"));
   const unit = String(formData.get("unit") ?? "");
-  const category = String(formData.get("category") ?? "").trim();
+  const category = validateOptionalInventoryCategory(formData.get("category"));
 
   if (!name) redirect(`${INVENTORY_PATH}?inventoryError=name-required`);
   if (name.length > 120) redirect(`${INVENTORY_PATH}?inventoryError=name-too-long`);
   if (!Number.isFinite(quantity) || quantity <= 0) redirect(`${INVENTORY_PATH}?inventoryError=invalid-quantity`);
   if (!isInventoryUnit(unit)) redirect(`${INVENTORY_PATH}?inventoryError=invalid-unit`);
   if (!isInventoryLocation(location)) redirect(`${INVENTORY_PATH}?inventoryError=invalid-location`);
-  if (!isInventoryCategory(category)) redirect(`${INVENTORY_PATH}?inventoryError=invalid-category`);
+  if (!category.ok) redirect(`${INVENTORY_PATH}?inventoryError=invalid-category`);
 
   const nutritionFields = getOptionalNutritionFields(formData);
 
@@ -203,7 +203,7 @@ function getValidatedInventoryFields(formData: FormData) {
     quantity,
     unit,
     location,
-    category,
+    category: category.value,
     expiresAt: getOptionalExpirationDate(formData),
     ...nutritionFields,
   };

@@ -59,9 +59,10 @@ export function normalizeBarcodeProductLocation(
   return { ok: true, value: location as BarcodeCatalogLocation };
 }
 
-export function validateBarcodeProductCategory(value: FormDataEntryValue | null): BarcodeCatalogValidationResult<InventoryCategory> {
+export function validateBarcodeProductCategory(value: FormDataEntryValue | null): BarcodeCatalogValidationResult<InventoryCategory | null> {
   const category = String(value ?? "").trim();
 
+  if (!category) return { ok: true, value: null };
   if (!isInventoryCategory(category)) return { ok: false, code: "invalid" };
 
   return { ok: true, value: category };

@@ -54,7 +54,7 @@ type ExternalBarcodeProduct = {
   default_quantity: number;
   default_unit: "ud" | "g" | "kg" | "ml" | "l";
   default_location: "pantry" | "fridge" | "freezer" | null;
-  category?: string;
+  category?: string | null;
   nutrition_basis?: string;
   calories?: number | null;
   protein_g?: number | null;
