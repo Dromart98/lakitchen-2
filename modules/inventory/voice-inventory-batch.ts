@@ -7,7 +7,7 @@ export const VOICE_INVENTORY_BATCH_MAX_ITEMS = 30;
 export const VOICE_INVENTORY_BATCH_UNITS = ["g", "kg", "ml", "l", "ud"] as const;
 export const VOICE_INVENTORY_BATCH_LOCATIONS = ["pantry", "fridge", "freezer"] as const;
 export const VOICE_INVENTORY_BATCH_ISSUES = [
-  "quantity-missing", "unit-missing", "location-unconfirmed", "category-missing",
+  "quantity-missing", "unit-missing", "location-unconfirmed",
   "package-size-missing", "nutrition-incomplete", "nutrition-basis-mismatch",
   "low-confidence", "ambiguous-product",
 ] as const;
@@ -44,7 +44,7 @@ function nutritionBasisMatches(item: z.infer<typeof VoiceInventoryDraftItemSchem
 function packageResolved(item: z.infer<typeof VoiceInventoryDraftItemSchema>) { return item.quantity !== null && item.quantity > 0 && item.unit !== null && nutritionComplete(item); }
 export function normalizeVoiceInventoryDraftItem(item: z.infer<typeof VoiceInventoryDraftItemSchema>) {
  const issues = new Set(item.issues);
- const derived: Array<[VoiceInventoryDraftIssue, boolean]> = [["quantity-missing", item.quantity === null || item.quantity <= 0], ["unit-missing", item.unit === null], ["location-unconfirmed", item.location === null], ["category-missing", item.category === null], ["nutrition-incomplete", !nutritionComplete(item)], ["nutrition-basis-mismatch", Boolean(item.unit && item.nutrition_basis && !nutritionBasisMatches(item))], ["low-confidence", item.confidence === "low"]];
+ const derived: Array<[VoiceInventoryDraftIssue, boolean]> = [["quantity-missing", item.quantity === null || item.quantity <= 0], ["unit-missing", item.unit === null], ["location-unconfirmed", item.location === null], ["nutrition-incomplete", !nutritionComplete(item)], ["nutrition-basis-mismatch", Boolean(item.unit && item.nutrition_basis && !nutritionBasisMatches(item))], ["low-confidence", item.confidence === "low"]];
  for (const [issue, needed] of derived) { if (needed) issues.add(issue); else issues.delete(issue); }
  if (packageResolved(item)) issues.delete("package-size-missing");
  return { ...item, issues: [...issues] };
@@ -55,6 +55,6 @@ export function normalizeEditedVoiceInventoryDraftItem(item: VoiceInventoryDraft
  return { ...normalizeVoiceInventoryDraftItem(next), client_id: item.client_id };
 }
 export function withDraftClientIds(items: z.infer<typeof VoiceInventoryDraftItemSchema>[]) { return items.map((item, index) => ({ ...normalizeVoiceInventoryDraftItem(item), client_id: `voice-draft-${Date.now().toString(36)}-${index}` })); }
-const structuralIssues: VoiceInventoryDraftIssue[] = ["quantity-missing", "unit-missing", "location-unconfirmed", "category-missing", "package-size-missing", "nutrition-incomplete", "nutrition-basis-mismatch", "ambiguous-product"];
+const structuralIssues: VoiceInventoryDraftIssue[] = ["quantity-missing", "unit-missing", "location-unconfirmed", "package-size-missing", "nutrition-incomplete", "nutrition-basis-mismatch", "ambiguous-product"];
 export function getVoiceInventoryDraftReadiness(item: VoiceInventoryDraftItem) { const normalized = normalizeVoiceInventoryDraftItem(item); const structuralReady = normalized.name.trim().length > 0 && !normalized.issues.some((issue) => structuralIssues.includes(issue)); const requiresReview = normalized.issues.some((issue) => !structuralIssues.includes(issue)); return { structuralReady, requiresReview, reviewReady: !requiresReview || Boolean(item.review_acknowledged), saveReady: structuralReady && (!requiresReview || Boolean(item.review_acknowledged)) }; }
 export function getVoiceInventoryDraftStatus(item: VoiceInventoryDraftItem) { const readiness = getVoiceInventoryDraftReadiness(item); return !readiness.structuralReady ? "Incompleto" : !readiness.reviewReady ? "Necesita revisión" : "Listo"; }

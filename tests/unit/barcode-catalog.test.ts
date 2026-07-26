@@ -42,6 +42,10 @@ describe("barcode catalog helpers", () => {
     expect(validateBarcodeProductCategory("vegetable")).toEqual({ ok: true, value: "vegetable" });
   });
 
+  it("normalizes an empty remembered-product category to null", () => {
+    expect(validateBarcodeProductCategory("")).toEqual({ ok: true, value: null });
+  });
+
   it("rejects invalid categories", () => {
     expect(validateBarcodeProductCategory("snack")).toEqual({ ok: false, code: "invalid" });
   });

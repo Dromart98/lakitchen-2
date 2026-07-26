@@ -1,6 +1,6 @@
 # Roadmap estratégico de Lakitchenapp
 
-Última actualización: 23 de julio de 2026.
+Última actualización: 26 de julio de 2026.
 
 ## Principios de producto
 
@@ -30,12 +30,15 @@ Incluye:
 Estado ya cerrado:
 
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
+- **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
+
+Siguiente tarea: **Resolver cantidades compuestas, envases y conversiones por unidad.**
 
 Orden de implementación acordado:
 
 #### Bloque 1 — Contratos básicos de Inventario
 
-1. Hacer opcional la categoría nutricional al añadir o editar productos.
+1. **Implementada/cerrada:** Hacer opcional la categoría nutricional al añadir o editar productos.
    - Permitir `category = null` en formulario manual, edición, dictado, guardado por lote y productos recordados por código de barras.
    - Eliminar `category-missing` como bloqueo de guardado.
    - Mostrar “Sin categoría” cuando el producto no tenga una asignada.

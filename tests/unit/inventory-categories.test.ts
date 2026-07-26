@@ -5,6 +5,7 @@ import {
   INVENTORY_CATEGORIES,
   INVENTORY_CATEGORY_LABELS,
   isInventoryCategory,
+  validateOptionalInventoryCategory,
 } from "@/modules/inventory/inventory-categories";
 
 describe("inventory categories", () => {
@@ -34,5 +35,16 @@ describe("inventory categories", () => {
 
   it("does not contain duplicate categories", () => {
     expect(new Set(INVENTORY_CATEGORIES).size).toBe(INVENTORY_CATEGORIES.length);
+  });
+
+  it("normalizes an empty optional category to null", () => {
+    expect(validateOptionalInventoryCategory("")).toEqual({ ok: true, value: null });
+    expect(validateOptionalInventoryCategory("   ")).toEqual({ ok: true, value: null });
+  });
+
+  it("accepts known optional categories and rejects unknown values", () => {
+    expect(validateOptionalInventoryCategory(" vegetable ")).toEqual({ ok: true, value: "vegetable" });
+    expect(validateOptionalInventoryCategory("snack")).toEqual({ ok: false });
+    expect(validateOptionalInventoryCategory(123)).toEqual({ ok: false });
   });
 });

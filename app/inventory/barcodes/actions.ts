@@ -28,7 +28,7 @@ type SupabaseBarcodeCatalogClient = {
       default_quantity: number;
       default_unit: string;
       default_location: string | null;
-      default_category: string;
+      default_category: string | null;
       nutrition_basis: string | null;
       calories: number | null;
       protein_g: number | null;

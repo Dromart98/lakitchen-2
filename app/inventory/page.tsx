@@ -588,12 +588,9 @@ export default async function InventoryPage({
                                       <select
                                         id={`inventory-category-${item.id}`}
                                         name="category"
-                                        required
                                         defaultValue={item.category ?? ""}
                                       >
-                                        <option value="" disabled>
-                                          Selecciona una categoría
-                                        </option>
+                                        <option value="">Sin categoría</option>
                                         {INVENTORY_CATEGORIES.map(
                                           (category) => (
                                             <option
@@ -865,12 +862,9 @@ export default async function InventoryPage({
                 <select
                   id={INVENTORY_ADD_FORM_FIELD_IDS.category}
                   name="category"
-                  required
                   defaultValue=""
                 >
-                  <option value="" disabled>
-                    Selecciona una categoría
-                  </option>
+                  <option value="">Sin categoría</option>
                   {INVENTORY_CATEGORIES.map((category) => (
                     <option key={category} value={category}>
                       {INVENTORY_CATEGORY_LABELS[category]}
