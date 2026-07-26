@@ -32,7 +32,7 @@ Estado ya cerrado:
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
 - **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
 
-Siguiente tarea: **Eliminar toda referencia visible a niveles de confianza.**
+Siguiente tarea: **Fase 1.1 — Sistema híbrido de fuentes.**
 
 Orden de implementación acordado:
 
@@ -84,7 +84,7 @@ Casos obligatorios de validación del bloque de voz:
    - En móvil, ordenar: registrar comida, comidas registradas y objetivos diarios.
    - No modificar consultas, almacenamiento ni acciones de registro.
 
-6. Eliminar toda referencia visible a niveles de confianza.
+6. **Implementada/cerrada:** Eliminar toda referencia visible a niveles de confianza.
    - Quitar de la interfaz “confianza alta”, “confianza media”, “confianza baja”, porcentajes y etiquetas equivalentes.
    - Sustituirlos por mensajes prácticos como “Estimación orientativa”, “Revisa estos valores” o “Faltan datos para identificar el producto”.
    - Mantener la confianza únicamente como dato interno para validar, aceptar, solicitar revisión o rechazar resultados inseguros.

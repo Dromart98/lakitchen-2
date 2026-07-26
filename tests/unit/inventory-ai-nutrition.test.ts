@@ -531,16 +531,14 @@ describe("overwrite confirmation", () => {
 });
 
 
-describe("InventoryNutritionAiControls confidence labels", () => {
-  it("shows Spanish confidence labels instead of raw enum values", () => {
+describe("InventoryNutritionAiControls estimation guidance", () => {
+  it("asks for review without exposing internal confidence levels", () => {
     const source = readFileSync("components/inventory/InventoryNutritionAiControls.tsx", "utf8");
 
-    expect(source).toContain("Confianza alta");
-    expect(source).toContain("Confianza media");
-    expect(source).toContain("Confianza baja");
-    expect(source).not.toContain("HIGH");
-    expect(source).not.toContain("MEDIUM");
-    expect(source).not.toContain("LOW");
+    expect(source).toContain("Estimación realizada. Revisa los valores antes de guardar.");
+    expect(source).toContain("Suposición: {message.assumptions}");
+    expect(source).not.toMatch(/Confianza (?:alta|media|baja)/i);
+    expect(source).not.toContain("getConfidenceText");
   });
 });
 
