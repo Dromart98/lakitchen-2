@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildVoiceInventoryBatchSaveItems, toVoiceInventoryBatchSaveInput } from "@/modules/inventory/voice-inventory-batch-save";
+import type { VoiceInventoryDraftItem } from "@/modules/inventory/voice-inventory-batch";
 const item = { name: " Pollo ", quantity: 2, unit: "kg", location: "freezer", category: "protein", nutrition_basis: "per_100g", calories: 120, protein_g: 22, carbs_g: 0, fat_g: 3 };
 describe("voice batch save schema", () => {
  it("accepts compatible strict inventory items", () => expect(toVoiceInventoryBatchSaveInput("123e4567-e89b-42d3-a456-426614174000", [item]).success).toBe(true));
@@ -7,4 +8,10 @@ describe("voice batch save schema", () => {
  it("rejects empty, too-large, invalid and extra payloads", () => { expect(toVoiceInventoryBatchSaveInput("123e4567-e89b-42d3-a456-426614174000", []).success).toBe(false); expect(toVoiceInventoryBatchSaveInput("123e4567-e89b-42d3-a456-426614174000", Array.from({ length: 31 }, () => item)).success).toBe(false); for (const changed of [{ quantity: 0 }, { quantity: -1 }, { name: "" }, { name: "x".repeat(121) }, { unit: "box" }, { location: "garage" }, { category: "nope" }, { calories: -1 }, { nutrition_basis: "per_unit" }, { client_id: "x" }, { expires_at: "2026-01-01" }, { user_id: "x" }]) expect(toVoiceInventoryBatchSaveInput("123e4567-e89b-42d3-a456-426614174000", [{ ...item, ...changed }]).success).toBe(false); });
  it("rejects non-finite numbers", () => { for (const value of [NaN, Infinity, -Infinity]) expect(toVoiceInventoryBatchSaveInput("123e4567-e89b-42d3-a456-426614174000", [{ ...item, calories: value }]).success).toBe(false); });
  it("requires mapping real editable drafts before strict save validation", () => { const draft = { ...item, client_id: "draft", food_state: "raw" as const, confidence: "low" as const, issues: ["low-confidence"], review_acknowledged: true }; expect(toVoiceInventoryBatchSaveInput("123e4567-e89b-42d3-a456-426614174000", [draft]).success).toBe(false); const mapped = buildVoiceInventoryBatchSaveItems([draft as any]); expect(mapped.success).toBe(true); if (mapped.success) expect(Object.keys(mapped.data[0])).toEqual(["name", "quantity", "unit", "location", "category", "nutrition_basis", "calories", "protein_g", "carbs_g", "fat_g"]); });
+ it("blocks an incomplete draft and accepts it after the missing quantity and unit are corrected", () => {
+   const incomplete = { ...item, quantity: null, unit: null, nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null, client_id: "salt", food_state: "not_applicable" as const, confidence: "low" as const, nutrition_assumptions: "Falta indicar la cantidad.", issues: ["quantity-missing", "unit-missing", "nutrition-incomplete"] };
+   expect(buildVoiceInventoryBatchSaveItems([incomplete as unknown as VoiceInventoryDraftItem]).success).toBe(false);
+   const corrected = { ...incomplete, quantity: 100, unit: "g", nutrition_basis: "per_100g", calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, issues: [] };
+   expect(buildVoiceInventoryBatchSaveItems([corrected as unknown as VoiceInventoryDraftItem]).success).toBe(true);
+ });
 });

@@ -32,7 +32,7 @@ Estado ya cerrado:
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
 - **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
 
-Siguiente tarea: **Analizar listas extensas sin que un producto inválido rechace todo el lote.**
+Siguiente tarea: **Reconocer secciones de ubicación dentro de un mismo dictado.**
 
 Orden de implementación acordado:
 
@@ -54,7 +54,7 @@ Orden de implementación acordado:
 
 #### Bloque 2 — Reconstrucción del dictado de Inventario
 
-3. Analizar listas extensas sin que un producto inválido rechace todo el lote.
+3. **Implementada/cerrada:** Analizar listas extensas sin que un producto inválido rechace todo el lote.
    - Separar extracción de productos y resolución nutricional.
    - Conservar todos los productos identificables aunque uno necesite revisión.
    - Resolver cada producto de forma independiente.
