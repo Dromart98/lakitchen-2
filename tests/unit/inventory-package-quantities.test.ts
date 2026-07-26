@@ -16,6 +16,10 @@ describe("inventory package quantities", () => {
     expect(resolvePackageQuantity(facts({ package_count: 4, package_size: 500, package_size_unit: "ml" }))).toMatchObject({ calculated_total_size: 2, calculated_total_size_unit: "l" });
     expect(resolvePackageQuantity(facts({ package_size_unit: "g", total_size: 1, total_size_unit: "l" }))).toBeNull();
   });
+  it("rejects conflicting individual and total facts", () => {
+    expect(resolvePackageQuantity(facts({ package_count: 6, package_size: 60, total_size: 350, total_size_unit: "g" }))).toBeNull();
+    expect(resolvePackageQuantity(facts({ package_count: 6, package_size: 60, total_size: 360, total_size_unit: "g" }))).not.toBeNull();
+  });
   it("converts per-100 nutrition to per-unit deterministically", () => {
     const mass = resolvePackageQuantity(facts())!;
     expect(convertNutritionToPerUnit({ calories: 200, protein_g: 20, carbs_g: 10, fat_g: 5 }, "per_100g", mass)).toEqual({ calories: 286, protein_g: 28.599999999999998, carbs_g: 14.299999999999999, fat_g: 7.1499999999999995 });

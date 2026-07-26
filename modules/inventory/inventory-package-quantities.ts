@@ -47,6 +47,8 @@ export function resolvePackageQuantity(facts: PackageFacts): ResolvedPackageQuan
     const individualDefinition = unitDefinition(facts.package_size_unit!);
     const totalDefinition = unitDefinition(facts.total_size_unit!);
     if (individualDefinition.dimension !== totalDefinition.dimension) return null;
+    const tolerance = Math.max(1, total) * Number.EPSILON * 8;
+    if (Math.abs(individual * count - total) > tolerance) return null;
   }
   const definition = individual !== null ? unitDefinition(facts.package_size_unit!) : unitDefinition(facts.total_size_unit!);
   const unitSize = individual ?? total! / count;

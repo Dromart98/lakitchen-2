@@ -37,6 +37,7 @@ export const VoiceInventoryDraftItemSchema = z.object({
   source_protein_g: finiteNonNegative.nullable().optional(),
   source_carbs_g: finiteNonNegative.nullable().optional(),
   source_fat_g: finiteNonNegative.nullable().optional(),
+  manually_edited_nutrition: z.array(z.enum(["calories", "protein_g", "carbs_g", "fat_g"])).max(4).optional(),
   issues: z.array(z.enum(VOICE_INVENTORY_BATCH_ISSUES)).max(9),
 }).strict();
 export const VoiceInventoryBatchOutputSchema = z.object({ items: z.array(VoiceInventoryDraftItemSchema).min(1).max(VOICE_INVENTORY_BATCH_MAX_ITEMS) }).strict();
@@ -62,12 +63,19 @@ export function normalizeVoiceInventoryDraftItem(item: z.infer<typeof VoiceInven
  const converted = resolved && sourceBasis
    ? convertNutritionToPerUnit(sourceNutrition, sourceBasis, resolved)
    : null;
+ const manualNutrition = new Set(item.manually_edited_nutrition ?? []);
+ const finalNutrition = converted ? {
+   calories: manualNutrition.has("calories") ? item.calories : converted.calories,
+   protein_g: manualNutrition.has("protein_g") ? item.protein_g : converted.protein_g,
+   carbs_g: manualNutrition.has("carbs_g") ? item.carbs_g : converted.carbs_g,
+   fat_g: manualNutrition.has("fat_g") ? item.fat_g : converted.fat_g,
+ } : null;
  const normalizedItem = resolved ? {
    ...item,
    quantity: resolved.package_count,
    unit: "ud" as const,
-   ...(converted ? {
-     ...converted, nutrition_basis: "per_unit" as const,
+   ...(finalNutrition ? {
+     ...finalNutrition, nutrition_basis: "per_unit" as const,
      source_nutrition_basis: sourceBasis,
      source_calories: sourceNutrition.calories, source_protein_g: sourceNutrition.protein_g,
      source_carbs_g: sourceNutrition.carbs_g, source_fat_g: sourceNutrition.fat_g,
@@ -76,11 +84,15 @@ export function normalizeVoiceInventoryDraftItem(item: z.infer<typeof VoiceInven
  const issues = new Set(normalizedItem.issues);
  const derived: Array<[VoiceInventoryDraftIssue, boolean]> = [["quantity-missing", normalizedItem.quantity === null || normalizedItem.quantity <= 0], ["unit-missing", normalizedItem.unit === null], ["location-unconfirmed", normalizedItem.location === null], ["nutrition-incomplete", !nutritionComplete(normalizedItem)], ["nutrition-basis-mismatch", Boolean(normalizedItem.unit && normalizedItem.nutrition_basis && !nutritionBasisMatches(normalizedItem))], ["low-confidence", normalizedItem.confidence === "low"]];
  for (const [issue, needed] of derived) { if (needed) issues.add(issue); else issues.delete(issue); }
- if (resolved) issues.delete("package-size-missing");
+ if (item.package_count !== null && (!resolved || (sourceBasis && !converted))) issues.add("package-size-missing");
+ else if (resolved) issues.delete("package-size-missing");
  return { ...normalizedItem, issues: [...issues] };
 }
 export function normalizeEditedVoiceInventoryDraftItem(item: VoiceInventoryDraftItem, field: keyof VoiceInventoryDraftItem, value: unknown): VoiceInventoryDraftItem {
  const next = { ...item, [field]: value, review_acknowledged: field === "review_acknowledged" ? Boolean(value) : false };
+ if (["calories", "protein_g", "carbs_g", "fat_g"].includes(field)) {
+   next.manually_edited_nutrition = [...new Set([...(item.manually_edited_nutrition ?? []), field as "calories" | "protein_g" | "carbs_g" | "fat_g"])];
+ }
  if (field === "name" && typeof value === "string" && value.trim()) next.issues = next.issues.filter((issue) => issue !== "ambiguous-product");
  return { ...normalizeVoiceInventoryDraftItem(next), client_id: item.client_id };
 }
