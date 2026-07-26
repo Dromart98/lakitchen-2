@@ -147,6 +147,44 @@ describe("voice inventory batch provider", () => {
     }
   });
 
+  it("reconciles the required long multi-section list after per-item recovery", async () => {
+    const pantryNames = ["Tortillas de trigo integral", "Atún", "Arroz", "Pasta de lenteja roja", "Aceite", "Vinagre de manzana", "Perejil", "Comino", "Canela", "Ajo molido", "Sal"];
+    const pending = (name: string) => ({ ...readyItem, name, quantity: null, unit: null, location: "freezer", category: null, nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null, issues: ["quantity-missing", "unit-missing", "nutrition-incomplete"] });
+    const tuna = { ...readyItem, name: "Atún", quantity: 3, unit: "ud", location: "fridge", category: "protein", food_state: "processed", package_count: 3, package_size: 143, package_size_unit: "g", nutrition_basis: "per_100g", calories: 116, protein_g: 26, carbs_g: 0, fat_g: 1 };
+    const providerItems = [
+      { ...readyItem, name: pantryNames[0], quantity: 6, unit: "ud", location: "freezer", category: "carbohydrate", food_state: "processed", nutrition_basis: "per_unit" },
+      tuna,
+      ...pantryNames.slice(2).map(pending),
+      { ...readyItem, name: "Pollo", location: "pantry" },
+      { ...readyItem, name: "Leche", unit: "l", location: "pantry", category: "dairy", food_state: "not_applicable", nutrition_basis: "per_100ml" },
+      { ...readyItem, name: "Pescado", location: "pantry" },
+      { ...readyItem, name: "Pimiento", location: "pantry", category: "vegetable" },
+    ];
+    const text = "En la despensa tengo seis tortillas de trigo integral, 3 latas de atún de 143 g, medio kilo de arroz, doscientos cincuenta gramos de pasta de lenteja roja, 1 litro de aceite, medio litro de vinagre de manzana, perejil, comino, canela, ajo molido y sal. En la nevera tengo pollo y leche. En el congelador tengo pescado y pimiento.";
+    const result = await generateVoiceInventoryBatch(text, { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: providerItems }) }) });
+    expect(result).toMatchObject({ status: "needs-clarification" });
+    if (result.status === "needs-clarification") {
+      expect(result.items).toHaveLength(15);
+      expect(result.items.slice(0, 11).every(({ location }) => location === "pantry")).toBe(true);
+      expect(result.items.slice(11, 13).every(({ location }) => location === "fridge")).toBe(true);
+      expect(result.items.slice(13).every(({ location }) => location === "freezer")).toBe(true);
+      expect(result.items[1]).toMatchObject({ quantity: 3, unit: "ud", package_count: 3, package_size: 143, package_size_unit: "g", nutrition_basis: "per_unit" });
+      expect(result.items.slice(6, 11).every(({ issues }) => issues.includes("quantity-missing"))).toBe(true);
+    }
+  });
+
+  it("keeps countable foods out of package metadata while inheriting fridge", async () => {
+    const providerItems = [
+      { ...readyItem, name: "Huevos", quantity: 6, unit: "ud", location: "pantry", category: "protein", package_count: null, food_state: "raw", nutrition_basis: "per_unit" },
+      { ...readyItem, name: "Manzanas", quantity: 4, unit: "ud", location: "pantry", category: "fruit", package_count: null, food_state: "not_applicable", nutrition_basis: "per_unit" },
+    ];
+    const result = await generateVoiceInventoryBatch("En la nevera tengo 6 huevos y 4 manzanas.", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: providerItems }) }) });
+    expect(result).toMatchObject({ items: [
+      expect.objectContaining({ name: "Huevos", location: "fridge", package_count: null, package_size: null }),
+      expect.objectContaining({ name: "Manzanas", location: "fridge", package_count: null, package_size: null }),
+    ] });
+  });
+
   it("handles long batches in one call up to the existing maximum", async () => {
     for (const count of [20, VOICE_INVENTORY_BATCH_MAX_ITEMS]) {
       let calls = 0;

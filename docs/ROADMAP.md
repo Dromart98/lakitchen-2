@@ -62,7 +62,7 @@ Orden de implementación acordado:
    - Aplicar una regla práctica y editable a especias o productos sin cantidad explícita.
    - Mantener el máximo actual de 30 productos y el guardado atómico e idempotente.
 
-4. Reconocer secciones de ubicación dentro de un mismo dictado.
+4. **Implementada/cerrada:** Reconocer secciones de ubicación dentro de un mismo dictado.
    - Admitir frases como “en la nevera tengo…”, “en el congelador tengo…” y “en la despensa tengo…”.
    - Heredar cada ubicación para todos los productos siguientes hasta encontrar otro encabezado de ubicación.
    - Admitir comas, pausas, puntos, saltos de línea y sinónimos como frigorífico o refrigerador.
