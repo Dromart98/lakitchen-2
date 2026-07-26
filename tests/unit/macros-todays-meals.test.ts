@@ -21,7 +21,13 @@ describe("macros today's meals", () => {
   it("renders the list after the registration tools with loaded, empty, and error states", async () => {
     const source = await readFile(pagePath, "utf8");
 
-    expect(source.indexOf('className="macros-lower-grid"')).toBeLessThan(source.indexOf('className="card macros-today-meals"'));
+    const recorderPosition = source.indexOf("<MacroMealRecorder");
+    const mealsPosition = source.indexOf('className="card macros-today-meals"');
+    const goalsPosition = source.indexOf('className="card macros-goals"');
+
+    expect(recorderPosition).toBeGreaterThan(-1);
+    expect(mealsPosition).toBeGreaterThan(recorderPosition);
+    expect(goalsPosition).toBeGreaterThan(mealsPosition);
     expect(source).toContain("Comidas registradas hoy");
     expect(source).toContain("Todavía no has registrado ninguna comida hoy.");
     expect(source).toContain("No se pudieron cargar las comidas registradas hoy. Inténtalo de nuevo.");
