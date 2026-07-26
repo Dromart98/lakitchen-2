@@ -90,7 +90,11 @@ describe("voice inventory batch provider", () => {
     const success = await generateVoiceInventoryBatch("1 kg de arroz a la despensa", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: [rice] }) }) });
     const rejected = await generateVoiceInventoryBatch("1 kg de arroz a la despensa", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: [{ ...rice, food_state: "cooked", calories: 130, carbs_g: 28 }] }) }) });
     expect(success).toMatchObject({ status: "success", items: [expect.objectContaining({ food_state: "raw", nutrition_basis: "per_100g", calories: 360 })] });
-    expect(rejected).toMatchObject({ status: "needs-clarification", items: [expect.objectContaining({ name: "Arroz", quantity: 1, unit: "kg", nutrition_basis: null, calories: null, issues: expect.arrayContaining(["nutrition-incomplete"]) })] });
+    expect(rejected).toMatchObject({ status: "needs-clarification", items: [expect.objectContaining({ name: "Arroz", quantity: 1, unit: "kg", location: "pantry", food_state: "unknown", nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null, issues: expect.arrayContaining(["nutrition-incomplete"]) })] });
+  });
+  it("preserves a valid food state when nutrition is rejected for a different reason", async () => {
+    const result = await generateVoiceInventoryBatch("1 kg de pollo", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: [{ ...readyItem, food_state: "raw", nutrition_basis: "per_100ml" }] }) }) });
+    expect(result).toMatchObject({ status: "needs-clarification", items: [expect.objectContaining({ name: "Pollo", food_state: "raw", nutrition_basis: null, calories: null, issues: expect.arrayContaining(["nutrition-incomplete"]) })] });
   });
   it("preserves explicit cooked rice", async () => {
     const result = await generateVoiceInventoryBatch("500 g de arroz cocido en la nevera", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: [{ ...readyItem, name: "Arroz cocido", quantity: 500, unit: "g", location: "fridge", category: "carbohydrate", food_state: "cooked", nutrition_basis: "per_100g", calories: 130, protein_g: 2.5, carbs_g: 28, fat_g: 0.3 }] }) }) });

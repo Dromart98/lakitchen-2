@@ -53,8 +53,9 @@ function resolveItemNutrition(item: (typeof VoiceInventoryBatchOutputSchema)["_o
   if (nutritionValues.every((value) => value === null)) return item;
 
   const nutritionUnit = item.package_size_unit ?? item.total_size_unit ?? item.unit;
-  const incomplete = () => ({
+  const incomplete = (foodStateRejected = false) => ({
     ...item,
+    ...(foodStateRejected ? { food_state: "unknown" as const } : {}),
     nutrition_basis: null,
     calories: null,
     protein_g: null,
@@ -80,7 +81,7 @@ function resolveItemNutrition(item: (typeof VoiceInventoryBatchOutputSchema)["_o
       clarification: item.calories === null ? item.nutrition_assumptions : null,
     },
   );
-  if (result.status !== "success") return incomplete();
+  if (result.status !== "success") return incomplete(result.status === "invalid" && result.reason === "food-state");
 
   return {
     ...item,
