@@ -84,7 +84,7 @@ function locationForAlias(alias: string): VoiceInventoryLocation | null {
 
 const LOCATION_WORDS = LOCATION_ALIASES.flatMap(({ aliases }) => aliases).join("|");
 const HEADER_PATTERN = new RegExp(
-  `(?:^|[.;:\\n]|,\\s*(?:y\\s+)?)(?:\\s*(?:y|pero)\\s+)?(?:en\\s+(?:la|el)\\s+|del\\s+|de\\s+la\\s+)?(${LOCATION_WORDS})\\b(?:\\s*(?:tengo|hay)\\b|\\s*:)?`,
+  `(?:^|[.;:\\n]|,)\\s*(?:(?:y|pero)\\s+)?(?:en\\s+(?:la|el)\\s+|del\\s+|de\\s+la\\s+)?(${LOCATION_WORDS})\\b(?:\\s*(?:tengo|hay)\\b|\\s*:)?`,
   "g",
 );
 const LOCATION_MENTION_PATTERN = new RegExp(`\\b(${LOCATION_WORDS})\\b`, "g");
