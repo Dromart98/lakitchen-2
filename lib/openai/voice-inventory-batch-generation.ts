@@ -43,6 +43,57 @@ export function extractVoiceInventoryBatchOutputText(body: unknown): ExtractionR
   return { status: "invalid-ai-response" };
 }
 
+/**
+ * Resolves nutrition without changing the facts extracted for the product.
+ * Nutrition is inferred data, so an invalid estimate becomes an editable,
+ * incomplete draft instead of invalidating the observed product or its peers.
+ */
+function resolveItemNutrition(item: (typeof VoiceInventoryBatchOutputSchema)["_output"]["items"][number]) {
+  const nutritionValues = [item.nutrition_basis, item.calories, item.protein_g, item.carbs_g, item.fat_g];
+  if (nutritionValues.every((value) => value === null)) return item;
+
+  const nutritionUnit = item.package_size_unit ?? item.total_size_unit ?? item.unit;
+  const incomplete = () => ({
+    ...item,
+    nutrition_basis: null,
+    calories: null,
+    protein_g: null,
+    carbs_g: null,
+    fat_g: null,
+    issues: [...new Set([...item.issues, "nutrition-incomplete" as const])],
+  });
+  if (nutritionUnit === null || item.nutrition_basis === null) return incomplete();
+
+  const result = validateInventoryNutritionAiOutput(
+    { name: item.name, quantity: item.package_size ?? item.total_size ?? item.quantity, unit: nutritionUnit, category: item.category },
+    {
+      status: item.calories === null || item.protein_g === null || item.carbs_g === null || item.fat_g === null ? "needs_clarification" : "estimated",
+      nutrition_basis: item.nutrition_basis,
+      calories: item.calories,
+      protein_g: item.protein_g,
+      carbs_g: item.carbs_g,
+      fat_g: item.fat_g,
+      confidence: item.confidence,
+      food_state: item.food_state,
+      normalized_food_name: item.name,
+      assumptions: item.nutrition_assumptions,
+      clarification: item.calories === null ? item.nutrition_assumptions : null,
+    },
+  );
+  if (result.status !== "success") return incomplete();
+
+  return {
+    ...item,
+    nutrition_basis: result.estimate.nutrition_basis,
+    calories: result.estimate.calories,
+    protein_g: result.estimate.protein_g,
+    carbs_g: result.estimate.carbs_g,
+    fat_g: result.estimate.fat_g,
+    confidence: result.estimate.confidence,
+    nutrition_assumptions: result.estimate.assumptions,
+  };
+}
+
 export async function generateVoiceInventoryBatch(text: string, options: { apiKey: string; model?: string; fetchImpl?: typeof fetch }): Promise<VoiceInventoryBatchResult> {
  const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 20000);
  try { const response = await (options.fetchImpl ?? fetch)(endpoint, { method: "POST", headers: { Authorization: `Bearer ${options.apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: options.model ?? "gpt-5.6-terra", input: [{ role: "system", content: prompt }, { role: "user", content: text }], text: { format: { type: "json_schema", name: "voice_inventory_batch", strict: true, schema: VOICE_INVENTORY_BATCH_JSON_SCHEMA } }, store: false, max_output_tokens: 5000, reasoning: { effort: "low" } }), signal: controller.signal });
@@ -51,29 +102,10 @@ export async function generateVoiceInventoryBatch(text: string, options: { apiKe
  if (extracted.status === "provider-error") return { status: "error", code: "provider-error", message: "No se pudo analizar la lista. Inténtalo de nuevo." };
  if (extracted.status !== "success") return { status: "error", code: "invalid-ai-response", message: "No se pudo obtener una lista válida." };
  const raw = extracted.text;
- if (!raw) return { status: "error", code: "invalid-ai-response", message: "No se pudo obtener una lista válida." }; let parsed: unknown; try { parsed = JSON.parse(raw); } catch { return { status: "error", code: "invalid-ai-response", message: "No se pudo obtener una lista válida." }; } const validated = VoiceInventoryBatchOutputSchema.safeParse(parsed); if (!validated.success) return { status: "error", code: "invalid-ai-response", message: "No se pudo obtener una lista válida." }; if (validated.data.items.length > VOICE_INVENTORY_BATCH_MAX_ITEMS) return { status: "error", code: "too-many-products", message: "Se detectaron demasiados productos." };
- const nutritionItems = [];
- for (const item of validated.data.items) {
-   const nutritionValues = [item.nutrition_basis, item.calories, item.protein_g, item.carbs_g, item.fat_g];
-   if (nutritionValues.every((value) => value === null)) {
-     nutritionItems.push(item);
-     continue;
-   }
-   const nutritionUnit = item.package_size_unit ?? item.total_size_unit ?? item.unit;
-   if (nutritionUnit === null || item.nutrition_basis === null) return { status: "error", code: "invalid-ai-response", message: "No se pudo obtener una estimación nutricional válida." };
-   const result = validateInventoryNutritionAiOutput({ name: item.name, quantity: item.package_size ?? item.total_size ?? item.quantity, unit: nutritionUnit, category: item.category }, { status: item.calories === null || item.protein_g === null || item.carbs_g === null || item.fat_g === null ? "needs_clarification" : "estimated", nutrition_basis: item.nutrition_basis, calories: item.calories, protein_g: item.protein_g, carbs_g: item.carbs_g, fat_g: item.fat_g, confidence: item.confidence, food_state: item.food_state, normalized_food_name: item.name, assumptions: item.nutrition_assumptions, clarification: item.calories === null ? item.nutrition_assumptions : null });
-   if (result.status !== "success") return { status: "error", code: "invalid-ai-response", message: "No se pudo obtener una estimación nutricional válida." };
-   nutritionItems.push({
-     ...item,
-     nutrition_basis: result.estimate.nutrition_basis,
-     calories: result.estimate.calories,
-     protein_g: result.estimate.protein_g,
-     carbs_g: result.estimate.carbs_g,
-     fat_g: result.estimate.fat_g,
-     confidence: result.estimate.confidence,
-     nutrition_assumptions: result.estimate.assumptions,
-   });
- }
+ if (!raw) return { status: "error", code: "invalid-ai-response", message: "No se pudo obtener una lista válida." }; let parsed: unknown; try { parsed = JSON.parse(raw); } catch { return { status: "error", code: "invalid-ai-response", message: "No se pudo obtener una lista válida." }; }
+ if (isRecord(parsed) && Array.isArray(parsed.items) && parsed.items.length > VOICE_INVENTORY_BATCH_MAX_ITEMS) return { status: "error", code: "too-many-products", message: "Se detectaron demasiados productos." };
+ const validated = VoiceInventoryBatchOutputSchema.safeParse(parsed); if (!validated.success) return { status: "error", code: "invalid-ai-response", message: "No se pudo obtener una lista válida." };
+ const nutritionItems = validated.data.items.map(resolveItemNutrition);
  const items = withDraftClientIds(nutritionItems); return items.some((item) => getVoiceInventoryDraftStatus(item) !== "Listo") ? { status: "needs-clarification", items, message: "Revisa los productos marcados antes de la próxima fase." } : { status: "success", items };
  } catch (error) { return { status: "error", code: error instanceof Error && error.name === "AbortError" ? "timeout" : "provider-error", message: "No se pudo analizar la lista. Inténtalo de nuevo." }; } finally { clearTimeout(timer); }
 }
