@@ -88,19 +88,18 @@ const HEADER_PATTERN = new RegExp(
   "g",
 );
 const LOCATION_MENTION_PATTERN = new RegExp(`\\b(${LOCATION_WORDS})\\b`, "g");
+const EXPLICIT_LOCATION_PATTERN = new RegExp(
+  `(?:^|[.;,\\n]|\\bpero\\b)\\s*([^.;,\\n]{1,120}?)\\s+(?:esta|va|se encuentra|lo tengo|la tengo|los tengo|las tengo)\\s+en\\s+(?:la|el)\\s+(${LOCATION_WORDS})\\b`,
+  "g",
+);
 
 function findExplicitLocationClauses(normalized: string): ExplicitLocationClause[] {
-  const clauses = normalized.split(/[.;\n]+/).map((part) => part.trim()).filter(Boolean);
   const result: ExplicitLocationClause[] = [];
-  for (const clause of clauses) {
-    LOCATION_MENTION_PATTERN.lastIndex = 0;
-    for (const match of clause.matchAll(LOCATION_MENTION_PATTERN)) {
-      const location = locationForAlias(match[1]);
-      if (!location) continue;
-      const alias = escapeRegExp(match[1]);
-      const relation = new RegExp(`\\b(?:esta|va|se encuentra|lo tengo|la tengo|los tengo|las tengo)\\s+en\\s+(?:la|el)\\s+${alias}\\b`);
-      if (relation.test(clause)) result.push({ location, content: clause });
-    }
+  EXPLICIT_LOCATION_PATTERN.lastIndex = 0;
+  for (const match of normalized.matchAll(EXPLICIT_LOCATION_PATTERN)) {
+    const location = locationForAlias(match[2]);
+    const content = match[1]?.trim();
+    if (location && content) result.push({ location, content });
   }
   return result;
 }
