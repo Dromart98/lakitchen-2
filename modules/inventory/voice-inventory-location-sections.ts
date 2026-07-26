@@ -15,6 +15,7 @@ type ExplicitLocationClause = {
 
 export type VoiceInventoryLocationEvidence = {
   hasLocationEvidence: boolean;
+  shouldClearUnsupportedLocation: boolean;
   sections: LocationSection[];
   explicitClauses: ExplicitLocationClause[];
 };
@@ -119,8 +120,10 @@ export function detectVoiceInventoryLocationEvidence(text: string): VoiceInvento
   }
 
   LOCATION_MENTION_PATTERN.lastIndex = 0;
+  const hasLocationEvidence = LOCATION_MENTION_PATTERN.test(normalized);
   return {
-    hasLocationEvidence: LOCATION_MENTION_PATTERN.test(normalized),
+    hasLocationEvidence,
+    shouldClearUnsupportedLocation: !hasLocationEvidence && /^(?:tengo|hay)\b/.test(normalized.trim()),
     sections,
     explicitClauses: findExplicitLocationClauses(normalized),
   };
@@ -137,7 +140,9 @@ export function reconcileVoiceInventoryDraftLocation(
   item: VoiceInventoryLocationDraft,
   evidence: VoiceInventoryLocationEvidence,
 ): VoiceInventoryLocationDraft {
-  if (!evidence.hasLocationEvidence) return withLocationIssue(item, null);
+  if (!evidence.hasLocationEvidence) {
+    return evidence.shouldClearUnsupportedLocation ? withLocationIssue(item, null) : item;
+  }
 
   const explicitLocations = new Set(
     evidence.explicitClauses
