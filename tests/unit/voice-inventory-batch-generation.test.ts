@@ -17,7 +17,7 @@ import { VOICE_INVENTORY_BATCH_MAX_ITEMS } from "@/modules/inventory/voice-inven
 const readyItem = {
   name: "Pollo", quantity: 1, unit: "kg", location: "freezer", category: "protein",
   food_state: "raw", nutrition_basis: "per_100g", calories: 120, protein_g: 22,
-  carbs_g: 0, fat_g: 3, confidence: "high", nutrition_assumptions: "Valores típicos por 100 g.", issues: [],
+  carbs_g: 0, fat_g: 3, package_count: null, package_size: null, package_size_unit: null, total_size: null, total_size_unit: null, confidence: "high", nutrition_assumptions: "Valores típicos por 100 g.", issues: [],
 };
 const completed = (value: unknown) => new Response(JSON.stringify(value), { status: 200 });
 
@@ -43,6 +43,7 @@ describe("voice inventory batch provider", () => {
     expect(body.input[0].content).toContain("No apliques esta regla a platos compuestos");
     expect(body.input[0].content).toContain("pasta fresca");
     expect(body.input[0].content).toContain("No supongas que arroz, pasta seca o legumbres secas están cocinados");
+    expect(body.input[0].content).toContain("No uses metadatos de envase para alimentos naturalmente contables como manzanas o huevos");
   });
   it("applies the shared validator's calibrated confidence to the draft", async () => {
     const result = await generateVoiceInventoryBatch("un kilo de pollo", {

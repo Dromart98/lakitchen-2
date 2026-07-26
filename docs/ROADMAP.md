@@ -32,7 +32,7 @@ Estado ya cerrado:
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
 - **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
 
-Siguiente tarea: **Resolver cantidades compuestas, envases y conversiones por unidad.**
+Siguiente tarea: **Analizar listas extensas sin que un producto inválido rechace todo el lote.**
 
 Orden de implementación acordado:
 
@@ -44,7 +44,7 @@ Orden de implementación acordado:
    - Mostrar “Sin categoría” cuando el producto no tenga una asignada.
    - No modificar ubicación, cantidad, nutrición, RLS ni aislamiento por usuario.
 
-2. Resolver cantidades compuestas, envases y conversiones por unidad.
+2. **Implementada/cerrada:** Resolver cantidades compuestas, envases y conversiones por unidad.
    - Interpretar expresiones como “3 latas de atún de 143 g cada una”.
    - Calcular automáticamente `3 × 143 g = 429 g` sin pedir al usuario que haga la suma.
    - Guardar la cantidad útil para el usuario como unidades cuando corresponda y derivar macros por unidad a partir del peso.
