@@ -12,7 +12,7 @@ const issueLabels: Record<string, string> = {
   "unit-missing": "Unidad pendiente",
   "package-size-missing": "Falta el tamaño del paquete",
   "ambiguous-product": "Corrige el nombre ambiguo",
-  "low-confidence": "Confianza baja",
+  "low-confidence": "Revisa los valores estimados",
 };
 
 type VoiceShoppingBatchPreviewProps = {

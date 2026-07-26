@@ -22,7 +22,7 @@ type InventoryNutritionAiControlsProps = {
 };
 
 type Message =
-  | { tone: "success"; text: string; confidence: "low" | "medium" | "high"; assumptions: string }
+  | { tone: "success"; text: string; assumptions: string }
   | { tone: "warning" | "error" | "info"; text: string };
 
 function getFieldValue(id: string) {
@@ -37,27 +37,6 @@ function setFieldValue(id: string, value: string) {
   element.value = value;
   element.dispatchEvent(new Event("input", { bubbles: true }));
   element.dispatchEvent(new Event("change", { bubbles: true }));
-}
-
-function getConfidenceText(confidence: "low" | "medium" | "high") {
-  if (confidence === "high") {
-    return {
-      label: "Confianza alta",
-      explanation: "El alimento y su estado están claramente identificados. Los valores siguen siendo orientativos.",
-    };
-  }
-
-  if (confidence === "medium") {
-    return {
-      label: "Confianza media",
-      explanation: "Los valores pueden variar según variedad, marca o preparación.",
-    };
-  }
-
-  return {
-    label: "Confianza baja",
-    explanation: "La estimación contiene suposiciones importantes. Revisa los valores antes de guardar.",
-  };
 }
 
 function readCurrentInput(fieldIds: InventoryNutritionAiControlsProps["fieldIds"]): InventoryNutritionAiInput | null {
@@ -122,8 +101,7 @@ export function InventoryNutritionAiControls({
         setFieldValue(fieldIds.fatG, String(result.estimate.fat_g));
         setMessage({
           tone: "success",
-          text: "Estimación realizada con IA. Revisa los valores antes de guardar.",
-          confidence: result.estimate.confidence,
+          text: "Estimación realizada. Revisa los valores antes de guardar.",
           assumptions: result.estimate.assumptions,
         });
         return;
@@ -148,9 +126,7 @@ export function InventoryNutritionAiControls({
         <div className={message.tone === "error" ? "auth-message error" : "auth-message success"} role={message.tone === "error" ? "alert" : "status"}>
           <p>{message.text}</p>
           {message.tone === "success" ? (
-            <p>
-              {getConfidenceText(message.confidence).label}. {getConfidenceText(message.confidence).explanation} Suposición: {message.assumptions}
-            </p>
+            <p>Suposición: {message.assumptions}</p>
           ) : null}
         </div>
       ) : null}
