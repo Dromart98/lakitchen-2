@@ -1503,7 +1503,12 @@ h3 {
   gap: 20px;
 }
 
-.macros-add,
+.macros-primary-flow {
+  display: grid;
+  min-width: 0;
+  gap: 20px;
+}
+
 .macros-goals {
   min-width: 0;
 }
@@ -1697,11 +1702,8 @@ h3 {
   }
 
   .macros-lower-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .macros-add {
-    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+    align-items: start;
   }
 
   .macros-modes {
