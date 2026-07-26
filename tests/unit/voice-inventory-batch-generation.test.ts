@@ -160,4 +160,50 @@ describe("voice inventory batch provider", () => {
     const result = await generateVoiceInventoryBatch("lista demasiado larga", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items }) }) });
     expect(result).toMatchObject({ status: "error", code: "too-many-products" });
   });
+
+  it("recovers an invalid quantity without dropping its valid neighbors", async () => {
+    const items = [readyItem, { ...readyItem, name: "Arroz", quantity: -1, unit: "g", location: "pantry" }, { ...readyItem, name: "Aceite", unit: "l", nutrition_basis: "per_100ml" }];
+    const result = await generateVoiceInventoryBatch("pollo, arroz y aceite", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items }) }) });
+    expect(result).toMatchObject({ status: "needs-clarification", items: [
+      expect.objectContaining({ name: "Pollo", quantity: 1 }),
+      expect.objectContaining({ name: "Arroz", quantity: null, unit: "g", location: "pantry", issues: expect.arrayContaining(["quantity-missing"]) }),
+      expect.objectContaining({ name: "Aceite" }),
+    ] });
+  });
+
+  it("recovers invalid nutrition without dropping its valid neighbors", async () => {
+    const items = [readyItem, { ...readyItem, name: "Arroz", protein_g: -7 }, { ...readyItem, name: "Aceite", unit: "l", nutrition_basis: "per_100ml" }];
+    const result = await generateVoiceInventoryBatch("pollo, arroz y aceite", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items }) }) });
+    expect(result).toMatchObject({ status: "needs-clarification", items: [
+      expect.objectContaining({ name: "Pollo" }),
+      expect.objectContaining({ name: "Arroz", nutrition_basis: null, calories: null, protein_g: null, issues: expect.arrayContaining(["nutrition-incomplete"]) }),
+      expect.objectContaining({ name: "Aceite" }),
+    ] });
+  });
+
+  it("recovers invalid package metadata and individual enums", async () => {
+    const invalidPackage = { ...readyItem, name: "Atún", quantity: 3, unit: "ud", package_count: 3, package_size: -143, package_size_unit: "g", nutrition_basis: "per_100g" };
+    const invalidEnums = { ...readyItem, name: "Arroz", unit: "saco", location: "armario", category: "cereal", food_state: "dry" };
+    const result = await generateVoiceInventoryBatch("pollo, atún, arroz y aceite", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: [readyItem, invalidPackage, invalidEnums, { ...readyItem, name: "Aceite", unit: "l", nutrition_basis: "per_100ml" }] }) }) });
+    expect(result).toMatchObject({ status: "needs-clarification" });
+    if (result.status === "needs-clarification") {
+      expect(result.items).toHaveLength(4);
+      expect(result.items[1]).toMatchObject({ name: "Atún", package_count: 3, package_size: null, issues: expect.arrayContaining(["package-size-missing"]) });
+      expect(result.items[2]).toMatchObject({ name: "Arroz", unit: null, location: null, category: null, food_state: "unknown", issues: expect.arrayContaining(["unit-missing", "location-unconfirmed"]) });
+    }
+  });
+
+  it("omits only a nameless item and rejects a batch with no identifiable products", async () => {
+    const partial = await generateVoiceInventoryBatch("pollo y aceite", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: [readyItem, { quantity: -1 }, { ...readyItem, name: "Aceite", unit: "l", nutrition_basis: "per_100ml" }] }) }) });
+    expect(partial).toMatchObject({ status: "success", items: [expect.objectContaining({ name: "Pollo" }), expect.objectContaining({ name: "Aceite" })] });
+    const empty = await generateVoiceInventoryBatch("nada reconocible", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: [{ name: "" }, null, 42] }) }) });
+    expect(empty).toMatchObject({ status: "error", code: "invalid-ai-response" });
+  });
+
+  it("keeps invalid roots as global errors", async () => {
+    for (const root of [null, [], {}, { items: "pollo" }]) {
+      const result = await generateVoiceInventoryBatch("pollo", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify(root) }) });
+      expect(result).toMatchObject({ status: "error", code: "invalid-ai-response" });
+    }
+  });
 });

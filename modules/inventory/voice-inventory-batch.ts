@@ -41,6 +41,7 @@ export const VoiceInventoryDraftItemSchema = z.object({
   issues: z.array(z.enum(VOICE_INVENTORY_BATCH_ISSUES)).max(9),
 }).strict();
 export const VoiceInventoryBatchOutputSchema = z.object({ items: z.array(VoiceInventoryDraftItemSchema).min(1).max(VOICE_INVENTORY_BATCH_MAX_ITEMS) }).strict();
+export const VoiceInventoryBatchRootSchema = z.object({ items: z.array(z.unknown()) });
 export type VoiceInventoryDraftItem = z.infer<typeof VoiceInventoryDraftItemSchema> & { client_id: string; review_acknowledged?: boolean };
 export type VoiceInventoryBatchResult =
  | { status: "success"; items: VoiceInventoryDraftItem[] }
@@ -48,6 +49,49 @@ export type VoiceInventoryBatchResult =
  | { status: "error"; code: "invalid-input" | "too-many-products" | "not-configured" | "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response"; message: string };
 
 export function parseVoiceInventoryBatchInput(text: string) { const value = text.trim(); return value && value.length <= VOICE_INVENTORY_BATCH_MAX_LENGTH ? value : null; }
+
+function record(value: unknown): Record<string, unknown> | null { return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : null; }
+function nonNegativeNumber(value: unknown) { return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null; }
+function enumValue<T extends readonly string[]>(value: unknown, values: T): T[number] | null { return typeof value === "string" && values.includes(value) ? value as T[number] : null; }
+
+/** Converts one untrusted provider item into a valid, editable domain draft. */
+export function recoverVoiceInventoryDraftItem(value: unknown): z.infer<typeof VoiceInventoryDraftItemSchema> | null {
+ const strict = VoiceInventoryDraftItemSchema.safeParse(value);
+ if (strict.success) return strict.data;
+ const raw = record(value);
+ const name = typeof raw?.name === "string" ? raw.name.trim() : "";
+ if (!raw || !name || name.length > 120) return null;
+
+ const issues = Array.isArray(raw.issues)
+   ? raw.issues.filter((issue): issue is VoiceInventoryDraftIssue => typeof issue === "string" && VOICE_INVENTORY_BATCH_ISSUES.includes(issue as VoiceInventoryDraftIssue))
+   : [];
+ const nutritionFields = ["calories", "protein_g", "carbs_g", "fat_g"] as const;
+ const nutritionInvalid = nutritionFields.some((field) => raw[field] !== null && nonNegativeNumber(raw[field]) === null)
+   || (raw.nutrition_basis !== null && enumValue(raw.nutrition_basis, ["per_100g", "per_100ml", "per_unit"] as const) === null);
+ if (nutritionInvalid && !issues.includes("nutrition-incomplete")) issues.push("nutrition-incomplete");
+
+ return VoiceInventoryDraftItemSchema.parse({
+   name,
+   quantity: nonNegativeNumber(raw.quantity),
+   unit: enumValue(raw.unit, VOICE_INVENTORY_BATCH_UNITS),
+   location: enumValue(raw.location, VOICE_INVENTORY_BATCH_LOCATIONS),
+   category: enumValue(raw.category, INVENTORY_CATEGORIES),
+   food_state: enumValue(raw.food_state, ["raw", "cooked", "processed", "not_applicable", "unknown"] as const) ?? "unknown",
+   nutrition_basis: nutritionInvalid ? null : enumValue(raw.nutrition_basis, ["per_100g", "per_100ml", "per_unit"] as const),
+   calories: nutritionInvalid ? null : nonNegativeNumber(raw.calories),
+   protein_g: nutritionInvalid ? null : nonNegativeNumber(raw.protein_g),
+   carbs_g: nutritionInvalid ? null : nonNegativeNumber(raw.carbs_g),
+   fat_g: nutritionInvalid ? null : nonNegativeNumber(raw.fat_g),
+   confidence: enumValue(raw.confidence, ["high", "medium", "low"] as const) ?? "low",
+   nutrition_assumptions: typeof raw.nutrition_assumptions === "string" && raw.nutrition_assumptions.length <= 500 ? raw.nutrition_assumptions : "Completa los datos pendientes.",
+   package_count: nonNegativeNumber(raw.package_count),
+   package_size: nonNegativeNumber(raw.package_size),
+   package_size_unit: enumValue(raw.package_size_unit, PACKAGE_SIZE_UNITS),
+   total_size: nonNegativeNumber(raw.total_size),
+   total_size_unit: enumValue(raw.total_size_unit, PACKAGE_SIZE_UNITS),
+   issues,
+ });
+}
 function nutritionComplete(item: z.infer<typeof VoiceInventoryDraftItemSchema>) { return Boolean(item.nutrition_basis) && [item.calories, item.protein_g, item.carbs_g, item.fat_g].every((value) => value !== null); }
 function nutritionBasisMatches(item: z.infer<typeof VoiceInventoryDraftItemSchema>) {
   if (!item.unit || !item.nutrition_basis) return false;
