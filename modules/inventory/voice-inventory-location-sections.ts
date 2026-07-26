@@ -1,6 +1,7 @@
 import type { VoiceInventoryDraftItem, VoiceInventoryDraftIssue } from "@/modules/inventory/voice-inventory-batch";
 
-type VoiceInventoryLocation = NonNullable<VoiceInventoryDraftItem["location"]>;
+type VoiceInventoryLocationDraft = Omit<VoiceInventoryDraftItem, "client_id" | "review_acknowledged">;
+type VoiceInventoryLocation = NonNullable<VoiceInventoryLocationDraft["location"]>;
 
 type LocationSection = {
   location: VoiceInventoryLocation;
@@ -126,7 +127,7 @@ export function detectVoiceInventoryLocationEvidence(text: string): VoiceInvento
   };
 }
 
-function withLocationIssue(item: VoiceInventoryDraftItem, location: VoiceInventoryLocation | null): VoiceInventoryDraftItem {
+function withLocationIssue(item: VoiceInventoryLocationDraft, location: VoiceInventoryLocation | null): VoiceInventoryLocationDraft {
   const issues = new Set<VoiceInventoryDraftIssue>(item.issues);
   if (location === null) issues.add("location-unconfirmed");
   else issues.delete("location-unconfirmed");
@@ -134,9 +135,9 @@ function withLocationIssue(item: VoiceInventoryDraftItem, location: VoiceInvento
 }
 
 export function reconcileVoiceInventoryDraftLocation(
-  item: VoiceInventoryDraftItem,
+  item: VoiceInventoryLocationDraft,
   evidence: VoiceInventoryLocationEvidence,
-): VoiceInventoryDraftItem {
+): VoiceInventoryLocationDraft {
   if (!evidence.hasLocationEvidence) return withLocationIssue(item, null);
 
   const explicitLocations = new Set(
