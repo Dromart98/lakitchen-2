@@ -1,37 +1,51 @@
-# Lakitchen
+# LaKitchen
 
-MVP funcional de una app mobile-first para seguimiento de macros, inventario doméstico y generación de recetas con alimentos disponibles.
+LaKitchen es una aplicación web mobile-first para gestionar inventario doméstico, seguimiento nutricional, recetas, planificación de comidas y lista de la compra desde un único flujo.
 
-## Qué incluye este primer código
+## Capacidades principales
 
-- Dashboard PWA-style con macros consumidos, macros restantes, productos próximos a caducar y receta sugerida.
-- Módulo de cálculo de macros con Mifflin-St Jeor, multiplicadores de actividad y objetivos por meta física.
-- Módulo de inventario con ubicaciones `pantry`, `fridge`, `freezer`, alertas de caducidad y consumo seguro.
-- Generador de recetas por reglas que prioriza caducidad, disponibilidad y encaje con macros restantes.
-- API routes iniciales para cálculo de macros, inventario, comidas y generación de recetas.
-- Esquema Prisma/PostgreSQL con usuarios, perfiles, objetivos, inventario, comidas, recetas y transacciones.
-- Tests unitarios para cálculo nutricional e inventario.
+- Inventario por despensa, nevera y congelador, con cantidades, categorías, caducidad, nutrición, filtros, edición y consumo.
+- Registro de comidas y macros de forma manual o mediante flujos asistidos de texto, foto e ingredientes del inventario.
+- Perfil nutricional, objetivos diarios, progreso e historial.
+- Recetas y planes que tienen en cuenta disponibilidad, cantidades, caducidades y datos nutricionales guardados.
+- Lista de la compra con transferencia de artículos al inventario.
+- Flujos revisables de voz, foto y código de barras cuando el navegador o los datos disponibles lo permiten.
+- Tema claro, oscuro o del sistema.
 
-## Comandos
+Las estimaciones asistidas se presentan para revisión antes de confirmar datos cuando existe ambigüedad. La aplicación prioriza lenguaje cotidiano y no expone detalles internos de proveedores o modelos en la interfaz.
+
+## Stack principal
+
+- Next.js 15 y React 19.
+- TypeScript.
+- Supabase Auth y PostgreSQL con RLS para datos personales.
+- Zod para validación.
+- Vitest para pruebas.
+- Vercel para despliegue web.
+
+Consulta `package.json` para las versiones y dependencias vigentes.
+
+## Desarrollo
 
 ```bash
 npm install
 npm run dev
-npm run test
-npm run typecheck
 ```
 
-## Stack
+Validaciones disponibles:
 
-- Next.js + React + TypeScript.
-- Prisma + PostgreSQL.
-- Zod para validación de entradas API.
-- Vitest para pruebas unitarias.
+```bash
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
 
-## Próximos pasos
+## Fuentes de verdad
 
-1. Conectar autenticación real con Auth.js o Supabase Auth.
-2. Reemplazar datos demo por Prisma en los endpoints.
-3. Añadir formularios CRUD de inventario y registro de comidas.
-4. Implementar transacción real de `preparar receta` para descontar inventario y registrar comida.
-5. Añadir PWA manifest, service worker, IndexedDB y cola offline.
+- `PRODUCT.md`: propósito, usuarios, capacidades y principios de producto.
+- `DESIGN.md`: sistema visual, componentes, accesibilidad y reglas de diseño.
+- `AGENTS.md`: instrucciones específicas del repositorio para agentes de desarrollo.
+- Código de `main`: estado funcional real.
+
+El README resume el producto y la puesta en marcha. No mantiene una lista paralela de funcionalidades pendientes ni sustituye al código como fuente del estado implementado.
