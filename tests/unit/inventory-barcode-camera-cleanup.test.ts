@@ -9,7 +9,7 @@ const controls = readFileSync(
 );
 
 const cleanupScanner = controls.match(/  function cleanupScanner\([\s\S]*?\n  }\n\n  async function configureAutofocus/)?.[0] ?? "";
-const startScanner = controls.match(/  async function startScanner\([\s\S]*?\n  }\n\n  async function lookupOpenFoodFacts/)?.[0] ?? "";
+const startScanner = controls.match(/  async function startScanner\([\s\S]*?\n  }\n\n  function searchBarcode/)?.[0] ?? "";
 
 describe("inventory barcode camera lifecycle", () => {
   it("uses one cleanup routine for close, manual stop, unmount, and terminal scanner errors", () => {

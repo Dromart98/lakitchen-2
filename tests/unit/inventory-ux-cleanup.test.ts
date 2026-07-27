@@ -41,8 +41,9 @@ describe("inventory nutrition completion access", () => {
     expect(inventoryPage).toContain('name="protein_g"');
     expect(inventoryPage).toContain('name="carbs_g"');
     expect(inventoryPage).toContain('name="fat_g"');
-    expect(nutritionControls).toContain("Calcular macros con IA");
-    expect(nutritionControls).toContain("Sustituir valores con IA");
+    expect(nutritionControls).toContain("Calcular macros");
+    expect(nutritionControls).toContain("Sustituir valores");
+    expect(nutritionControls).not.toMatch(/con IA|La IA ofrece/);
     expect(nutritionControls).toContain("controlId?: string");
     expect(nutritionControls).toContain("buttonId?: string");
   });

@@ -51,8 +51,8 @@ type BarcodeAutofillState = {
 type ExternalBarcodeProduct = {
   barcode: string;
   name: string;
-  default_quantity: number;
-  default_unit: "ud" | "g" | "kg" | "ml" | "l";
+  default_quantity: number | null;
+  default_unit: "ud" | "g" | "kg" | "ml" | "l" | null;
   default_location: "pantry" | "fridge" | "freezer" | null;
   category?: string | null;
   nutrition_basis?: string;
@@ -62,13 +62,8 @@ type ExternalBarcodeProduct = {
   fat_g?: number | null;
 };
 
-type ExternalLookupResult =
-  | { status: "found"; source: "open-food-facts"; product: ExternalBarcodeProduct }
-  | { status: "unknown"; barcode: string }
-  | { status: "invalid" | "error"; message: string };
-
 const unsupportedScannerMessage = "Tu navegador no permite escanear directamente. Introduce el código manualmente.";
-const scannerIdleMessage = "Introduce o escanea un código para buscarlo en tu catálogo personal y en Open Food Facts.";
+const scannerIdleMessage = "Introduce o escanea un código para buscar el producto.";
 const autofillFieldIds = INVENTORY_BARCODE_AUTOFILL_FIELD_IDS;
 
 function getInputElement(id: string): HTMLInputElement | HTMLSelectElement | null {
@@ -99,8 +94,8 @@ function getAutofillValues(product: ExternalBarcodeProduct): Record<(typeof auto
 
   return {
     [INVENTORY_ADD_FORM_FIELD_IDS.name]: product.name,
-    [INVENTORY_ADD_FORM_FIELD_IDS.quantity]: String(product.default_quantity),
-    [INVENTORY_ADD_FORM_FIELD_IDS.unit]: product.default_unit,
+    [INVENTORY_ADD_FORM_FIELD_IDS.quantity]: product.default_quantity === null ? "" : String(product.default_quantity),
+    [INVENTORY_ADD_FORM_FIELD_IDS.unit]: product.default_unit ?? "",
     [INVENTORY_ADD_FORM_FIELD_IDS.location]: product.default_location ?? "",
     [INVENTORY_ADD_FORM_FIELD_IDS.category]: product.category ?? "",
     [INVENTORY_ADD_FORM_FIELD_IDS.nutritionBasis]: hasNutrition ? product.nutrition_basis ?? "per_100g" : "",
@@ -139,7 +134,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
     lastAutofillRef.current = null;
   }
 
-  function applyProduct(product: ExternalBarcodeProduct, source: "personal" | "open-food-facts") {
+  function applyProduct(product: ExternalBarcodeProduct) {
     clearPreviousAutofill();
     const appliedValues = getAutofillValues(product);
 
@@ -153,11 +148,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
     };
 
     autofillFieldIds.forEach((id) => setInputValue(id, appliedValues[id]));
-    setMessage(
-      source === "personal"
-        ? "Producto encontrado en tu catálogo. Revisa los datos antes de añadirlo."
-        : "Producto encontrado en Open Food Facts. Revisa y corrige los datos antes de añadirlo.",
-    );
+    setMessage("Producto encontrado. Revisa los datos antes de añadirlo.");
   }
 
   function cleanupScanner({ resetStatus = true, resetCameraSelection = true }: { resetStatus?: boolean; resetCameraSelection?: boolean } = {}) {
@@ -362,12 +353,6 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
     }
   }
 
-  async function lookupOpenFoodFacts(normalized: string): Promise<ExternalLookupResult> {
-    const response = await fetch(`/api/barcodes/${encodeURIComponent(normalized)}`, { cache: "no-store" });
-    const result = await response.json() as ExternalLookupResult;
-    return result;
-  }
-
   function searchBarcode() {
     const normalized = normalizeBarcodeInput(barcode);
     setBarcode(normalized);
@@ -385,24 +370,11 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
         }
 
         if (personalResult.status === "found") {
-          applyProduct(personalResult.product, "personal");
+          applyProduct(personalResult.product);
           return;
         }
-
-        setMessage("No está en tu catálogo. Buscando en Open Food Facts...");
-        const externalResult = await lookupOpenFoodFacts(normalized);
-
-        if (externalResult.status === "found") {
-          applyProduct(externalResult.product, "open-food-facts");
-          return;
-        }
-
         clearPreviousAutofill();
-        setMessage(
-          externalResult.status === "unknown"
-            ? "No encontramos este código. Completa los datos manualmente y marca la opción de recordarlo."
-            : externalResult.message,
-        );
+        setMessage(personalResult.status === "unknown" ? personalResult.message : "No se pudo buscar el código. Inténtalo de nuevo.");
       } catch {
         clearPreviousAutofill();
         setMessage("No se pudo buscar el código. Inténtalo de nuevo.");
@@ -415,7 +387,7 @@ export function BarcodeCatalogControls({ lookupAction }: BarcodeCatalogControlsP
       <div className="barcode-lookup__heading">
         <span>Código de barras</span>
         <h3 id="barcode-lookup-heading">Busca o escanea el producto</h3>
-        <p>Primero consultaremos tu catálogo personal y, después, Open Food Facts.</p>
+        <p>Buscaremos el producto y podrás revisar los datos antes de añadirlo.</p>
       </div>
       <div className="barcode-lookup__form-row">
         <label className="field" htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.barcode}>

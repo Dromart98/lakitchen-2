@@ -13,7 +13,8 @@ import {
   parseOptionalInventoryNutritionNumber,
 } from "@/modules/inventory/inventory-nutrition";
 import { isMealType } from "@/modules/meals/meal-types";
-import { estimateInventoryNutritionWithOpenAi } from "@/lib/openai/inventory-nutrition";
+import { lookupOpenFoodFactsProduct } from "@/lib/nutrition/open-food-facts";
+import { resolveInventoryNutrition } from "@/lib/nutrition/hybrid-resolver";
 import { parseInventoryNutritionAiInput, type InventoryNutritionAiEstimate, type InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
 import { toVoiceInventoryBatchSaveInput } from "@/modules/inventory/voice-inventory-batch-save";
 
@@ -38,7 +39,7 @@ type InventoryNutritionAiErrorCode = "invalid-input" | "not-configured" | "timeo
 
 const inventoryNutritionAiErrorMessages: Record<InventoryNutritionAiErrorCode, string> = {
   "invalid-input": "Completa un nombre y una unidad válidos antes de calcular.",
-  "not-configured": "La estimación con IA no está configurada todavía.",
+  "not-configured": "El cálculo nutricional no está configurado todavía.",
   timeout: "La estimación está tardando demasiado. Inténtalo de nuevo.",
   "rate-limited": "Hay demasiadas solicitudes en este momento. Inténtalo de nuevo en unos minutos.",
   "provider-error": "No se pudieron estimar los macros. Inténtalo de nuevo.",
@@ -56,20 +57,10 @@ export async function estimateInventoryNutritionAction(input: InventoryNutrition
   const supabase = await createClient();
   await requireAuthenticatedUser(supabase, "inventory nutrition AI estimate");
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return inventoryNutritionAiError("not-configured");
-
-  const result = await estimateInventoryNutritionWithOpenAi(validatedInput, {
-    apiKey,
-    model: process.env.OPENAI_INVENTORY_NUTRITION_MODEL || undefined,
-  });
-
-  if (result.status === "error") {
-    console.warn("inventory_nutrition_ai_estimate_failed", { code: result.code });
-    return inventoryNutritionAiError(result.code);
-  }
-
-  return result;
+  const result = await resolveInventoryNutrition(validatedInput);
+  if (result.status === "needs-clarification") return result;
+  if (result.status !== "resolved") return inventoryNutritionAiError(result.reason === "not-configured" ? "not-configured" : "provider-error");
+  return { status: "success", estimate: { nutrition_basis: result.nutritionBasis, calories: result.calories, protein_g: result.proteinG, carbs_g: result.carbsG, fat_g: result.fatG, confidence: "medium", assumptions: result.assumptions } };
 }
 
 function isInventoryLocation(value: string): value is InventoryLocation {
@@ -83,7 +74,7 @@ function isInventoryUnit(value: string): value is InventoryUnit {
 
 type BarcodeProductLookupResult =
   | { status: "invalid"; message: string }
-  | { status: "found"; product: { barcode: string; name: string; default_quantity: number; default_unit: InventoryUnit; default_location: InventoryLocation | null; category: InventoryCategory | null; nutrition_basis?: string; calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null } }
+  | { status: "found"; product: { barcode: string; name: string; default_quantity: number | null; default_unit: InventoryUnit | null; default_location: InventoryLocation | null; category: InventoryCategory | null; nutrition_basis?: string; calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null } }
   | { status: "unknown"; barcode: string; message: string }
   | { status: "error"; message: string };
 
@@ -113,7 +104,11 @@ export async function lookupBarcodeProductAction(rawBarcode: string): Promise<Ba
   }
 
   if (!data) {
-    return { status: "unknown", barcode: validation.barcode, message: "Este código no está guardado todavía. Completa los datos manualmente." };
+    const external = await lookupOpenFoodFactsProduct(validation.barcode);
+    if (external.status === "provider-error") return { status: "error", message: "No se pudo consultar el producto. Inténtalo de nuevo." };
+    if (external.status === "not-found") return { status: "unknown", barcode: validation.barcode, message: "No encontramos este código. Completa los datos manualmente." };
+    const nutrition = external.product.nutrition;
+    return { status: "found", product: { barcode: validation.barcode, name: external.product.name, default_quantity: external.product.package?.quantity ?? null, default_unit: external.product.package?.unit ?? null, default_location: null, category: null, nutrition_basis: nutrition?.basis, calories: nutrition?.calories ?? null, protein_g: nutrition?.proteinG ?? null, carbs_g: nutrition?.carbsG ?? null, fat_g: nutrition?.fatG ?? null } };
   }
 
   return {
