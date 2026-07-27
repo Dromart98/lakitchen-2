@@ -13,6 +13,7 @@ const catalogRow = (values: Partial<NutritionCatalogRow> = {}): NutritionCatalog
 
 function catalogClient(initialRows: NutritionCatalogRow[]) {
   const rows = [...initialRows];
+  const identities: Array<{ id: string; user_id: string; normalized_name: string; aliases: string[]; food_state: string; source: string; external_id: string | null; user_confirmed: boolean; display_name: string }> = [];
   let reads = 0;
   const client = { from: vi.fn(() => ({
     select: vi.fn(() => {
@@ -24,14 +25,42 @@ function catalogClient(initialRows: NutritionCatalogRow[]) {
       };
       return builder;
     }),
-  })), rpc: vi.fn(async (_name: string, args: { p_items: NutritionCatalogRow[] }) => {
+  })), rpc: vi.fn(async (name: string, args: any) => {
+    if (name === "resolve_or_create_food_catalog_item") {
+      let identity = args.p_existing_food_catalog_item_id && identities.find((item) => item.id === args.p_existing_food_catalog_item_id && item.user_id === args.p_user_id);
+      identity ??= args.p_external_id && identities.find((item) => item.user_id === args.p_user_id && item.food_state === args.p_food_state && item.source === args.p_identity_source && item.external_id === args.p_external_id);
+      identity ??= identities.find((item) => item.user_id === args.p_user_id && item.food_state === args.p_food_state && item.normalized_name === args.p_normalized_name);
+      const evidencedNames = [args.p_normalized_name, ...args.p_aliases];
+      const aliasCandidates = identities.filter((item) => item.user_id === args.p_user_id && item.food_state === args.p_food_state
+        && (args.p_aliases.includes(item.normalized_name) || item.aliases.some((alias) => evidencedNames.includes(alias)))
+        && !(args.p_external_id && item.source === args.p_identity_source && item.external_id && item.external_id !== args.p_external_id));
+      if (!identity && aliasCandidates.length === 1) identity = aliasCandidates[0];
+      if (!identity) {
+        identity = { id: `food-${identities.length + 1}`, user_id: args.p_user_id, normalized_name: args.p_normalized_name, aliases: args.p_aliases,
+          food_state: args.p_food_state, source: args.p_identity_source, external_id: args.p_external_id, user_confirmed: args.p_user_confirmed, display_name: args.p_display_name };
+        identities.push(identity);
+      } else {
+        identity.aliases = [...new Set([...identity.aliases, args.p_normalized_name, ...args.p_aliases])].filter((alias) => alias !== identity!.normalized_name);
+        if (args.p_user_confirmed && !identity.user_confirmed) { identity.display_name = args.p_display_name; identity.source = args.p_identity_source; identity.user_confirmed = true; }
+      }
+      return { data: identity.id, error: null };
+    }
     for (const incoming of args.p_items) {
       const index = rows.findIndex((row) => row.user_id === incoming.user_id && row.normalized_name === incoming.normalized_name && row.food_state === incoming.food_state && row.nutrition_basis === incoming.nutrition_basis);
       if (index < 0) rows.push(incoming); else if (shouldReplaceCatalogRow(rows[index], incoming)) rows[index] = incoming;
     }
     return { data: args.p_items.length, error: null };
   }) };
-  return { client, reads: () => reads, rows };
+  const insertWithExactConflict = (incoming: (typeof identities)[number]) => {
+    const existing = identities.find((item) => item.user_id === incoming.user_id && item.food_state === incoming.food_state && item.normalized_name === incoming.normalized_name);
+    if (!existing) identities.push(incoming);
+    else {
+      existing.aliases = [...new Set([...existing.aliases, ...incoming.aliases])];
+      if (incoming.user_confirmed && !existing.user_confirmed) { existing.display_name = incoming.display_name; existing.source = incoming.source; }
+      existing.user_confirmed ||= incoming.user_confirmed;
+    }
+  };
+  return { client, reads: () => reads, rows, identities, insertWithExactConflict };
 }
 
 const voiceItem = (name: string) => ({ client_id: name, name, quantity: 1, unit: "kg" as const, location: "freezer" as const,
@@ -93,6 +122,75 @@ describe("catalog-first integrations", () => {
     const second = await resolveInventoryNutritionForUser(client, "user-a", input, { usdaApiKey: "usda", openAiApiKey: "openai", fetchImpl });
     expect(second).toMatchObject({ status: "resolved", provenance: { source: "usda" } });
     expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("reuses one identity for evidenced USDA aliases across nutrition bases", async () => {
+    const { client, rows, identities } = catalogClient([]);
+    const first = catalogRow({ normalized_name: "arroz cocido", aliases: ["rice cooked"], food_state: "cooked", source: "usda", external_id: "123", user_confirmed: false, refresh_after: new Date(Date.now() + 10_000).toISOString() });
+    const second = { ...first, normalized_name: "arroz hervido", aliases: ["rice cooked"], nutrition_basis: "per_unit" as const };
+    await Promise.all([persistNutritionCatalogRow(client, first), persistNutritionCatalogRow(client, second)]);
+    expect(identities).toHaveLength(1);
+    expect(identities[0].aliases).toEqual(expect.arrayContaining(["arroz hervido", "rice cooked"]));
+    expect(rows).toHaveLength(2);
+    expect(new Set(rows.map((item) => item.food_catalog_item_id))).toEqual(new Set(["food-1"]));
+  });
+
+  it("does not merge different USDA IDs solely through a shared alias", async () => {
+    const { client, identities } = catalogClient([]);
+    const automatic = (name: string, externalId: string) => catalogRow({ normalized_name: name, aliases: ["chicken raw"], food_state: "raw", source: "usda", external_id: externalId, user_confirmed: false, refresh_after: new Date(Date.now() + 10_000).toISOString() });
+    await persistNutritionCatalogRow(client, automatic("pollo", "A"));
+    await persistNutritionCatalogRow(client, automatic("pechuga de pollo", "B"));
+    expect(identities).toHaveLength(2);
+    expect(identities.map((item) => item.external_id)).toEqual(["A", "B"]);
+  });
+
+  it("does not select an arbitrary identity when an alias is ambiguous", async () => {
+    const { client, identities } = catalogClient([]);
+    const automatic = (name: string, externalId: string | null, alias: string) => catalogRow({ normalized_name: name, aliases: [alias], food_state: "raw", source: "usda", external_id: externalId, user_confirmed: false, refresh_after: new Date(Date.now() + 10_000).toISOString() });
+    await persistNutritionCatalogRow(client, automatic("pollo", "A", "ave habitual"));
+    await persistNutritionCatalogRow(client, automatic("pavo", "B", "ave habitual"));
+    await persistNutritionCatalogRow(client, automatic("ave para caldo", null, "ave habitual"));
+    expect(identities).toHaveLength(3);
+    expect(identities[2]).toMatchObject({ normalized_name: "ave para caldo" });
+  });
+
+  it.each(["automatic-first", "user-first"] as const)("preserves user authority through an exact ON CONFLICT race: %s", (order) => {
+    const { identities, insertWithExactConflict } = catalogClient([]);
+    const automatic = { id: "automatic", user_id: "user-a", normalized_name: "arroz", aliases: [], food_state: "raw", source: "usda", external_id: "123", user_confirmed: false, display_name: "Rice" };
+    const confirmed = { ...automatic, id: "confirmed", source: "user", external_id: null, user_confirmed: true, display_name: "Mi arroz" };
+    for (const identity of order === "automatic-first" ? [automatic, confirmed] : [confirmed, automatic]) insertWithExactConflict(identity);
+    expect(identities).toHaveLength(1);
+    expect(identities[0]).toMatchObject({ display_name: "Mi arroz", source: "user", user_confirmed: true });
+  });
+
+  it("keeps states, external foods, and users as distinct identities", async () => {
+    const { client, identities } = catalogClient([]);
+    const automatic = (name: string, state: "raw" | "cooked", externalId: string, user = "user-a") =>
+      catalogRow({ user_id: user, normalized_name: name, food_state: state, source: "usda", external_id: externalId, user_confirmed: false, refresh_after: new Date(Date.now() + 10_000).toISOString() });
+    await persistNutritionCatalogRow(client, automatic("arroz", "raw", "rice"));
+    await persistNutritionCatalogRow(client, automatic("arroz", "cooked", "rice"));
+    await persistNutritionCatalogRow(client, automatic("pollo", "raw", "A"));
+    await persistNutritionCatalogRow(client, automatic("pechuga de pollo", "raw", "B"));
+    await persistNutritionCatalogRow(client, automatic("arroz", "raw", "rice", "user-b"));
+    expect(identities).toHaveLength(5);
+  });
+
+  it("preserves a user-confirmed display name when automatic evidence arrives", async () => {
+    const { client, identities } = catalogClient([]);
+    await persistNutritionCatalogRow(client, confirmedCatalogRow({ userId: "user-a", name: "Mi arroz habitual", unit: "g", foodState: "cooked", nutritionBasis: "per_100g", calories: 130, proteinG: 2.7, carbsG: 28, fatG: 0.3 }));
+    const identity = identities[0];
+    await persistNutritionCatalogRow(client, catalogRow({ normalized_name: "arroz blanco cocido", aliases: ["mi arroz habitual"], food_state: "cooked", source: "usda", external_id: "123", user_confirmed: false, refresh_after: new Date(Date.now() + 10_000).toISOString() }));
+    expect(identities).toHaveLength(1);
+    expect(identity).toMatchObject({ display_name: "Mi arroz habitual", source: "user", user_confirmed: true });
+    expect(identity.aliases).toContain("arroz blanco cocido");
+  });
+
+  it("does not lose valid nutrition when identity resolution fails", async () => {
+    const { client, rows } = catalogClient([]);
+    client.rpc.mockImplementationOnce(async () => ({ data: null, error: { message: "identity unavailable" } }) as any);
+    await expect(persistNutritionCatalogRow(client, catalogRow())).resolves.toBe(true);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].food_catalog_item_id).toBeNull();
   });
 
   it("keeps a reviewed raw state for Arroz and reuses it in the next voice batch", async () => {

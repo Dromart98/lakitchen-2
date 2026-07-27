@@ -32,7 +32,7 @@ Estado ya cerrado:
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
 - **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
 
-Siguiente tarea: **Fase 1.2 — Catálogo nutricional interno**, necesario para integrar el dictado por lotes sin consultas externas ingenuas.
+Siguiente tarea: **Fase 1.3A — núcleo de identidad única + catálogo nutricional**.
 
 Orden de implementación acordado:
 
@@ -104,7 +104,7 @@ Prioridad: crítica.
 
 ### 1.1 Sistema híbrido de fuentes
 
-**Estado: Preparada.** La resolución híbrida del servidor ya se usa en el cálculo manual y en códigos de barras, el dictado por lotes reutiliza el catálogo nutricional mediante búsquedas agrupadas y los empates entre candidatos USDA reales se resuelven mediante selección estructurada y validada. Queda pendiente únicamente confirmar/configurar `USDA_FDC_API_KEY` en producción.
+**Implementada/cerrada.** La resolución híbrida del servidor ya se usa en el cálculo manual y en códigos de barras, el dictado por lotes reutiliza el catálogo nutricional mediante búsquedas agrupadas y los empates entre candidatos USDA reales se resuelven mediante selección estructurada y validada. `USDA_FDC_API_KEY` está configurada y el redeploy de producción fue verificado.
 
 Orden recomendado:
 
@@ -141,6 +141,12 @@ Crear un catálogo central reutilizable con:
 Objetivo: no consultar APIs externas repetidamente y mantener resultados estables.
 
 ### 1.3 Entidad única de alimento
+
+**En progreso.** La implementación se divide para mantener el aislamiento y evitar una adopción transversal insegura:
+
+- **1.3A:** núcleo de identidad privada por usuario y relación con el catálogo nutricional.
+- **1.3B:** adopción por Inventario, comidas, lista de compra y recetas guardadas.
+- **1.3C:** estrategia para planes JSON y recetas de plantilla/globales sin romper aislamiento.
 
 Crear una entidad central de alimento, por ejemplo `food_catalog_items`, utilizada por:
 
