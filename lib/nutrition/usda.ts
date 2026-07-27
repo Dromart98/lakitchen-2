@@ -21,6 +21,16 @@ const translations: Array<[RegExp, string]> = [
 function toSearchQuery(name: string) { return translations.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), name).replace(/\s+/g, " ").trim(); }
 function words(value: string) { return new Set(value.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((word) => word.length > 2)); }
 
+type UsdaNutrient = z.infer<typeof detailSchema>["foodNutrients"][number];
+
+export function getUsdaEnergyKcal(foodNutrients: UsdaNutrient[]): number | undefined {
+  const amount = (id: number) => foodNutrients.find((item) => item.nutrient.id === id)?.amount;
+  // USDA Foundation exposes specific-factor energy (2048) and general-factor
+  // energy (2047). Prefer the more specific calculation, then general, while
+  // retaining 1008 for SR Legacy and compatible historical records. Never sum.
+  return amount(2048) ?? amount(2047) ?? amount(1008);
+}
+
 export function selectUsdaCandidate(input: InventoryNutritionAiInput, candidates: z.infer<typeof foodSchema>[]) {
   if (/^\s*(queso|cheese)\s*$/iu.test(input.name)) return null;
   const expected = getInventoryNutritionFoodStateExpectation(input.name)?.state ?? null;
@@ -58,7 +68,7 @@ export async function lookupUsdaFood(input: InventoryNutritionAiInput, options: 
     const parsedDetail = detailSchema.safeParse(await detail.json());
     if (!parsedDetail.success || !allowedDataTypes.includes(parsedDetail.data.dataType as typeof allowedDataTypes[number])) return { status: "unresolved", reason: "provider-error" };
     const nutrient = (id: number) => parsedDetail.data.foodNutrients.find((item) => item.nutrient.id === id)?.amount;
-    const values = { calories: nutrient(1008), proteinG: nutrient(1003), carbsG: nutrient(1005), fatG: nutrient(1004) };
+    const values = { calories: getUsdaEnergyKcal(parsedDetail.data.foodNutrients), proteinG: nutrient(1003), carbsG: nutrient(1005), fatG: nutrient(1004) };
     if (!isCompleteNutrition(values)) return { status: "unresolved", reason: "provider-error" };
     return { status: "resolved", normalizedName: parsedDetail.data.description.slice(0, 120), foodState: getInventoryNutritionFoodStateExpectation(input.name)?.state ?? "unknown", nutritionBasis: "per_100g", calories: values.calories!, proteinG: values.proteinG!, carbsG: values.carbsG!, fatG: values.fatG!, needsReview: true, provenance: { source: "usda", externalId: String(selected.fdcId), resolvedAt: new Date().toISOString() }, assumptions: "Valores orientativos por 100 g; revisa que el alimento y su estado sean correctos." };
   } catch { return { status: "unresolved", reason: "provider-error" }; }

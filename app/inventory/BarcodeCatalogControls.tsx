@@ -51,8 +51,8 @@ type BarcodeAutofillState = {
 type ExternalBarcodeProduct = {
   barcode: string;
   name: string;
-  default_quantity: number;
-  default_unit: "ud" | "g" | "kg" | "ml" | "l";
+  default_quantity: number | null;
+  default_unit: "ud" | "g" | "kg" | "ml" | "l" | null;
   default_location: "pantry" | "fridge" | "freezer" | null;
   category?: string | null;
   nutrition_basis?: string;
@@ -94,8 +94,8 @@ function getAutofillValues(product: ExternalBarcodeProduct): Record<(typeof auto
 
   return {
     [INVENTORY_ADD_FORM_FIELD_IDS.name]: product.name,
-    [INVENTORY_ADD_FORM_FIELD_IDS.quantity]: String(product.default_quantity),
-    [INVENTORY_ADD_FORM_FIELD_IDS.unit]: product.default_unit,
+    [INVENTORY_ADD_FORM_FIELD_IDS.quantity]: product.default_quantity === null ? "" : String(product.default_quantity),
+    [INVENTORY_ADD_FORM_FIELD_IDS.unit]: product.default_unit ?? "",
     [INVENTORY_ADD_FORM_FIELD_IDS.location]: product.default_location ?? "",
     [INVENTORY_ADD_FORM_FIELD_IDS.category]: product.category ?? "",
     [INVENTORY_ADD_FORM_FIELD_IDS.nutritionBasis]: hasNutrition ? product.nutrition_basis ?? "per_100g" : "",

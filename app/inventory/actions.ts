@@ -74,7 +74,7 @@ function isInventoryUnit(value: string): value is InventoryUnit {
 
 type BarcodeProductLookupResult =
   | { status: "invalid"; message: string }
-  | { status: "found"; product: { barcode: string; name: string; default_quantity: number; default_unit: InventoryUnit; default_location: InventoryLocation | null; category: InventoryCategory | null; nutrition_basis?: string; calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null } }
+  | { status: "found"; product: { barcode: string; name: string; default_quantity: number | null; default_unit: InventoryUnit | null; default_location: InventoryLocation | null; category: InventoryCategory | null; nutrition_basis?: string; calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null } }
   | { status: "unknown"; barcode: string; message: string }
   | { status: "error"; message: string };
 
@@ -105,9 +105,10 @@ export async function lookupBarcodeProductAction(rawBarcode: string): Promise<Ba
 
   if (!data) {
     const external = await lookupOpenFoodFactsProduct(validation.barcode);
-    if (external.status !== "resolved") return { status: "unknown", barcode: validation.barcode, message: "No encontramos este código. Completa los datos manualmente." };
-    const isVolume = external.nutritionBasis === "per_100ml";
-    return { status: "found", product: { barcode: validation.barcode, name: external.normalizedName, default_quantity: 100, default_unit: isVolume ? "ml" : "g", default_location: null, category: null, nutrition_basis: external.nutritionBasis, calories: external.calories, protein_g: external.proteinG, carbs_g: external.carbsG, fat_g: external.fatG } };
+    if (external.status === "provider-error") return { status: "error", message: "No se pudo consultar el producto. Inténtalo de nuevo." };
+    if (external.status === "not-found") return { status: "unknown", barcode: validation.barcode, message: "No encontramos este código. Completa los datos manualmente." };
+    const nutrition = external.product.nutrition;
+    return { status: "found", product: { barcode: validation.barcode, name: external.product.name, default_quantity: external.product.package?.quantity ?? null, default_unit: external.product.package?.unit ?? null, default_location: null, category: null, nutrition_basis: nutrition?.basis, calories: nutrition?.calories ?? null, protein_g: nutrition?.proteinG ?? null, carbs_g: nutrition?.carbsG ?? null, fat_g: nutrition?.fatG ?? null } };
   }
 
   return {

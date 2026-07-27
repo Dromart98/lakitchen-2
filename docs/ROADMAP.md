@@ -104,7 +104,7 @@ Prioridad: crítica.
 
 ### 1.1 Sistema híbrido de fuentes
 
-**Estado: Preparada.** La resolución híbrida del servidor ya se usa en el cálculo manual y en códigos de barras. El dictado por lotes permanece como borrador inferido hasta que 1.2 aporte catálogo/caché: consultar hasta 30 alimentos por dictado añadiría latencia, duplicación y riesgo de límites de proveedor. La activación de datos genéricos requiere configurar `USDA_FDC_API_KEY` exclusivamente en el servidor.
+**Estado: Preparada.** La resolución híbrida del servidor ya se usa en el cálculo manual y en códigos de barras. Continúan pendientes: integrar el dictado por lotes cuando 1.2 aporte catálogo/caché (consultar hasta 30 alimentos por dictado añadiría latencia, duplicación y riesgo de límites); confirmar `USDA_FDC_API_KEY` en producción; e implementar una selección estructurada por IA entre candidatos USDA reales cuando las reglas deterministas no deshagan la ambigüedad.
 
 Orden recomendado:
 
