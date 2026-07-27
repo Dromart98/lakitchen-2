@@ -104,7 +104,7 @@ Prioridad: crítica.
 
 ### 1.1 Sistema híbrido de fuentes
 
-**Estado: Preparada.** La resolución híbrida del servidor ya se usa en el cálculo manual y en códigos de barras, y el dictado por lotes reutiliza el catálogo nutricional mediante búsquedas agrupadas. Continúan pendientes: confirmar `USDA_FDC_API_KEY` en producción; e implementar una selección estructurada por IA entre candidatos USDA reales cuando las reglas deterministas no deshagan la ambigüedad.
+**Estado: Preparada.** La resolución híbrida del servidor ya se usa en el cálculo manual y en códigos de barras, el dictado por lotes reutiliza el catálogo nutricional mediante búsquedas agrupadas y los empates entre candidatos USDA reales se resuelven mediante selección estructurada y validada. Queda pendiente únicamente confirmar/configurar `USDA_FDC_API_KEY` en producción.
 
 Orden recomendado:
 

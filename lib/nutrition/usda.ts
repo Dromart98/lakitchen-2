@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { selectUsdaCandidateWithOpenAi } from "@/lib/openai/usda-candidate-selector";
 import { getInventoryNutritionFoodStateExpectation, type InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
 import { isCompleteNutrition, type NutritionResolution } from "@/modules/nutrition/resolution";
 
@@ -31,8 +32,13 @@ export function getUsdaEnergyKcal(foodNutrients: UsdaNutrient[]): number | undef
   return amount(2048) ?? amount(2047) ?? amount(1008);
 }
 
-export function selectUsdaCandidate(input: InventoryNutritionAiInput, candidates: z.infer<typeof foodSchema>[]) {
-  if (/^\s*(queso|cheese)\s*$/iu.test(input.name)) return null;
+export type UsdaCandidateSelection =
+  | { status: "selected"; candidate: z.infer<typeof foodSchema> }
+  | { status: "ambiguous"; candidates: z.infer<typeof foodSchema>[] }
+  | { status: "insufficient-match" };
+
+export function selectUsdaCandidate(input: InventoryNutritionAiInput, candidates: z.infer<typeof foodSchema>[]): UsdaCandidateSelection {
+  if (/^\s*(queso|cheese)\s*$/iu.test(input.name)) return { status: "insufficient-match" };
   const expected = getInventoryNutritionFoodStateExpectation(input.name)?.state ?? null;
   const queryWords = words(toSearchQuery(input.name));
   const scored = candidates
@@ -45,11 +51,13 @@ export function selectUsdaCandidate(input: InventoryNutritionAiInput, candidates
       return { candidate, score: overlap * 3 + (stateMatch ? 4 : 0), stateConflict };
     }).filter((entry) => !entry.stateConflict && entry.score >= 7)
     .sort((a, b) => b.score - a.score);
-  if (!scored[0] || (scored[1] && scored[0].score === scored[1].score)) return null;
-  return scored[0].candidate;
+  if (!scored[0]) return { status: "insufficient-match" };
+  const top = scored.filter((entry) => entry.score === scored[0].score).map((entry) => entry.candidate);
+  if (top.length > 1) return { status: "ambiguous", candidates: top.slice(0, 5) };
+  return { status: "selected", candidate: top[0] };
 }
 
-export async function lookupUsdaFood(input: InventoryNutritionAiInput, options: { apiKey?: string; fetchImpl?: typeof fetch } = {}): Promise<NutritionResolution> {
+export async function lookupUsdaFood(input: InventoryNutritionAiInput, options: { apiKey?: string; openAiApiKey?: string; openAiModel?: string; fetchImpl?: typeof fetch } = {}): Promise<NutritionResolution> {
   const apiKey = options.apiKey ?? process.env.USDA_FDC_API_KEY;
   if (!apiKey) return { status: "unresolved", reason: "not-configured" };
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -61,8 +69,20 @@ export async function lookupUsdaFood(input: InventoryNutritionAiInput, options: 
     if (!search.ok) return { status: "unresolved", reason: "provider-error" };
     const parsedSearch = searchSchema.safeParse(await search.json());
     if (!parsedSearch.success) return { status: "unresolved", reason: "provider-error" };
-    const selected = selectUsdaCandidate(input, parsedSearch.data.foods);
-    if (!selected) return { status: "needs-clarification", message: "No hemos encontrado una coincidencia suficientemente clara. Añade más detalles sobre el alimento y su estado." };
+    const selection = selectUsdaCandidate(input, parsedSearch.data.foods);
+    if (selection.status === "insufficient-match") return { status: "needs-clarification", message: "No hemos encontrado una coincidencia suficientemente clara. Añade más detalles sobre el alimento y su estado." };
+    let selected: z.infer<typeof foodSchema>;
+    if (selection.status === "selected") {
+      selected = selection.candidate;
+    } else {
+      const openAiApiKey = options.openAiApiKey ?? process.env.OPENAI_API_KEY;
+      if (!openAiApiKey) return { status: "needs-clarification", message: "Hay varias coincidencias posibles. Añade más detalles sobre el alimento y su estado." };
+      const aiSelection = await selectUsdaCandidateWithOpenAi(input, getInventoryNutritionFoodStateExpectation(input.name)?.state ?? null, selection.candidates, { apiKey: openAiApiKey, model: options.openAiModel, fetchImpl });
+      if (aiSelection.status !== "selected") return { status: "needs-clarification", message: "Hay varias coincidencias posibles. Añade más detalles sobre el alimento y su estado." };
+      const selectedCandidate = selection.candidates.find((candidate) => candidate.fdcId === aiSelection.fdcId);
+      if (!selectedCandidate) return { status: "needs-clarification", message: "Hay varias coincidencias posibles. Añade más detalles sobre el alimento y su estado." };
+      selected = selectedCandidate;
+    }
     const detail = await fetchImpl(`${baseUrl}/food/${selected.fdcId}?api_key=${encodeURIComponent(apiKey)}`, { signal: AbortSignal.timeout(timeoutMs), cache: "no-store" });
     if (!detail.ok) return { status: "unresolved", reason: "provider-error" };
     const parsedDetail = detailSchema.safeParse(await detail.json());

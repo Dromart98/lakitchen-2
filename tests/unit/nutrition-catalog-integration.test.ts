@@ -78,20 +78,21 @@ describe("catalog-first integrations", () => {
     expect(otherResult).toMatchObject({ items: [{ calories: 999 }] });
   });
 
-  it("caches the requested Spanish identity and avoids a second USDA/OpenAI resolution", async () => {
+  it("caches an AI-selected USDA candidate and avoids every external call on the second resolution", async () => {
     const { client, rows } = catalogClient([]);
     const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
     const fetchImpl = vi.fn()
-      .mockResolvedValueOnce(json({ foods: [{ fdcId: 42, description: "Rice, cooked", dataType: "Foundation" }] }))
+      .mockResolvedValueOnce(json({ foods: [{ fdcId: 41, description: "Rice, white, cooked", dataType: "Foundation" }, { fdcId: 42, description: "Rice, brown, cooked", dataType: "Foundation" }] }))
+      .mockResolvedValueOnce(json({ status: "completed", output_text: JSON.stringify({ status: "selected", fdc_id: 42 }) }))
       .mockResolvedValueOnce(json({ fdcId: 42, description: "Rice, cooked", dataType: "Foundation", foodNutrients: [{ nutrient: { id: 2047 }, amount: 130 }, { nutrient: { id: 1003 }, amount: 2.7 }, { nutrient: { id: 1005 }, amount: 28 }, { nutrient: { id: 1004 }, amount: 0.3 }] }));
     const input = { name: "Arroz cocido", quantity: 100, unit: "g", category: "carbohydrate" } as const;
     const first = await resolveInventoryNutritionForUser(client, "user-a", input, { usdaApiKey: "usda", openAiApiKey: "openai", fetchImpl });
     expect(first).toMatchObject({ status: "resolved", provenance: { source: "usda", externalId: "42" } });
     expect(rows[0]).toMatchObject({ normalized_name: "arroz cocido", aliases: ["rice cooked"], external_id: "42" });
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
     const second = await resolveInventoryNutritionForUser(client, "user-a", input, { usdaApiKey: "usda", openAiApiKey: "openai", fetchImpl });
     expect(second).toMatchObject({ status: "resolved", provenance: { source: "usda" } });
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
   it("keeps a reviewed raw state for Arroz and reuses it in the next voice batch", async () => {
