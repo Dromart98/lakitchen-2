@@ -5,6 +5,7 @@ import type { InventoryItemRecord } from "@/modules/inventory/inventory.types";
 
 const items: InventoryItemRecord[] = [
   {
+    food_catalog_item_id: null,
     id: "pantry-item",
     name: "Arroz",
     location: "pantry",
@@ -20,6 +21,7 @@ const items: InventoryItemRecord[] = [
     created_at: "2026-01-01T00:00:00.000Z",
   },
   {
+    food_catalog_item_id: null,
     id: "fridge-item",
     name: "Yogur",
     location: "fridge",
@@ -35,6 +37,7 @@ const items: InventoryItemRecord[] = [
     created_at: "2026-01-01T00:00:00.000Z",
   },
   {
+    food_catalog_item_id: null,
     id: "freezer-item",
     name: "Pollo",
     location: "freezer",

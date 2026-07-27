@@ -96,7 +96,12 @@ export function catalogRequestKey(name: string, state: NutritionCatalogFoodState
 }
 
 export async function persistNutritionCatalogRow(client: CatalogClient, incoming: NutritionCatalogRow) {
-  if (!complete(incoming) || !incoming.normalized_name) return false;
+  const result = await persistNutritionCatalogRowWithIdentity(client, incoming);
+  return result.persisted;
+}
+
+export async function persistNutritionCatalogRowWithIdentity(client: CatalogClient, incoming: NutritionCatalogRow) {
+  if (!complete(incoming) || !incoming.normalized_name) return { persisted: false, foodCatalogItemId: null };
   const { resolveOrCreateFoodCatalogItemForUser } = await import("@/modules/nutrition/food-catalog");
   let foodCatalogItemId = incoming.food_catalog_item_id ?? null;
   try {
@@ -111,7 +116,7 @@ export async function persistNutritionCatalogRow(client: CatalogClient, incoming
   const payload = { ...incoming, food_catalog_item_id: foodCatalogItemId, aliases: [...new Set(incoming.aliases.map(normalizeNutritionCatalogName).filter(Boolean))] };
   const result = await client.rpc("upsert_nutrition_catalog_items", { p_items: [payload] });
   if (result.error) throw new Error(result.error.message);
-  return Number(result.data) > 0;
+  return { persisted: Number(result.data) > 0, foodCatalogItemId };
 }
 
 export function catalogRowFromResolution(userId: string, requestedName: string, resolution: ResolvedNutrition): NutritionCatalogRow {
@@ -134,12 +139,17 @@ export function confirmedCatalogRow(input: { userId: string; name: string; unit:
 }
 
 export async function persistConfirmedNutritionBatch(client: CatalogClient, rows: NutritionCatalogRow[]) {
+  const result = await persistConfirmedNutritionBatchWithIdentities(client, rows);
+  return result.persistedCount;
+}
+
+export async function persistConfirmedNutritionBatchWithIdentities(client: CatalogClient, rows: NutritionCatalogRow[]) {
   const deduplicated = new Map<string, NutritionCatalogRow>();
   for (const row of rows) {
     if (!complete(row) || !row.user_confirmed || !row.normalized_name) continue;
     deduplicated.set(catalogRequestKey(row.normalized_name, row.food_state, row.nutrition_basis), row);
   }
-  if (!deduplicated.size) return 0;
+  if (!deduplicated.size) return { persistedCount: 0, foodCatalogItemIds: new Map<string, string | null>() };
   const { resolveOrCreateFoodCatalogItemForUser } = await import("@/modules/nutrition/food-catalog");
   const payload = await Promise.all([...deduplicated.values()].map(async (row) => {
     let foodCatalogItemId = row.food_catalog_item_id ?? null;
@@ -156,5 +166,8 @@ export async function persistConfirmedNutritionBatch(client: CatalogClient, rows
   }));
   const result = await client.rpc("upsert_nutrition_catalog_items", { p_items: payload });
   if (result.error) throw new Error(result.error.message);
-  return Number(result.data);
+  return {
+    persistedCount: Number(result.data),
+    foodCatalogItemIds: new Map(payload.map((row) => [catalogRequestKey(row.normalized_name, row.food_state, row.nutrition_basis), row.food_catalog_item_id ?? null])),
+  };
 }

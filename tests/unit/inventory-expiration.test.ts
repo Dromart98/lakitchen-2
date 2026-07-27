@@ -9,6 +9,7 @@ import type { InventoryItemRecord } from "@/modules/inventory/inventory.types";
 
 function item(id: string, expires_at: string | null): InventoryItemRecord {
   return {
+    food_catalog_item_id: null,
     id,
     name: `Producto ${id}`,
     location: "pantry",

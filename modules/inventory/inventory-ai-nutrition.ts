@@ -60,6 +60,7 @@ export type InventoryNutritionAiConfidence = "low" | "medium" | "high";
 export type InventoryNutritionAiFoodState = "raw" | "cooked" | "processed" | "not_applicable" | "unknown";
 
 export type InventoryNutritionAiEstimate = {
+  food_catalog_item_id?: string | null;
   nutrition_basis: InventoryNutritionBasis;
   calories: number;
   protein_g: number;
