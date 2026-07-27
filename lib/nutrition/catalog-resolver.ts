@@ -19,7 +19,7 @@ export async function resolveInventoryNutritionForUser(client: any, userId: stri
   const resolution = await resolveInventoryNutrition(input, options);
   if (resolution.status === "resolved") {
     const compatibleFoodState = foodState === "drained" || foodState === "frozen" ? "unknown" : foodState;
-    try { await persistNutritionCatalogRow(client, catalogRowFromResolution(userId, { ...resolution, foodState: compatibleFoodState })); }
+    try { await persistNutritionCatalogRow(client, catalogRowFromResolution(userId, input.name, { ...resolution, foodState: compatibleFoodState })); }
     catch (error) { console.warn("Supabase could not cache resolved nutrition:", error instanceof Error ? error.message : error); }
   }
   return resolution;

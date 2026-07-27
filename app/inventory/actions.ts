@@ -17,7 +17,7 @@ import { lookupOpenFoodFactsProduct } from "@/lib/nutrition/open-food-facts";
 import { resolveInventoryNutritionForUser } from "@/lib/nutrition/catalog-resolver";
 import { confirmedCatalogRow, persistConfirmedNutritionBatch } from "@/modules/nutrition/catalog";
 import { parseInventoryNutritionAiInput, type InventoryNutritionAiEstimate, type InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
-import { toVoiceInventoryBatchSaveInput } from "@/modules/inventory/voice-inventory-batch-save";
+import { toVoiceInventoryBatchSaveInput, VoiceInventoryBatchCatalogMetadataSchema } from "@/modules/inventory/voice-inventory-batch-save";
 
 type InventoryLocation = "pantry" | "fridge" | "freezer";
 type InventoryUnit = "ud" | "g" | "kg" | "ml" | "l";
@@ -471,9 +471,15 @@ export type SaveVoiceInventoryBatchResult =
   | { status: "success"; outcome: "saved" | "already-saved"; insertedCount: number; message: string }
   | { status: "error"; code: "invalid-input" | "invalid-batch-payload" | "submission-conflict" | "save-failed"; message: string };
 
-export async function saveVoiceInventoryBatchAction(submissionId: string, items: unknown): Promise<SaveVoiceInventoryBatchResult> {
+export async function saveVoiceInventoryBatchAction(submissionId: string, items: unknown, catalogMetadata: unknown): Promise<SaveVoiceInventoryBatchResult> {
   const parsed = toVoiceInventoryBatchSaveInput(submissionId, items);
   if (!parsed.success) return { status: "error", code: "invalid-input", message: "Revisa los productos antes de añadirlos al inventario." };
+  const parsedCatalogMetadata = VoiceInventoryBatchCatalogMetadataSchema.safeParse(catalogMetadata);
+  const alignedCatalogMetadata = parsedCatalogMetadata.success
+    && parsedCatalogMetadata.data.length === parsed.data.items.length
+    && parsedCatalogMetadata.data.every((metadata, index) => metadata.name === parsed.data.items[index].name)
+    ? parsedCatalogMetadata.data
+    : null;
 
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "voice inventory batch save");
@@ -488,7 +494,7 @@ export async function saveVoiceInventoryBatchAction(submissionId: string, items:
   const result = data?.[0];
   if (!result || !["saved", "already-saved"].includes(result.status) || !Number.isInteger(result.inserted_count)) return { status: "error", code: "save-failed", message: "No se pudieron añadir los productos. Inténtalo de nuevo." };
   try {
-    await persistConfirmedNutritionBatch(supabase, parsed.data.items.map((item) => confirmedCatalogRow({ userId: user.id, name: item.name, unit: item.unit, nutritionBasis: item.nutrition_basis, calories: item.calories, proteinG: item.protein_g, carbsG: item.carbs_g, fatG: item.fat_g })));
+    if (alignedCatalogMetadata) await persistConfirmedNutritionBatch(supabase, parsed.data.items.map((item, index) => confirmedCatalogRow({ userId: user.id, name: item.name, unit: item.unit, foodState: alignedCatalogMetadata[index].food_state, nutritionBasis: item.nutrition_basis, calories: item.calories, proteinG: item.protein_g, carbsG: item.carbs_g, fatG: item.fat_g })));
   } catch (error) {
     console.warn("Supabase could not cache the confirmed voice batch nutrition:", error instanceof Error ? error.message : error);
   }

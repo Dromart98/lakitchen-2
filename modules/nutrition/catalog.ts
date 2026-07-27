@@ -1,4 +1,5 @@
 import type { InventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
+import { getInventoryNutritionFoodStateExpectation } from "@/modules/inventory/inventory-ai-nutrition";
 import type { NutritionSource, ResolvedNutrition } from "@/modules/nutrition/resolution";
 
 export const NUTRITION_CATALOG_FRESHNESS_MS: Record<NutritionSource, number> = {
@@ -16,9 +17,10 @@ export type NutritionCatalogRow = {
   calories: number; protein_g: number; carbs_g: number; fat_g: number;
   source: NutritionSource; external_id: string | null; match_confidence: "low" | "medium" | "high";
   user_confirmed: boolean; verified: boolean; resolved_at: string; updated_at?: string;
+  refresh_after: string | null;
 };
 
-const SOURCE_PRIORITY: Record<NutritionSource, number> = { ai: 1, "open-food-facts": 2, usda: 3, "barcode-memory": 4, user: 5 };
+const SOURCE_PRIORITY: Record<NutritionSource, number> = { ai: 1, usda: 2, "open-food-facts": 3, "barcode-memory": 4, user: 5 };
 
 export function normalizeNutritionCatalogName(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es-ES")
@@ -26,28 +28,28 @@ export function normalizeNutritionCatalogName(value: string) {
 }
 
 export function inferCatalogFoodState(name: string): NutritionCatalogFoodState {
-  const value = normalizeNutritionCatalogName(name);
-  if (/(^| )(crudo|cruda|crudos|crudas)( |$)/.test(value)) return "raw";
-  if (/(^| )(cocido|cocida|cocidos|cocidas)( |$)/.test(value)) return "cooked";
-  if (/(^| )(escurrido|escurrida)( |$)/.test(value)) return "drained";
-  if (/(^| )(congelado|congelada)( |$)/.test(value)) return "frozen";
-  if (/(^| )(procesado|procesada)( |$)/.test(value)) return "processed";
-  return "unknown";
+  return getInventoryNutritionFoodStateExpectation(name)?.state ?? "unknown";
 }
 
 export function catalogBasisForUnit(unit: string): InventoryNutritionBasis {
   return unit === "ud" ? "per_unit" : unit === "ml" || unit === "l" ? "per_100ml" : "per_100g";
 }
 
-export function isCatalogRowFresh(row: Pick<NutritionCatalogRow, "source" | "user_confirmed" | "resolved_at">, now = Date.now()) {
-  if (row.user_confirmed) return true;
-  const resolvedAt = Date.parse(row.resolved_at);
-  return Number.isFinite(resolvedAt) && now - resolvedAt <= NUTRITION_CATALOG_FRESHNESS_MS[row.source];
+export function getCatalogRefreshAfter(source: NutritionSource, resolvedAt: string) {
+  const duration = NUTRITION_CATALOG_FRESHNESS_MS[source];
+  return Number.isFinite(duration) ? new Date(Date.parse(resolvedAt) + duration).toISOString() : null;
 }
 
-export function shouldReplaceCatalogRow(existing: NutritionCatalogRow, incoming: NutritionCatalogRow) {
-  if (existing.user_confirmed && !incoming.user_confirmed) return false;
-  if (incoming.user_confirmed) return true;
+export function isCatalogRowFresh(row: Pick<NutritionCatalogRow, "user_confirmed" | "refresh_after">, now = Date.now()) {
+  if (row.user_confirmed) return true;
+  const refreshAfter = row.refresh_after === null ? Number.NaN : Date.parse(row.refresh_after);
+  return Number.isFinite(refreshAfter) && now <= refreshAfter;
+}
+
+export function shouldReplaceCatalogRow(existing: NutritionCatalogRow, incoming: NutritionCatalogRow, now = Date.now()) {
+  if (incoming.user_confirmed) return incoming.source === "user" || existing.source !== "user";
+  if (existing.user_confirmed) return false;
+  if (!isCatalogRowFresh(existing, now)) return true;
   return SOURCE_PRIORITY[incoming.source] >= SOURCE_PRIORITY[existing.source];
 }
 
@@ -67,7 +69,7 @@ export function selectCatalogMatch(rows: NutritionCatalogRow[], name: string, st
 }
 
 type CatalogClient = any;
-const CATALOG_COLUMNS = "id,user_id,normalized_name,aliases,food_state,nutrition_basis,calories,protein_g,carbs_g,fat_g,source,external_id,match_confidence,user_confirmed,verified,resolved_at,updated_at";
+const CATALOG_COLUMNS = "id,user_id,normalized_name,aliases,food_state,nutrition_basis,calories,protein_g,carbs_g,fat_g,source,external_id,match_confidence,user_confirmed,verified,resolved_at,refresh_after,updated_at";
 
 export async function findNutritionCatalogMatches(client: CatalogClient, userId: string, requests: Array<{ name: string; foodState: NutritionCatalogFoodState; nutritionBasis: InventoryNutritionBasis }>) {
   const keys = [...new Set(requests.map((request) => normalizeNutritionCatalogName(request.name)).filter(Boolean))];
@@ -95,33 +97,29 @@ export function catalogRequestKey(name: string, state: NutritionCatalogFoodState
 
 export async function persistNutritionCatalogRow(client: CatalogClient, incoming: NutritionCatalogRow) {
   if (!complete(incoming) || !incoming.normalized_name) return false;
-  const query = client.from("nutrition_catalog_items").select(CATALOG_COLUMNS)
-    .eq("user_id", incoming.user_id).eq("normalized_name", incoming.normalized_name)
-    .eq("food_state", incoming.food_state).eq("nutrition_basis", incoming.nutrition_basis).maybeSingle();
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  if (data && !shouldReplaceCatalogRow(data as NutritionCatalogRow, incoming)) return false;
   const payload = { ...incoming, aliases: [...new Set(incoming.aliases.map(normalizeNutritionCatalogName).filter(Boolean))] };
-  const result = await client.from("nutrition_catalog_items").upsert(payload, { onConflict: "user_id,normalized_name,food_state,nutrition_basis" });
+  const result = await client.rpc("upsert_nutrition_catalog_items", { p_items: [payload] });
   if (result.error) throw new Error(result.error.message);
-  return true;
+  return Number(result.data) > 0;
 }
 
-export function catalogRowFromResolution(userId: string, resolution: ResolvedNutrition): NutritionCatalogRow {
-  return { user_id: userId, normalized_name: normalizeNutritionCatalogName(resolution.normalizedName), aliases: [],
+export function catalogRowFromResolution(userId: string, requestedName: string, resolution: ResolvedNutrition): NutritionCatalogRow {
+  const normalizedRequestedName = normalizeNutritionCatalogName(requestedName);
+  const normalizedProviderName = normalizeNutritionCatalogName(resolution.normalizedName);
+  return { user_id: userId, normalized_name: normalizedRequestedName, aliases: normalizedProviderName && normalizedProviderName !== normalizedRequestedName ? [normalizedProviderName] : [],
     food_state: resolution.foodState, nutrition_basis: resolution.nutritionBasis, calories: resolution.calories,
     protein_g: resolution.proteinG, carbs_g: resolution.carbsG, fat_g: resolution.fatG,
     source: resolution.provenance.source, external_id: resolution.provenance.externalId ?? null,
     match_confidence: resolution.needsReview ? "medium" : "high", user_confirmed: false,
     verified: resolution.provenance.source === "usda" || resolution.provenance.source === "open-food-facts",
-    resolved_at: resolution.provenance.resolvedAt };
+    resolved_at: resolution.provenance.resolvedAt, refresh_after: getCatalogRefreshAfter(resolution.provenance.source, resolution.provenance.resolvedAt) };
 }
 
-export function confirmedCatalogRow(input: { userId: string; name: string; unit: string; nutritionBasis: InventoryNutritionBasis; calories: number; proteinG: number; carbsG: number; fatG: number; source?: "user" | "barcode-memory"; externalId?: string | null }): NutritionCatalogRow {
-  return { user_id: input.userId, normalized_name: normalizeNutritionCatalogName(input.name), aliases: [], food_state: inferCatalogFoodState(input.name),
+export function confirmedCatalogRow(input: { userId: string; name: string; unit: string; foodState?: NutritionCatalogFoodState; nutritionBasis: InventoryNutritionBasis; calories: number; proteinG: number; carbsG: number; fatG: number; source?: "user" | "barcode-memory"; externalId?: string | null }): NutritionCatalogRow {
+  return { user_id: input.userId, normalized_name: normalizeNutritionCatalogName(input.name), aliases: [], food_state: input.foodState ?? inferCatalogFoodState(input.name),
     nutrition_basis: input.nutritionBasis, calories: input.calories, protein_g: input.proteinG, carbs_g: input.carbsG, fat_g: input.fatG,
     source: input.source ?? "user", external_id: input.externalId ?? null, match_confidence: "high", user_confirmed: true,
-    verified: true, resolved_at: new Date().toISOString() };
+    verified: true, resolved_at: new Date().toISOString(), refresh_after: null };
 }
 
 export async function persistConfirmedNutritionBatch(client: CatalogClient, rows: NutritionCatalogRow[]) {
@@ -131,9 +129,7 @@ export async function persistConfirmedNutritionBatch(client: CatalogClient, rows
     deduplicated.set(catalogRequestKey(row.normalized_name, row.food_state, row.nutrition_basis), row);
   }
   if (!deduplicated.size) return 0;
-  const result = await client.from("nutrition_catalog_items").upsert([...deduplicated.values()], {
-    onConflict: "user_id,normalized_name,food_state,nutrition_basis",
-  });
+  const result = await client.rpc("upsert_nutrition_catalog_items", { p_items: [...deduplicated.values()] });
   if (result.error) throw new Error(result.error.message);
-  return deduplicated.size;
+  return Number(result.data);
 }

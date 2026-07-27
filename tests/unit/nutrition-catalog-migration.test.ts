@@ -12,6 +12,7 @@ describe("nutrition catalog migration", () => {
     for (const macro of ["calories", "protein_g", "carbs_g", "fat_g"]) expect(sql).toContain(`${macro} >= 0`);
     expect(sql).toContain("using gin (aliases)");
     expect(sql).toContain("enable row level security");
+    expect(sql).toContain("refresh_after timestamptz");
   });
   it("isolates every operation and checks both sides of updates", () => {
     expect(sql.match(/\(select auth\.uid\(\)\) = user_id/g)).toHaveLength(5);
@@ -20,5 +21,13 @@ describe("nutrition catalog migration", () => {
     expect(sql).toMatch(/for update[\s\S]*?using \(\(select auth\.uid\(\)\) = user_id\)[\s\S]*?with check \(\(select auth\.uid\(\)\) = user_id\)/);
     expect(sql).toMatch(/for delete[\s\S]*?using \(\(select auth\.uid\(\)\) = user_id\)/);
     expect(sql).not.toMatch(/security definer/i);
+    expect(sql).toMatch(/security invoker/i);
+    expect(sql).toContain("on conflict (user_id, normalized_name, food_state, nutrition_basis) do update");
+    expect(sql).toContain("not public.nutrition_catalog_items.user_confirmed");
+    expect(sql).toContain("public.nutrition_catalog_items.refresh_after <= pg_catalog.now()");
+    expect(sql).toContain("excluded.source = 'user'");
+    expect(sql).toContain("public.nutrition_catalog_items.source <> 'user'");
+    expect(sql).toContain("revoke all on function public.upsert_nutrition_catalog_items(jsonb) from public, anon");
+    expect(sql).toContain("grant execute on function public.upsert_nutrition_catalog_items(jsonb) to authenticated");
   });
 });
