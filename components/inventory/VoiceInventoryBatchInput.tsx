@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { estimateVoiceInventoryBatchAction, saveVoiceInventoryBatchAction } from "@/app/inventory/actions";
 import { usePersistentSpeechRecognition } from "@/components/voice/usePersistentSpeechRecognition";
 import { VOICE_INVENTORY_BATCH_MAX_LENGTH, type VoiceInventoryDraftItem } from "@/modules/inventory/voice-inventory-batch";
-import { buildVoiceInventoryBatchSaveItems } from "@/modules/inventory/voice-inventory-batch-save";
+import { buildVoiceInventoryBatchCatalogMetadata, buildVoiceInventoryBatchSaveItems } from "@/modules/inventory/voice-inventory-batch-save";
 import { mergeVoiceTranscript } from "@/modules/voice/browser-speech-recognition";
 
 import { VoiceInventoryBatchPreview } from "./VoiceInventoryBatchPreview";
@@ -65,7 +65,8 @@ export function VoiceInventoryBatchInput() {
   async function save() {
     if (saving || !submissionId) return;
     const saveItems = buildVoiceInventoryBatchSaveItems(items);
-    if (!saveItems.success) {
+    const catalogMetadata = buildVoiceInventoryBatchCatalogMetadata(items);
+    if (!saveItems.success || !catalogMetadata.success) {
       setMessage("Revisa los productos antes de añadirlos al inventario.");
       return;
     }
@@ -73,7 +74,7 @@ export function VoiceInventoryBatchInput() {
     setSaving(true);
     setMessage(null);
     try {
-      const result = await saveVoiceInventoryBatchAction(submissionId, saveItems.data);
+      const result = await saveVoiceInventoryBatchAction(submissionId, saveItems.data, catalogMetadata.data);
       if (result.status === "error") {
         setMessage(result.message);
         return;

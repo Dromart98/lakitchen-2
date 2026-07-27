@@ -13,6 +13,7 @@ import {
   validateBarcodeProductQuantity,
   validateBarcodeProductUnit,
 } from "@/modules/barcodes/barcode-catalog";
+import { confirmedCatalogRow, persistConfirmedNutritionBatch } from "@/modules/nutrition/catalog";
 
 const BARCODE_CATALOG_PATH = "/inventory/barcodes";
 
@@ -134,6 +135,15 @@ export async function updateRememberedBarcodeProductAction(formData: FormData) {
   }
 
   if (!data) redirectToError("not-found");
+
+  if (nutritionBasis && calories !== null && proteinG !== null && carbsG !== null && fatG !== null) {
+    try {
+      await persistConfirmedNutritionBatch(supabase, [confirmedCatalogRow({ userId: user.id, name, unit: defaultUnit,
+        nutritionBasis, calories, proteinG, carbsG, fatG, source: "barcode-memory" })]);
+    } catch (catalogError) {
+      console.warn("Supabase could not update the nutrition catalog:", catalogError instanceof Error ? catalogError.message : catalogError);
+    }
+  }
 
   revalidatePath(BARCODE_CATALOG_PATH);
   redirect(`${BARCODE_CATALOG_PATH}?barcodeCatalogSuccess=updated`);

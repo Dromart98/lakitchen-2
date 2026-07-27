@@ -104,7 +104,7 @@ Prioridad: crítica.
 
 ### 1.1 Sistema híbrido de fuentes
 
-**Estado: Preparada.** La resolución híbrida del servidor ya se usa en el cálculo manual y en códigos de barras. Continúan pendientes: integrar el dictado por lotes cuando 1.2 aporte catálogo/caché (consultar hasta 30 alimentos por dictado añadiría latencia, duplicación y riesgo de límites); confirmar `USDA_FDC_API_KEY` en producción; e implementar una selección estructurada por IA entre candidatos USDA reales cuando las reglas deterministas no deshagan la ambigüedad.
+**Estado: Preparada.** La resolución híbrida del servidor ya se usa en el cálculo manual y en códigos de barras, y el dictado por lotes reutiliza el catálogo nutricional mediante búsquedas agrupadas. Continúan pendientes: confirmar `USDA_FDC_API_KEY` en producción; e implementar una selección estructurada por IA entre candidatos USDA reales cuando las reglas deterministas no deshagan la ambigüedad.
 
 Orden recomendado:
 
@@ -122,6 +122,8 @@ Regla de interfaz:
 - Mantener la procedencia únicamente de forma interna para caché, control de calidad y diagnóstico.
 
 ### 1.2 Catálogo nutricional interno
+
+**Estado: Implementada/cerrada.** El catálogo nutricional privado por usuario se consulta antes de la resolución externa, conserva correcciones confirmadas, aplica frescura según la fuente y enriquece el dictado con búsquedas deduplicadas y agrupadas sin peticiones externas por producto.
 
 Crear un catálogo central reutilizable con:
 

@@ -17,6 +17,15 @@ export const SaveVoiceInventoryBatchInputSchema = z.object({ submissionId: z.str
 export type SaveVoiceInventoryBatchInput = z.infer<typeof SaveVoiceInventoryBatchInputSchema>;
 export function toVoiceInventoryBatchSaveInput(submissionId: string, items: unknown) { return SaveVoiceInventoryBatchInputSchema.safeParse({ submissionId, items }); }
 
+export const VoiceInventoryBatchCatalogMetadataSchema = z.array(z.object({
+  name: z.string().trim().min(1).max(120),
+  food_state: z.enum(["raw", "cooked", "processed", "not_applicable", "unknown"]),
+}).strict()).min(1).max(30);
+
+export function buildVoiceInventoryBatchCatalogMetadata(items: VoiceInventoryDraftItem[]) {
+  return VoiceInventoryBatchCatalogMetadataSchema.safeParse(items.map((item) => ({ name: item.name, food_state: item.food_state })));
+}
+
 /** Maps editable drafts to the only ten columns accepted by the batch RPC. */
 export function buildVoiceInventoryBatchSaveItems(items: VoiceInventoryDraftItem[]) {
   return z.array(VoiceInventoryBatchSaveItemSchema).min(1).max(30).safeParse(items.map((item) => ({
