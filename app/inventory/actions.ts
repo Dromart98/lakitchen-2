@@ -14,7 +14,8 @@ import {
 } from "@/modules/inventory/inventory-nutrition";
 import { isMealType } from "@/modules/meals/meal-types";
 import { lookupOpenFoodFactsProduct } from "@/lib/nutrition/open-food-facts";
-import { resolveInventoryNutrition } from "@/lib/nutrition/hybrid-resolver";
+import { resolveInventoryNutritionForUser } from "@/lib/nutrition/catalog-resolver";
+import { confirmedCatalogRow, persistConfirmedNutritionBatch } from "@/modules/nutrition/catalog";
 import { parseInventoryNutritionAiInput, type InventoryNutritionAiEstimate, type InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
 import { toVoiceInventoryBatchSaveInput } from "@/modules/inventory/voice-inventory-batch-save";
 
@@ -55,9 +56,9 @@ export async function estimateInventoryNutritionAction(input: InventoryNutrition
   if (!validatedInput) return inventoryNutritionAiError("invalid-input");
 
   const supabase = await createClient();
-  await requireAuthenticatedUser(supabase, "inventory nutrition AI estimate");
+  const user = await requireAuthenticatedUser(supabase, "inventory nutrition AI estimate");
 
-  const result = await resolveInventoryNutrition(validatedInput);
+  const result = await resolveInventoryNutritionForUser(supabase, user.id, validatedInput);
   if (result.status === "needs-clarification") return result;
   if (result.status !== "resolved") return inventoryNutritionAiError(result.reason === "not-configured" ? "not-configured" : "provider-error");
   return { status: "success", estimate: { nutrition_basis: result.nutritionBasis, calories: result.calories, protein_g: result.proteinG, carbs_g: result.carbsG, fat_g: result.fatG, confidence: "medium", assumptions: result.assumptions } };
@@ -204,6 +205,15 @@ function getValidatedInventoryFields(formData: FormData) {
   };
 }
 
+async function cacheConfirmedInventoryNutrition(supabase: any, input: { userId: string; name: string; unit: string; nutritionBasis: ReturnType<typeof getValidatedInventoryFields>["nutritionBasis"]; calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null; source?: "user" | "barcode-memory"; externalId?: string | null }) {
+  if (!input.nutritionBasis || ![input.calories, input.proteinG, input.carbsG, input.fatG].every((value) => typeof value === "number" && Number.isFinite(value) && value >= 0)) return;
+  try {
+    await persistConfirmedNutritionBatch(supabase, [confirmedCatalogRow({ ...input, nutritionBasis: input.nutritionBasis, calories: input.calories!, proteinG: input.proteinG!, carbsG: input.carbsG!, fatG: input.fatG! })]);
+  } catch (error) {
+    console.warn("Supabase could not update the nutrition catalog:", error instanceof Error ? error.message : error);
+  }
+}
+
 export async function addInventoryItemAction(formData: FormData) {
   const { name, quantity, unit, location, category, expiresAt, nutritionBasis, calories, proteinG, carbsG, fatG } = getValidatedInventoryFields(formData);
   const supabase = await createClient();
@@ -264,6 +274,9 @@ export async function addInventoryItemAction(formData: FormData) {
     }
   }
 
+  await cacheConfirmedInventoryNutrition(supabase, { userId: user.id, name, unit, nutritionBasis, calories, proteinG, carbsG, fatG,
+    source: rememberBarcode && barcodeValidation.ok ? "barcode-memory" : "user", externalId: barcodeValidation.ok ? barcodeValidation.barcode : null });
+
   revalidatePath(INVENTORY_PATH);
   redirect(`${INVENTORY_PATH}?inventorySuccess=item-created`);
 }
@@ -302,6 +315,8 @@ export async function updateInventoryItemAction(formData: FormData) {
   }
 
   if (!data?.length) redirect(`${INVENTORY_PATH}?inventoryError=update-not-found`);
+
+  await cacheConfirmedInventoryNutrition(supabase, { userId: user.id, name, unit, nutritionBasis, calories, proteinG, carbsG, fatG });
 
   revalidatePath(INVENTORY_PATH);
   redirect(`${INVENTORY_PATH}?inventorySuccess=item-updated`);
@@ -437,11 +452,19 @@ export async function estimateVoiceInventoryBatchAction(text: string) {
   const input = parseVoiceInventoryBatchInput(text);
   if (!input) return { status: "error" as const, code: "invalid-input" as const, message: "Escribe una lista de hasta 4.000 caracteres." };
   const supabase = await createClient();
-  await requireAuthenticatedUser(supabase, "voice inventory batch estimate");
+  const user = await requireAuthenticatedUser(supabase, "voice inventory batch estimate");
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { status: "error" as const, code: "not-configured" as const, message: "La estimación con IA no está configurada todavía." };
   const { generateVoiceInventoryBatch } = await import("@/lib/openai/voice-inventory-batch-generation");
-  return generateVoiceInventoryBatch(input, { apiKey, model: process.env.OPENAI_VOICE_INVENTORY_BATCH_MODEL || undefined });
+  const generated = await generateVoiceInventoryBatch(input, { apiKey, model: process.env.OPENAI_VOICE_INVENTORY_BATCH_MODEL || undefined });
+  if (generated.status === "error") return generated;
+  try {
+    const { applyNutritionCatalogToVoiceBatch } = await import("@/modules/inventory/voice-inventory-catalog");
+    return await applyNutritionCatalogToVoiceBatch(supabase, user.id, generated);
+  } catch (error) {
+    console.warn("Supabase could not apply the nutrition catalog to the voice draft:", error instanceof Error ? error.message : error);
+    return generated;
+  }
 }
 
 export type SaveVoiceInventoryBatchResult =
@@ -453,7 +476,7 @@ export async function saveVoiceInventoryBatchAction(submissionId: string, items:
   if (!parsed.success) return { status: "error", code: "invalid-input", message: "Revisa los productos antes de añadirlos al inventario." };
 
   const supabase = await createClient();
-  await requireAuthenticatedUser(supabase, "voice inventory batch save");
+  const user = await requireAuthenticatedUser(supabase, "voice inventory batch save");
   const { data, error } = await (supabase as any).rpc("save_voice_inventory_batch", {
     p_submission_id: parsed.data.submissionId,
     p_items: parsed.data.items,
@@ -464,6 +487,11 @@ export async function saveVoiceInventoryBatchAction(submissionId: string, items:
   }
   const result = data?.[0];
   if (!result || !["saved", "already-saved"].includes(result.status) || !Number.isInteger(result.inserted_count)) return { status: "error", code: "save-failed", message: "No se pudieron añadir los productos. Inténtalo de nuevo." };
+  try {
+    await persistConfirmedNutritionBatch(supabase, parsed.data.items.map((item) => confirmedCatalogRow({ userId: user.id, name: item.name, unit: item.unit, nutritionBasis: item.nutrition_basis, calories: item.calories, proteinG: item.protein_g, carbsG: item.carbs_g, fatG: item.fat_g })));
+  } catch (error) {
+    console.warn("Supabase could not cache the confirmed voice batch nutrition:", error instanceof Error ? error.message : error);
+  }
   revalidatePath(INVENTORY_PATH);
   return { status: "success", outcome: result.status, insertedCount: result.inserted_count, message: `Se añadieron ${result.inserted_count} productos al inventario.` };
 }
