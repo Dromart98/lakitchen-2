@@ -7,6 +7,7 @@ export type Unit = "g" | "kg" | "ml" | "l" | "unit" | "serving";
 
 export type InventoryItemRecord = {
   id: string;
+  food_catalog_item_id: string | null;
   name: string;
   location: InventoryLocation;
   category: InventoryCategory | null;

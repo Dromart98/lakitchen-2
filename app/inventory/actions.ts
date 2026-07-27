@@ -7,6 +7,7 @@ import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { validateBarcodeInput } from "@/modules/barcodes/barcode";
 import { createClient } from "@/lib/supabase/server";
 import { validateOptionalInventoryCategory, type InventoryCategory } from "@/modules/inventory/inventory-categories";
+import { getInventoryFoodIdentityUpdate } from "@/modules/inventory/inventory-food-identity";
 import {
   hasInventoryNutritionValues,
   isInventoryNutritionBasis,
@@ -15,7 +16,7 @@ import {
 import { isMealType } from "@/modules/meals/meal-types";
 import { lookupOpenFoodFactsProduct } from "@/lib/nutrition/open-food-facts";
 import { resolveInventoryNutritionForUser } from "@/lib/nutrition/catalog-resolver";
-import { confirmedCatalogRow, persistConfirmedNutritionBatch } from "@/modules/nutrition/catalog";
+import { catalogRequestKey, confirmedCatalogRow, normalizeNutritionCatalogName, persistConfirmedNutritionBatchWithIdentities } from "@/modules/nutrition/catalog";
 import { parseInventoryNutritionAiInput, type InventoryNutritionAiEstimate, type InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
 import { toVoiceInventoryBatchSaveInput, VoiceInventoryBatchCatalogMetadataSchema } from "@/modules/inventory/voice-inventory-batch-save";
 
@@ -61,7 +62,7 @@ export async function estimateInventoryNutritionAction(input: InventoryNutrition
   const result = await resolveInventoryNutritionForUser(supabase, user.id, validatedInput);
   if (result.status === "needs-clarification") return result;
   if (result.status !== "resolved") return inventoryNutritionAiError(result.reason === "not-configured" ? "not-configured" : "provider-error");
-  return { status: "success", estimate: { nutrition_basis: result.nutritionBasis, calories: result.calories, protein_g: result.proteinG, carbs_g: result.carbsG, fat_g: result.fatG, confidence: "medium", assumptions: result.assumptions } };
+  return { status: "success", estimate: { nutrition_basis: result.nutritionBasis, calories: result.calories, protein_g: result.proteinG, carbs_g: result.carbsG, fat_g: result.fatG, confidence: "medium", assumptions: result.assumptions, food_catalog_item_id: result.foodCatalogItemId ?? null } };
 }
 
 function isInventoryLocation(value: string): value is InventoryLocation {
@@ -205,12 +206,16 @@ function getValidatedInventoryFields(formData: FormData) {
   };
 }
 
-async function cacheConfirmedInventoryNutrition(supabase: any, input: { userId: string; name: string; unit: string; nutritionBasis: ReturnType<typeof getValidatedInventoryFields>["nutritionBasis"]; calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null; source?: "user" | "barcode-memory"; externalId?: string | null }) {
-  if (!input.nutritionBasis || ![input.calories, input.proteinG, input.carbsG, input.fatG].every((value) => typeof value === "number" && Number.isFinite(value) && value >= 0)) return;
+async function cacheConfirmedInventoryNutrition(supabase: any, input: { userId: string; name: string; unit: string; nutritionBasis: ReturnType<typeof getValidatedInventoryFields>["nutritionBasis"]; calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null; source?: "user" | "barcode-memory"; externalId?: string | null; foodCatalogItemId?: string | null }) {
+  if (!input.nutritionBasis || ![input.calories, input.proteinG, input.carbsG, input.fatG].every((value) => typeof value === "number" && Number.isFinite(value) && value >= 0)) return null;
   try {
-    await persistConfirmedNutritionBatch(supabase, [confirmedCatalogRow({ ...input, nutritionBasis: input.nutritionBasis, calories: input.calories!, proteinG: input.proteinG!, carbsG: input.carbsG!, fatG: input.fatG! })]);
+    const row = confirmedCatalogRow({ ...input, nutritionBasis: input.nutritionBasis, calories: input.calories!, proteinG: input.proteinG!, carbsG: input.carbsG!, fatG: input.fatG! });
+    row.food_catalog_item_id = input.foodCatalogItemId ?? null;
+    const result = await persistConfirmedNutritionBatchWithIdentities(supabase, [row]);
+    return result.foodCatalogItemIds.get(catalogRequestKey(row.normalized_name, row.food_state, row.nutrition_basis)) ?? null;
   } catch (error) {
     console.warn("Supabase could not update the nutrition catalog:", error instanceof Error ? error.message : error);
+    return null;
   }
 }
 
@@ -218,6 +223,14 @@ export async function addInventoryItemAction(formData: FormData) {
   const { name, quantity, unit, location, category, expiresAt, nutritionBasis, calories, proteinG, carbsG, fatG } = getValidatedInventoryFields(formData);
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "inventory item creation");
+  const rememberBarcode = formData.get("remember_barcode_product") === "on";
+  const barcodeValidation = validateBarcodeInput(String(formData.get("barcode") ?? ""));
+  const resolvedName = String(formData.get("catalog_resolved_name") ?? "").trim();
+  const submittedCatalogId = String(formData.get("food_catalog_item_id") ?? "").trim();
+  const existingFoodCatalogItemId = resolvedName === name && isUuid(submittedCatalogId) ? submittedCatalogId : null;
+  const foodCatalogItemId = await cacheConfirmedInventoryNutrition(supabase, { userId: user.id, name, unit, nutritionBasis, calories, proteinG, carbsG, fatG,
+    source: rememberBarcode && barcodeValidation.ok ? "barcode-memory" : "user", externalId: barcodeValidation.ok ? barcodeValidation.barcode : null,
+    foodCatalogItemId: existingFoodCatalogItemId });
 
   const { error } = await (supabase as any).from("inventory_items").insert({
     user_id: user.id,
@@ -231,6 +244,7 @@ export async function addInventoryItemAction(formData: FormData) {
     protein_g: proteinG,
     carbs_g: carbsG,
     fat_g: fatG,
+    food_catalog_item_id: foodCatalogItemId,
     expires_at: expiresAt,
   });
 
@@ -238,9 +252,6 @@ export async function addInventoryItemAction(formData: FormData) {
     console.warn("Supabase could not save the inventory item:", error.message);
     redirect(`${INVENTORY_PATH}?inventoryError=save-failed`);
   }
-
-  const rememberBarcode = formData.get("remember_barcode_product") === "on";
-  const barcodeValidation = validateBarcodeInput(String(formData.get("barcode") ?? ""));
 
   if (rememberBarcode) {
     if (!barcodeValidation.ok) {
@@ -274,9 +285,6 @@ export async function addInventoryItemAction(formData: FormData) {
     }
   }
 
-  await cacheConfirmedInventoryNutrition(supabase, { userId: user.id, name, unit, nutritionBasis, calories, proteinG, carbsG, fatG,
-    source: rememberBarcode && barcodeValidation.ok ? "barcode-memory" : "user", externalId: barcodeValidation.ok ? barcodeValidation.barcode : null });
-
   revalidatePath(INVENTORY_PATH);
   redirect(`${INVENTORY_PATH}?inventorySuccess=item-created`);
 }
@@ -289,6 +297,15 @@ export async function updateInventoryItemAction(formData: FormData) {
   const { name, quantity, unit, location, category, expiresAt, nutritionBasis, calories, proteinG, carbsG, fatG } = getValidatedInventoryFields(formData);
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "inventory item update");
+  const { data: current } = await (supabase as any).from("inventory_items").select("name,food_catalog_item_id").eq("id", id).eq("user_id", user.id).maybeSingle() as { data: { name: string; food_catalog_item_id: string | null } | null };
+  if (!current) redirect(`${INVENTORY_PATH}?inventoryError=update-not-found`);
+  const resolvedName = String(formData.get("catalog_resolved_name") ?? "").trim();
+  const submittedCatalogId = String(formData.get("food_catalog_item_id") ?? "").trim();
+  const explicitlyResolvedId = resolvedName === name && isUuid(submittedCatalogId) ? submittedCatalogId : null;
+  const sameName = normalizeNutritionCatalogName(current.name) === normalizeNutritionCatalogName(name);
+  const foodCatalogItemId = await cacheConfirmedInventoryNutrition(supabase, { userId: user.id, name, unit, nutritionBasis, calories, proteinG, carbsG, fatG,
+    foodCatalogItemId: explicitlyResolvedId ?? (sameName ? current.food_catalog_item_id : null) });
+  const hasCompleteNutrition = Boolean(nutritionBasis) && [calories, proteinG, carbsG, fatG].every((value) => typeof value === "number");
 
   const { data, error } = await (supabase as any)
     .from("inventory_items")
@@ -303,6 +320,7 @@ export async function updateInventoryItemAction(formData: FormData) {
       protein_g: proteinG,
       carbs_g: carbsG,
       fat_g: fatG,
+      ...getInventoryFoodIdentityUpdate({ currentName: current.name, currentFoodCatalogItemId: current.food_catalog_item_id, nextName: name, resolvedFoodCatalogItemId: foodCatalogItemId, hasCompleteNutrition }),
       expires_at: expiresAt,
     })
     .eq("id", id)
@@ -315,8 +333,6 @@ export async function updateInventoryItemAction(formData: FormData) {
   }
 
   if (!data?.length) redirect(`${INVENTORY_PATH}?inventoryError=update-not-found`);
-
-  await cacheConfirmedInventoryNutrition(supabase, { userId: user.id, name, unit, nutritionBasis, calories, proteinG, carbsG, fatG });
 
   revalidatePath(INVENTORY_PATH);
   redirect(`${INVENTORY_PATH}?inventorySuccess=item-updated`);
@@ -483,9 +499,19 @@ export async function saveVoiceInventoryBatchAction(submissionId: string, items:
 
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "voice inventory batch save");
+  let itemsWithIdentities = parsed.data.items.map((item) => ({ ...item, food_catalog_item_id: null as string | null }));
+  try {
+    if (alignedCatalogMetadata) {
+      const rows = parsed.data.items.map((item, index) => confirmedCatalogRow({ userId: user.id, name: item.name, unit: item.unit, foodState: alignedCatalogMetadata[index].food_state, nutritionBasis: item.nutrition_basis, calories: item.calories, proteinG: item.protein_g, carbsG: item.carbs_g, fatG: item.fat_g }));
+      const identities = await persistConfirmedNutritionBatchWithIdentities(supabase, rows);
+      itemsWithIdentities = itemsWithIdentities.map((item, index) => ({ ...item, food_catalog_item_id: identities.foodCatalogItemIds.get(catalogRequestKey(rows[index].normalized_name, rows[index].food_state, rows[index].nutrition_basis)) ?? null }));
+    }
+  } catch (error) {
+    console.warn("Supabase could not cache the confirmed voice batch nutrition:", error instanceof Error ? error.message : error);
+  }
   const { data, error } = await (supabase as any).rpc("save_voice_inventory_batch", {
     p_submission_id: parsed.data.submissionId,
-    p_items: parsed.data.items,
+    p_items: itemsWithIdentities,
   }) as { data: { status: "saved" | "already-saved"; inserted_count: number }[] | null; error: { code?: string; message?: string } | null };
   if (error) {
     const code = error.message === "submission-conflict" ? "submission-conflict" : error.message === "invalid-batch-payload" ? "invalid-batch-payload" : "save-failed";
@@ -493,11 +519,6 @@ export async function saveVoiceInventoryBatchAction(submissionId: string, items:
   }
   const result = data?.[0];
   if (!result || !["saved", "already-saved"].includes(result.status) || !Number.isInteger(result.inserted_count)) return { status: "error", code: "save-failed", message: "No se pudieron añadir los productos. Inténtalo de nuevo." };
-  try {
-    if (alignedCatalogMetadata) await persistConfirmedNutritionBatch(supabase, parsed.data.items.map((item, index) => confirmedCatalogRow({ userId: user.id, name: item.name, unit: item.unit, foodState: alignedCatalogMetadata[index].food_state, nutritionBasis: item.nutrition_basis, calories: item.calories, proteinG: item.protein_g, carbsG: item.carbs_g, fatG: item.fat_g })));
-  } catch (error) {
-    console.warn("Supabase could not cache the confirmed voice batch nutrition:", error instanceof Error ? error.message : error);
-  }
   revalidatePath(INVENTORY_PATH);
   return { status: "success", outcome: result.status, insertedCount: result.inserted_count, message: `Se añadieron ${result.inserted_count} productos al inventario.` };
 }

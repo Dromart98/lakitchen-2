@@ -18,6 +18,8 @@ type InventoryNutritionAiControlsProps = {
     proteinG: string;
     carbsG: string;
     fatG: string;
+    foodCatalogItemId: string;
+    catalogResolvedName: string;
   };
 };
 
@@ -99,6 +101,8 @@ export function InventoryNutritionAiControls({
         setFieldValue(fieldIds.proteinG, String(result.estimate.protein_g));
         setFieldValue(fieldIds.carbsG, String(result.estimate.carbs_g));
         setFieldValue(fieldIds.fatG, String(result.estimate.fat_g));
+        setFieldValue(fieldIds.foodCatalogItemId, result.estimate.food_catalog_item_id ?? "");
+        setFieldValue(fieldIds.catalogResolvedName, input.name.trim());
         setMessage({
           tone: "success",
           text: "Estimación realizada. Revisa los valores antes de guardar.",

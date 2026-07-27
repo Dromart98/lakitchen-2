@@ -16,3 +16,13 @@ describe("voice batch save schema", () => {
    expect(buildVoiceInventoryBatchSaveItems([corrected as unknown as VoiceInventoryDraftItem]).success).toBe(true);
  });
 });
+
+describe("voice inventory catalog identity payload", () => {
+  const legacy = { name: "Arroz", quantity: 1, unit: "kg", location: "pantry", category: null, nutrition_basis: "per_100g", calories: 360, protein_g: 7, carbs_g: 80, fat_g: 1 };
+  it("accepts both legacy items and optional valid identity metadata", () => {
+    const submissionId = "123e4567-e89b-42d3-a456-426614174000";
+    expect(toVoiceInventoryBatchSaveInput(submissionId, [legacy]).success).toBe(true);
+    expect(toVoiceInventoryBatchSaveInput(submissionId, [{ ...legacy, food_catalog_item_id: "223e4567-e89b-42d3-a456-426614174000" }]).success).toBe(true);
+    expect(toVoiceInventoryBatchSaveInput(submissionId, [{ ...legacy, food_catalog_item_id: "not-a-uuid" }]).success).toBe(false);
+  });
+});

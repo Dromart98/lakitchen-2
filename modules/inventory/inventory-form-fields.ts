@@ -11,6 +11,8 @@ export const INVENTORY_ADD_FORM_FIELD_IDS = {
   proteinG: "inventory-protein-g",
   carbsG: "inventory-carbs-g",
   fatG: "inventory-fat-g",
+  foodCatalogItemId: "inventory-food-catalog-item-id",
+  catalogResolvedName: "inventory-catalog-resolved-name",
 } as const;
 
 export const INVENTORY_BARCODE_AUTOFILL_FIELD_IDS = [

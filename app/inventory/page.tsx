@@ -181,7 +181,7 @@ export default async function InventoryPage({
   const { data, error } = (await (supabase as any)
     .from("inventory_items")
     .select(
-      "id, name, location, category, nutrition_basis, calories, protein_g, carbs_g, fat_g, quantity, unit, expires_at, created_at",
+      "id, food_catalog_item_id, name, location, category, nutrition_basis, calories, protein_g, carbs_g, fat_g, quantity, unit, expires_at, created_at",
     )
     .eq("user_id", user.id)
     .order("location", { ascending: true })
@@ -548,6 +548,8 @@ export default async function InventoryPage({
                                       type="hidden"
                                       value={item.id}
                                     />
+                                    <input id={`inventory-food-catalog-item-id-${item.id}`} name="food_catalog_item_id" type="hidden" defaultValue={item.food_catalog_item_id ?? ""} />
+                                    <input id={`inventory-catalog-resolved-name-${item.id}`} name="catalog_resolved_name" type="hidden" defaultValue={item.name} />
                                     <label
                                       className="field"
                                       htmlFor={`inventory-name-${item.id}`}
@@ -756,6 +758,8 @@ export default async function InventoryPage({
                                         proteinG: `inventory-protein-g-${item.id}`,
                                         carbsG: `inventory-carbs-g-${item.id}`,
                                         fatG: `inventory-fat-g-${item.id}`,
+                                        foodCatalogItemId: `inventory-food-catalog-item-id-${item.id}`,
+                                        catalogResolvedName: `inventory-catalog-resolved-name-${item.id}`,
                                       }}
                                     />
                                     <button className="button" type="submit">
@@ -824,6 +828,8 @@ export default async function InventoryPage({
               <VoiceInventoryBatchInput />
             </details>
             <form action={addInventoryItemAction} className="meal-log-form">
+              <input id={INVENTORY_ADD_FORM_FIELD_IDS.foodCatalogItemId} name="food_catalog_item_id" type="hidden" />
+              <input id={INVENTORY_ADD_FORM_FIELD_IDS.catalogResolvedName} name="catalog_resolved_name" type="hidden" />
               <label
                 className="field"
                 htmlFor={INVENTORY_ADD_FORM_FIELD_IDS.name}
@@ -1008,6 +1014,8 @@ export default async function InventoryPage({
                   proteinG: INVENTORY_ADD_FORM_FIELD_IDS.proteinG,
                   carbsG: INVENTORY_ADD_FORM_FIELD_IDS.carbsG,
                   fatG: INVENTORY_ADD_FORM_FIELD_IDS.fatG,
+                  foodCatalogItemId: INVENTORY_ADD_FORM_FIELD_IDS.foodCatalogItemId,
+                  catalogResolvedName: INVENTORY_ADD_FORM_FIELD_IDS.catalogResolvedName,
                 }}
               />
               <PendingSubmitButton
