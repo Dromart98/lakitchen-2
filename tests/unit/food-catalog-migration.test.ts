@@ -34,7 +34,22 @@ describe("food catalog identity migration", () => {
     expect(sql).toContain("distinct on (user_id, source, external_id, food_state)");
     expect(sql).toContain("distinct on (n.user_id, n.normalized_name, n.food_state)");
     expect(sql).toContain("pg_advisory_xact_lock");
-    expect(sql).toContain("normalized_name = any(v_aliases) or aliases && v_aliases");
+    expect(sql).toContain("normalized_name = p_normalized_name");
+    expect(sql).toContain("if v_candidate_count <> 1 then v_id := null");
+    expect(sql).toContain("f.external_id <> p_external_id");
+    expect(sql).toContain("n.external_id <> p_external_id");
     expect(sql).toContain("when p_user_confirmed and not user_confirmed then p_display_name else display_name");
+  });
+
+  it("preserves user authority in the exact-identity ON CONFLICT race", () => {
+    const conflict = sql.slice(sql.indexOf("on conflict (user_id, normalized_name, food_state) do update"), sql.indexOf("returning id into v_id"));
+    expect(conflict).toContain("when excluded.user_confirmed and not public.food_catalog_items.user_confirmed then excluded.display_name");
+    expect(conflict).toContain("when excluded.user_confirmed and not public.food_catalog_items.user_confirmed then excluded.identity_source");
+    expect(conflict).toContain("public.food_catalog_items.user_confirmed or excluded.user_confirmed");
+  });
+
+  it("locks exact names independently from external IDs while retaining the external lock", () => {
+    expect(sql).toContain("':name:' || p_normalized_name");
+    expect(sql).toContain("':external:' || p_identity_source || ':' || p_external_id");
   });
 });

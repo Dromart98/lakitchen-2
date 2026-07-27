@@ -111,6 +111,7 @@ as $$
 declare
   v_id uuid;
   v_aliases text[];
+  v_candidate_count integer;
 begin
   if auth.uid() is null or auth.uid() <> p_user_id then
     raise exception using errcode = '42501', message = 'food-catalog-user-mismatch';
@@ -119,9 +120,16 @@ begin
     raise exception using errcode = '22023', message = 'food-catalog-name-empty';
   end if;
   v_aliases := array(select distinct value from unnest(coalesce(p_aliases, '{}') || array[p_normalized_name]) value where value <> '');
+  -- Always coordinate the exact identity, including automatic/manual races whose
+  -- external-ID lock keys would otherwise differ. Constraints remain authoritative.
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
-    p_user_id::text || ':' || p_food_state || ':' || coalesce(p_identity_source || ':' || p_external_id, p_normalized_name), 0
+    p_user_id::text || ':' || p_food_state || ':name:' || p_normalized_name, 0
   ));
+  if p_external_id is not null then
+    perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
+      p_user_id::text || ':' || p_food_state || ':external:' || p_identity_source || ':' || p_external_id, 0
+    ));
+  end if;
 
   if p_existing_food_catalog_item_id is not null then
     select id into v_id from public.food_catalog_items
@@ -139,9 +147,24 @@ begin
   end if;
   if v_id is null then
     select id into v_id from public.food_catalog_items
-    where user_id = p_user_id and food_state = p_food_state
-      and (normalized_name = any(v_aliases) or aliases && v_aliases)
-    order by (normalized_name = p_normalized_name) desc limit 1;
+    where user_id = p_user_id and food_state = p_food_state and normalized_name = p_normalized_name;
+  end if;
+  if v_id is null then
+    select (array_agg(f.id order by f.id))[1], count(*)
+    into v_id, v_candidate_count
+    from public.food_catalog_items f
+    where f.user_id = p_user_id and f.food_state = p_food_state
+      and (f.normalized_name = any(coalesce(p_aliases, '{}')) or f.aliases && v_aliases)
+      and not (p_external_id is not null and (
+        (f.identity_source = p_identity_source and f.external_id is not null and f.external_id <> p_external_id)
+        or exists (
+          select 1 from public.nutrition_catalog_items n
+          where n.food_catalog_item_id = f.id and n.user_id = p_user_id
+            and n.food_state = p_food_state and n.source = p_identity_source
+            and n.external_id is not null and n.external_id <> p_external_id
+        )
+      ));
+    if v_candidate_count <> 1 then v_id := null; end if;
   end if;
 
   if v_id is null then
@@ -153,7 +176,14 @@ begin
       p_food_state, p_identity_source, p_external_id, p_user_confirmed
     )
     on conflict (user_id, normalized_name, food_state) do update
-      set aliases = array(select distinct value from unnest(public.food_catalog_items.aliases || excluded.aliases) value)
+      set aliases = array(select distinct value from unnest(public.food_catalog_items.aliases || excluded.aliases) value),
+        display_name = case
+          when excluded.user_confirmed and not public.food_catalog_items.user_confirmed then excluded.display_name
+          else public.food_catalog_items.display_name end,
+        identity_source = case
+          when excluded.user_confirmed and not public.food_catalog_items.user_confirmed then excluded.identity_source
+          else public.food_catalog_items.identity_source end,
+        user_confirmed = public.food_catalog_items.user_confirmed or excluded.user_confirmed
     returning id into v_id;
   else
     update public.food_catalog_items
