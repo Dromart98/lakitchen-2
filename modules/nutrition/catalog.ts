@@ -12,7 +12,7 @@ export const NUTRITION_CATALOG_FRESHNESS_MS: Record<NutritionSource, number> = {
 
 export type NutritionCatalogFoodState = "raw" | "cooked" | "drained" | "frozen" | "processed" | "not_applicable" | "unknown";
 export type NutritionCatalogRow = {
-  id?: string; user_id: string; normalized_name: string; aliases: string[];
+  id?: string; user_id: string; food_catalog_item_id?: string | null; identity_display_name?: string; normalized_name: string; aliases: string[];
   food_state: NutritionCatalogFoodState; nutrition_basis: InventoryNutritionBasis;
   calories: number; protein_g: number; carbs_g: number; fat_g: number;
   source: NutritionSource; external_id: string | null; match_confidence: "low" | "medium" | "high";
@@ -69,7 +69,7 @@ export function selectCatalogMatch(rows: NutritionCatalogRow[], name: string, st
 }
 
 type CatalogClient = any;
-const CATALOG_COLUMNS = "id,user_id,normalized_name,aliases,food_state,nutrition_basis,calories,protein_g,carbs_g,fat_g,source,external_id,match_confidence,user_confirmed,verified,resolved_at,refresh_after,updated_at";
+const CATALOG_COLUMNS = "id,user_id,food_catalog_item_id,normalized_name,aliases,food_state,nutrition_basis,calories,protein_g,carbs_g,fat_g,source,external_id,match_confidence,user_confirmed,verified,resolved_at,refresh_after,updated_at";
 
 export async function findNutritionCatalogMatches(client: CatalogClient, userId: string, requests: Array<{ name: string; foodState: NutritionCatalogFoodState; nutritionBasis: InventoryNutritionBasis }>) {
   const keys = [...new Set(requests.map((request) => normalizeNutritionCatalogName(request.name)).filter(Boolean))];
@@ -97,7 +97,18 @@ export function catalogRequestKey(name: string, state: NutritionCatalogFoodState
 
 export async function persistNutritionCatalogRow(client: CatalogClient, incoming: NutritionCatalogRow) {
   if (!complete(incoming) || !incoming.normalized_name) return false;
-  const payload = { ...incoming, aliases: [...new Set(incoming.aliases.map(normalizeNutritionCatalogName).filter(Boolean))] };
+  const { resolveOrCreateFoodCatalogItemForUser } = await import("@/modules/nutrition/food-catalog");
+  let foodCatalogItemId = incoming.food_catalog_item_id ?? null;
+  try {
+    foodCatalogItemId = await resolveOrCreateFoodCatalogItemForUser(client, {
+      userId: incoming.user_id, displayName: incoming.identity_display_name ?? incoming.normalized_name, providerName: incoming.aliases[0],
+      foodState: incoming.food_state, identitySource: incoming.source, externalId: incoming.external_id,
+      userConfirmed: incoming.user_confirmed, existingFoodCatalogItemId: foodCatalogItemId,
+    });
+  } catch (error) {
+    console.warn("Supabase could not link the food identity:", error instanceof Error ? error.message : error);
+  }
+  const payload = { ...incoming, food_catalog_item_id: foodCatalogItemId, aliases: [...new Set(incoming.aliases.map(normalizeNutritionCatalogName).filter(Boolean))] };
   const result = await client.rpc("upsert_nutrition_catalog_items", { p_items: [payload] });
   if (result.error) throw new Error(result.error.message);
   return Number(result.data) > 0;
@@ -106,7 +117,7 @@ export async function persistNutritionCatalogRow(client: CatalogClient, incoming
 export function catalogRowFromResolution(userId: string, requestedName: string, resolution: ResolvedNutrition): NutritionCatalogRow {
   const normalizedRequestedName = normalizeNutritionCatalogName(requestedName);
   const normalizedProviderName = normalizeNutritionCatalogName(resolution.normalizedName);
-  return { user_id: userId, normalized_name: normalizedRequestedName, aliases: normalizedProviderName && normalizedProviderName !== normalizedRequestedName ? [normalizedProviderName] : [],
+  return { user_id: userId, identity_display_name: requestedName.trim(), normalized_name: normalizedRequestedName, aliases: normalizedProviderName && normalizedProviderName !== normalizedRequestedName ? [normalizedProviderName] : [],
     food_state: resolution.foodState, nutrition_basis: resolution.nutritionBasis, calories: resolution.calories,
     protein_g: resolution.proteinG, carbs_g: resolution.carbsG, fat_g: resolution.fatG,
     source: resolution.provenance.source, external_id: resolution.provenance.externalId ?? null,
@@ -116,7 +127,7 @@ export function catalogRowFromResolution(userId: string, requestedName: string, 
 }
 
 export function confirmedCatalogRow(input: { userId: string; name: string; unit: string; foodState?: NutritionCatalogFoodState; nutritionBasis: InventoryNutritionBasis; calories: number; proteinG: number; carbsG: number; fatG: number; source?: "user" | "barcode-memory"; externalId?: string | null }): NutritionCatalogRow {
-  return { user_id: input.userId, normalized_name: normalizeNutritionCatalogName(input.name), aliases: [], food_state: input.foodState ?? inferCatalogFoodState(input.name),
+  return { user_id: input.userId, identity_display_name: input.name.trim(), normalized_name: normalizeNutritionCatalogName(input.name), aliases: [], food_state: input.foodState ?? inferCatalogFoodState(input.name),
     nutrition_basis: input.nutritionBasis, calories: input.calories, protein_g: input.proteinG, carbs_g: input.carbsG, fat_g: input.fatG,
     source: input.source ?? "user", external_id: input.externalId ?? null, match_confidence: "high", user_confirmed: true,
     verified: true, resolved_at: new Date().toISOString(), refresh_after: null };
@@ -129,7 +140,21 @@ export async function persistConfirmedNutritionBatch(client: CatalogClient, rows
     deduplicated.set(catalogRequestKey(row.normalized_name, row.food_state, row.nutrition_basis), row);
   }
   if (!deduplicated.size) return 0;
-  const result = await client.rpc("upsert_nutrition_catalog_items", { p_items: [...deduplicated.values()] });
+  const { resolveOrCreateFoodCatalogItemForUser } = await import("@/modules/nutrition/food-catalog");
+  const payload = await Promise.all([...deduplicated.values()].map(async (row) => {
+    let foodCatalogItemId = row.food_catalog_item_id ?? null;
+    try {
+      foodCatalogItemId = await resolveOrCreateFoodCatalogItemForUser(client, {
+        userId: row.user_id, displayName: row.identity_display_name ?? row.normalized_name, providerName: row.aliases[0], foodState: row.food_state,
+        identitySource: row.source, externalId: row.external_id, userConfirmed: true,
+        existingFoodCatalogItemId: foodCatalogItemId,
+      });
+    } catch (error) {
+      console.warn("Supabase could not link the food identity:", error instanceof Error ? error.message : error);
+    }
+    return { ...row, food_catalog_item_id: foodCatalogItemId };
+  }));
+  const result = await client.rpc("upsert_nutrition_catalog_items", { p_items: payload });
   if (result.error) throw new Error(result.error.message);
   return Number(result.data);
 }
