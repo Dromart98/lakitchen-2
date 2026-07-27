@@ -146,7 +146,7 @@ Objetivo: no consultar APIs externas repetidamente y mantener resultados estable
 
 - **1.3A — Implementada/cerrada:** núcleo privado desplegado, FK del catálogo nutricional desplegada y corrección de su índice compuesto aplicada y validada con el advisor.
 - **1.3B — En progreso:** adopción segura por los datos operativos, dividida en:
-  - **1.3B1 — Inventario:** implementada en esta entrega; la identidad es nullable, protegida por propietario y se propaga desde altas manuales, nutrición, códigos de barras y voz.
+  - **1.3B1 — Inventario:** en revisión; la identidad nullable y protegida por propietario se propaga desde altas manuales, nutrición, códigos de barras y voz, pendiente de publicación, despliegue y validación operativa.
   - **1.3B2 — comidas y recetas guardadas:** pendiente; heredará la identidad desde Inventario.
   - **1.3B3 — lista de compra y transferencia:** pendiente.
 - **1.3C — Pendiente:** estrategia para planes JSON y recetas de plantilla/globales sin romper aislamiento.

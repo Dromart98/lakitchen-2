@@ -20,4 +20,12 @@ describe("inventory action identity propagation", () => {
     expect(voice).toContain("itemsWithIdentities");
     expect(voice).toContain("catch (error)");
   });
+
+  it("plans rename identity before deciding whether to persist confirmed nutrition", () => {
+    const update = actions.slice(actions.indexOf("export async function updateInventoryItemAction"), actions.indexOf("export async function consumeInventoryItemAction"));
+    expect(update.indexOf("planInventoryFoodIdentityUpdate")).toBeLessThan(update.indexOf("cacheConfirmedInventoryNutrition"));
+    expect(update).toContain("identityUpdate.shouldPersistConfirmedNutrition");
+    expect(update).toContain("? await cacheConfirmedInventoryNutrition");
+    expect(update).toContain("food_catalog_item_id: resolvedFoodCatalogItemId ?? identityUpdate.fallbackFoodCatalogItemId");
+  });
 });

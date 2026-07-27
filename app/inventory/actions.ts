@@ -7,7 +7,7 @@ import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { validateBarcodeInput } from "@/modules/barcodes/barcode";
 import { createClient } from "@/lib/supabase/server";
 import { validateOptionalInventoryCategory, type InventoryCategory } from "@/modules/inventory/inventory-categories";
-import { getInventoryFoodIdentityUpdate } from "@/modules/inventory/inventory-food-identity";
+import { planInventoryFoodIdentityUpdate } from "@/modules/inventory/inventory-food-identity";
 import {
   hasInventoryNutritionValues,
   isInventoryNutritionBasis,
@@ -16,7 +16,7 @@ import {
 import { isMealType } from "@/modules/meals/meal-types";
 import { lookupOpenFoodFactsProduct } from "@/lib/nutrition/open-food-facts";
 import { resolveInventoryNutritionForUser } from "@/lib/nutrition/catalog-resolver";
-import { catalogRequestKey, confirmedCatalogRow, normalizeNutritionCatalogName, persistConfirmedNutritionBatchWithIdentities } from "@/modules/nutrition/catalog";
+import { catalogRequestKey, confirmedCatalogRow, persistConfirmedNutritionBatchWithIdentities } from "@/modules/nutrition/catalog";
 import { parseInventoryNutritionAiInput, type InventoryNutritionAiEstimate, type InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
 import { toVoiceInventoryBatchSaveInput, VoiceInventoryBatchCatalogMetadataSchema } from "@/modules/inventory/voice-inventory-batch-save";
 
@@ -302,10 +302,18 @@ export async function updateInventoryItemAction(formData: FormData) {
   const resolvedName = String(formData.get("catalog_resolved_name") ?? "").trim();
   const submittedCatalogId = String(formData.get("food_catalog_item_id") ?? "").trim();
   const explicitlyResolvedId = resolvedName === name && isUuid(submittedCatalogId) ? submittedCatalogId : null;
-  const sameName = normalizeNutritionCatalogName(current.name) === normalizeNutritionCatalogName(name);
-  const foodCatalogItemId = await cacheConfirmedInventoryNutrition(supabase, { userId: user.id, name, unit, nutritionBasis, calories, proteinG, carbsG, fatG,
-    foodCatalogItemId: explicitlyResolvedId ?? (sameName ? current.food_catalog_item_id : null) });
   const hasCompleteNutrition = Boolean(nutritionBasis) && [calories, proteinG, carbsG, fatG].every((value) => typeof value === "number");
+  const identityUpdate = planInventoryFoodIdentityUpdate({
+    currentName: current.name,
+    currentFoodCatalogItemId: current.food_catalog_item_id,
+    nextName: name,
+    explicitlyResolvedFoodCatalogItemId: explicitlyResolvedId,
+    hasCompleteNutrition,
+  });
+  const resolvedFoodCatalogItemId = identityUpdate.shouldPersistConfirmedNutrition
+    ? await cacheConfirmedInventoryNutrition(supabase, { userId: user.id, name, unit, nutritionBasis, calories, proteinG, carbsG, fatG,
+      foodCatalogItemId: identityUpdate.catalogFoodCatalogItemId })
+    : null;
 
   const { data, error } = await (supabase as any)
     .from("inventory_items")
@@ -320,7 +328,7 @@ export async function updateInventoryItemAction(formData: FormData) {
       protein_g: proteinG,
       carbs_g: carbsG,
       fat_g: fatG,
-      ...getInventoryFoodIdentityUpdate({ currentName: current.name, currentFoodCatalogItemId: current.food_catalog_item_id, nextName: name, resolvedFoodCatalogItemId: foodCatalogItemId, hasCompleteNutrition }),
+      food_catalog_item_id: resolvedFoodCatalogItemId ?? identityUpdate.fallbackFoodCatalogItemId,
       expires_at: expiresAt,
     })
     .eq("id", id)
