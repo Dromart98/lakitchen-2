@@ -4,26 +4,36 @@ import { validateBarcodeInput } from "@/modules/barcodes/barcode";
 import type { InventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
 import { isCompleteNutrition } from "@/modules/nutrition/resolution";
 
-// Product read API v2: https://openfoodfacts.github.io/openfoodfacts-server/api/ref-v2/
-const endpoint = "https://world.openfoodfacts.org/api/v2/product";
+// Product Read API v3: https://openfoodfacts.github.io/openfoodfacts-server/api/ref-v3/
+const endpoint = "https://world.openfoodfacts.org/api/v3/product";
 const timeoutMs = 6_000;
-const fields = "code,product_name_es,product_name,nutrition_data_per,product_quantity,product_quantity_unit,quantity,nutriments";
+const fields = "code,product_name_es,product_name,product_quantity,product_quantity_unit,quantity,nutrition";
+
+const nutrientValueSchema = z.object({
+  value: z.number().finite().optional(),
+}).passthrough();
 
 const payloadSchema = z.object({
-  status: z.number().optional(),
+  status: z.enum(["success", "success_with_warnings", "success_with_errors", "failure"]),
+  result: z.object({ id: z.string().optional() }).passthrough().optional(),
+  errors: z.array(z.object({}).passthrough()).optional(),
   product: z.object({
     code: z.string().nullish(),
     product_name_es: z.string().nullish(),
     product_name: z.string().nullish(),
-    nutrition_data_per: z.enum(["100g", "serving"]).nullish(),
     product_quantity: z.union([z.number().finite(), z.string()]).nullish(),
     product_quantity_unit: z.string().nullish(),
     quantity: z.string().nullish(),
-    nutriments: z.object({
-      "energy-kcal_100g": z.number().finite().optional(),
-      proteins_100g: z.number().finite().optional(),
-      carbohydrates_100g: z.number().finite().optional(),
-      fat_100g: z.number().finite().optional(),
+    nutrition: z.object({
+      aggregated_set: z.object({
+        per: z.enum(["100g", "100ml", "serving"]).optional(),
+        nutrients: z.object({
+          "energy-kcal": nutrientValueSchema.optional(),
+          proteins: nutrientValueSchema.optional(),
+          carbohydrates: nutrientValueSchema.optional(),
+          fat: nutrientValueSchema.optional(),
+        }).passthrough().optional(),
+      }).passthrough().nullish(),
     }).passthrough().nullish(),
   }).passthrough().optional(),
 }).passthrough();
@@ -62,17 +72,18 @@ function displayedPackage(quantity: string | null | undefined): OpenFoodFactsPac
   return { quantity: value, unit: unit as "g" | "ml" };
 }
 
-function extractNutrition(product: z.infer<typeof payloadSchema>["product"], packageData: OpenFoodFactsPackage | null): OpenFoodFactsNutrition | null {
-  if (!product?.nutriments || !packageData) return null;
+function extractNutrition(product: z.infer<typeof payloadSchema>["product"]): OpenFoodFactsNutrition | null {
+  const aggregated = product?.nutrition?.aggregated_set;
+  if (!aggregated?.nutrients || (aggregated.per !== "100g" && aggregated.per !== "100ml")) return null;
   const values = {
-    calories: product.nutriments["energy-kcal_100g"],
-    proteinG: product.nutriments.proteins_100g,
-    carbsG: product.nutriments.carbohydrates_100g,
-    fatG: product.nutriments.fat_100g,
+    calories: aggregated.nutrients["energy-kcal"]?.value,
+    proteinG: aggregated.nutrients.proteins?.value,
+    carbsG: aggregated.nutrients.carbohydrates?.value,
+    fatG: aggregated.nutrients.fat?.value,
   };
   if (!isCompleteNutrition(values)) return null;
   return {
-    basis: packageData.unit === "ml" ? "per_100ml" : "per_100g",
+    basis: aggregated.per === "100ml" ? "per_100ml" : "per_100g",
     calories: values.calories!, proteinG: values.proteinG!, carbsG: values.carbsG!, fatG: values.fatG!,
   };
 }
@@ -81,21 +92,21 @@ export async function lookupOpenFoodFactsProduct(rawBarcode: string, options: { 
   const validation = validateBarcodeInput(rawBarcode);
   if (!validation.ok) return { status: "not-found" };
   try {
-    const response = await (options.fetchImpl ?? fetch)(`${endpoint}/${validation.barcode}.json?fields=${encodeURIComponent(fields)}`, {
+    const response = await (options.fetchImpl ?? fetch)(`${endpoint}/${validation.barcode}?fields=${encodeURIComponent(fields)}`, {
       headers: { "User-Agent": "LaKitchenapp/1.1 (https://lakitchenapp.com)" }, cache: "no-store", signal: AbortSignal.timeout(timeoutMs),
     });
     if (response.status === 404) return { status: "not-found" };
     if (!response.ok) return { status: "provider-error" };
     const parsed = payloadSchema.safeParse(await response.json());
     if (!parsed.success) return { status: "provider-error" };
-    if (parsed.data.status !== 1 || !parsed.data.product) return { status: "not-found" };
+    if (parsed.data.status === "failure" || !parsed.data.product) return { status: "provider-error" };
     const product = parsed.data.product;
     const name = (product.product_name_es || product.product_name || "").trim();
     if (!name) return { status: "not-found" };
     const packageData = normalizedPackage(product.product_quantity, product.product_quantity_unit) ?? displayedPackage(product.quantity);
     return {
       status: "found",
-      product: { barcode: validation.barcode, name: name.slice(0, 120), package: packageData, nutrition: extractNutrition(product, packageData) },
+      product: { barcode: validation.barcode, name: name.slice(0, 120), package: packageData, nutrition: extractNutrition(product) },
     };
   } catch {
     return { status: "provider-error" };
