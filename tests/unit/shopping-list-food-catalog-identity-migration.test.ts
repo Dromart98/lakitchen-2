@@ -18,6 +18,17 @@ describe("shopping-list food catalog identity migration", () => {
     expect(sql).toContain("before update of name on public.shopping_list_items");
   });
 
+  it("keeps food identity and ownership out of browser write privileges", () => {
+    expect(sql).toContain("revoke insert, update on table public.shopping_list_items from authenticated");
+    expect(sql).toMatch(/grant insert \(user_id, name, quantity, unit, is_purchased\)\s+on table public\.shopping_list_items to authenticated/);
+    expect(sql).toMatch(/grant update \(name, quantity, unit, is_purchased\)\s+on table public\.shopping_list_items to authenticated/);
+
+    const grants = sql.match(/grant (?:insert|update) \([^)]+\)\s+on table public\.shopping_list_items to authenticated/g) ?? [];
+    expect(grants).toHaveLength(2);
+    expect(grants).not.toContainEqual(expect.stringContaining("food_catalog_item_id"));
+    expect(grants.find((grant) => grant.startsWith("grant update"))).not.toContain("user_id");
+  });
+
   it("locks an owned purchased row and transfers its server-read identity atomically", () => {
     expect(sql).toMatch(/where id = p_item_id and user_id = v_user_id and is_purchased = true\s+for update/);
     expect(sql).toContain("select id, name, quantity, unit, food_catalog_item_id");

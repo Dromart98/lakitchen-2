@@ -11,6 +11,14 @@ alter table public.shopping_list_items
 create index shopping_list_items_food_owner_idx
   on public.shopping_list_items (food_catalog_item_id, user_id);
 
+-- Browser clients may edit shopping-list fields, but food identity remains
+-- server-authoritative (the transfer RPC and rename trigger still manage it).
+revoke insert, update on table public.shopping_list_items from authenticated;
+grant insert (user_id, name, quantity, unit, is_purchased)
+  on table public.shopping_list_items to authenticated;
+grant update (name, quantity, unit, is_purchased)
+  on table public.shopping_list_items to authenticated;
+
 create or replace function public.clear_shopping_list_food_identity_on_rename()
 returns trigger
 language plpgsql

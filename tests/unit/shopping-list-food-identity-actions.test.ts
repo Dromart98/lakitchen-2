@@ -7,7 +7,7 @@ const actions = readFileSync(resolve(process.cwd(), "app/shopping-list/actions.t
 describe("shopping-list food identity actions", () => {
   it("creates manual entries without browser-authoritative identity", () => {
     const add = actions.slice(actions.indexOf("export async function addShoppingListItemAction"), actions.indexOf("export async function updateShoppingListItemAction"));
-    expect(add).toContain("food_catalog_item_id: null");
+    expect(add).not.toContain("food_catalog_item_id");
     expect(add).not.toContain('formData.get("food_catalog_item_id")');
   });
 

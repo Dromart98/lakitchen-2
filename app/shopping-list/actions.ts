@@ -146,7 +146,6 @@ export async function addShoppingListItemAction(formData: FormData) {
     name,
     quantity,
     unit,
-    food_catalog_item_id: null,
   });
 
   if (error) {
