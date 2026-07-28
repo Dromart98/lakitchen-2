@@ -46,11 +46,17 @@ describe("phase 1.3B2 food identity migration", () => {
     expect(sql).not.toMatch(/v_line\s*->>\s*'food_catalog_item_id'/);
   });
 
-  it("validates saved-recipe inventory ownership and copies nullable identity atomically", () => {
+  it("locks saved-recipe inventory deterministically and preserves ingredient order", () => {
     expect(sql).toContain("create or replace function public.save_user_ai_recipe");
-    expect(sql).toContain("and user_id = v_user_id\n    for key share");
-    expect(sql).toContain("v_inventory_item.id,\n      v_inventory_item.food_catalog_item_id");
-    expect(sql).not.toMatch(/v_ingredient\s*->>\s*'food_catalog_item_id'/);
+    expect(sql).toContain("with ordinality as ingredient(value, ordinality)");
+    expect(sql).toContain("order by inventory.id\n    for share of inventory");
+    expect(sql).not.toMatch(/for key share/i);
+    expect(sql).toContain("ingredient.sort_order");
+    expect(sql).toContain("order by ingredient.sort_order");
+    expect(sql).toContain("inventory.food_catalog_item_id");
+    expect(sql).toContain("inventory.user_id = v_user_id");
+    expect(sql).toContain("v_locked_inventory_count <> jsonb_array_length(p_ingredients)");
+    expect(sql).not.toMatch(/ingredient(?:\.ingredient)?\s*->>\s*'food_catalog_item_id'/);
   });
 
   it("preserves meal and recipe rows when a catalog identity is deleted", () => {

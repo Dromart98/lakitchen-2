@@ -601,9 +601,8 @@ declare
   v_user_id uuid := auth.uid();
   v_recipe_id uuid;
   v_existing_recipe_id uuid;
-  v_ingredient jsonb;
-  v_sort_order integer := 0;
   v_inventory_item public.inventory_items%rowtype;
+  v_locked_inventory_count integer := 0;
 begin
   if v_user_id is null then
     raise exception using errcode = '28000', message = 'Authentication required';
@@ -626,30 +625,54 @@ begin
     return v_existing_recipe_id;
   end if;
 
-  for v_ingredient in select value from jsonb_array_elements(p_ingredients) as ingredients(value) loop
-    select * into v_inventory_item
-    from public.inventory_items
-    where id = (v_ingredient ->> 'inventory_item_id')::uuid
-      and user_id = v_user_id
-    for key share;
+  create temporary table pg_temp.saved_recipe_ingredients (
+    sort_order integer primary key,
+    inventory_item_id uuid not null,
+    ingredient jsonb not null
+  ) on commit drop;
 
-    if not found then
-      raise exception using errcode = 'P0002', message = 'Inventory item not found';
-    end if;
+  insert into pg_temp.saved_recipe_ingredients (sort_order, inventory_item_id, ingredient)
+  select
+    ingredient.ordinality::integer - 1,
+    (ingredient.value ->> 'inventory_item_id')::uuid,
+    ingredient.value
+  from jsonb_array_elements(p_ingredients) with ordinality as ingredient(value, ordinality);
 
-    insert into public.user_saved_ai_recipe_ingredients (recipe_id, user_id, inventory_item_id, food_catalog_item_id, name, quantity, unit, sort_order)
-    values (
-      v_recipe_id,
-      v_user_id,
-      v_inventory_item.id,
-      v_inventory_item.food_catalog_item_id,
-      btrim(v_ingredient ->> 'name'),
-      (v_ingredient ->> 'quantity')::numeric,
-      btrim(v_ingredient ->> 'unit'),
-      v_sort_order
-    );
-    v_sort_order := v_sort_order + 1;
+  -- Match the consumption RPC lock order and prevent identity changes while it is copied.
+  for v_inventory_item in
+    select inventory.*
+    from public.inventory_items inventory
+    join pg_temp.saved_recipe_ingredients ingredient
+      on ingredient.inventory_item_id = inventory.id
+    where inventory.user_id = v_user_id
+    order by inventory.id
+    for share of inventory
+  loop
+    v_locked_inventory_count := v_locked_inventory_count + 1;
   end loop;
+
+  if v_locked_inventory_count <> jsonb_array_length(p_ingredients) then
+    raise exception using errcode = 'P0002', message = 'Inventory item not found';
+  end if;
+
+  insert into public.user_saved_ai_recipe_ingredients (
+    recipe_id, user_id, inventory_item_id, food_catalog_item_id,
+    name, quantity, unit, sort_order
+  )
+  select
+    v_recipe_id,
+    v_user_id,
+    inventory.id,
+    inventory.food_catalog_item_id,
+    btrim(ingredient.ingredient ->> 'name'),
+    (ingredient.ingredient ->> 'quantity')::numeric,
+    btrim(ingredient.ingredient ->> 'unit'),
+    ingredient.sort_order
+  from pg_temp.saved_recipe_ingredients ingredient
+  join public.inventory_items inventory
+    on inventory.id = ingredient.inventory_item_id
+   and inventory.user_id = v_user_id
+  order by ingredient.sort_order;
 
   return v_recipe_id;
 end;
