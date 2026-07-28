@@ -1,7 +1,13 @@
 import { getInventoryExpirationDayDifference } from "@/modules/inventory/inventory-expiration";
 import type { InventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
+import {
+  areFoodQuantityUnitsCompatible,
+  convertFoodQuantityToCanonical,
+  type CanonicalFoodQuantityUnit,
+  type FoodQuantityUnit,
+} from "@/modules/units/food-quantity";
 
-export type RecipeUnit = "g" | "kg" | "ml" | "l" | "ud";
+export type RecipeUnit = FoodQuantityUnit;
 export type RecipeIngredientStatus = "available" | "missing" | "insufficient" | "incompatible" | "expired";
 export type RecipeFilterMode = "all" | "available" | "quick" | "urgent";
 
@@ -86,8 +92,7 @@ export type RecipeMatchResult = {
   nearestExpirationDate: string | null;
 };
 
-type UnitKind = "weight" | "volume" | "unit";
-type BaseUnit = "g" | "ml" | "ud";
+type BaseUnit = CanonicalFoodQuantityUnit;
 
 type StockCopy = RecipeInventoryItem & {
   matchTerms: Set<string>;
@@ -117,14 +122,6 @@ export function toRecipeInventoryItem(row: RecipeInventoryItemRow): RecipeInvent
   return { ...inventoryItem, foodIdentity };
 }
 
-const unitMetadata: Record<RecipeUnit, { kind: UnitKind; baseUnit: BaseUnit; factor: number }> = {
-  g: { kind: "weight", baseUnit: "g", factor: 1 },
-  kg: { kind: "weight", baseUnit: "g", factor: 1000 },
-  ml: { kind: "volume", baseUnit: "ml", factor: 1 },
-  l: { kind: "volume", baseUnit: "ml", factor: 1000 },
-  ud: { kind: "unit", baseUnit: "ud", factor: 1 },
-};
-
 export function normalizeRecipeMatchTerm(value: string): string {
   return value
     .toLocaleLowerCase("es")
@@ -137,18 +134,11 @@ export function normalizeRecipeMatchTerm(value: string): string {
 }
 
 export function areRecipeUnitsCompatible(firstUnit: string, secondUnit: string): boolean {
-  const first = unitMetadata[firstUnit as RecipeUnit];
-  const second = unitMetadata[secondUnit as RecipeUnit];
-
-  return Boolean(first && second && first.kind === second.kind);
+  return areFoodQuantityUnitsCompatible(firstUnit, secondUnit);
 }
 
 export function convertRecipeQuantityToBase(quantity: number, unit: string): { quantity: number; unit: BaseUnit } | null {
-  const metadata = unitMetadata[unit as RecipeUnit];
-
-  if (!metadata || !Number.isFinite(quantity)) return null;
-
-  return { quantity: quantity * metadata.factor, unit: metadata.baseUnit };
+  return convertFoodQuantityToCanonical(quantity, unit);
 }
 
 function compareExpiration(first: string | null, second: string | null): number {

@@ -1,5 +1,6 @@
 import type { RecipeIngredientAllocation } from "@/modules/recipes/recipe-matching";
 import { RECIPE_MAX_INGREDIENTS } from "@/modules/recipes/recipe-limits";
+import { convertFoodQuantity } from "@/modules/units/food-quantity";
 
 export type RecipeConsumptionLine = {
   item_id: string;
@@ -36,23 +37,7 @@ function isPositiveFiniteQuantity(value: number): boolean {
 }
 
 function convertBaseQuantityToInventoryUnit(quantity: number, baseUnit: BaseUnit, inventoryUnit: string): number | null {
-  if (baseUnit === "g") {
-    if (inventoryUnit === "g") return quantity;
-    if (inventoryUnit === "kg") return quantity / 1000;
-    return null;
-  }
-
-  if (baseUnit === "ml") {
-    if (inventoryUnit === "ml") return quantity;
-    if (inventoryUnit === "l") return quantity / 1000;
-    return null;
-  }
-
-  if (baseUnit === "ud") {
-    return inventoryUnit === "ud" ? quantity : null;
-  }
-
-  return null;
+  return convertFoodQuantity(quantity, baseUnit, inventoryUnit);
 }
 
 export function buildRecipeConsumptionLines(

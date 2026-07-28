@@ -164,7 +164,11 @@ Crear una entidad central de alimento, por ejemplo `food_catalog_items`, utiliza
 
 Evitar que variaciones como “pollo”, “pechuga de pollo” y “pollo fresco” se conviertan en alimentos nutricionalmente distintos sin necesidad.
 
-### 1.4 Conversión fiable de unidades
+### 1.4 Conversión fiable de unidades — En progreso
+
+- **1.4A — núcleo exacto — En progreso:** fuente común para conversiones dimensionales exactas entre `g`/`kg`, `ml`/`l` y `ud`.
+- **1.4B — equivalencias estimadas y revisables — Pendiente.**
+- **1.4C — adopción transversal de equivalencias — Pendiente.**
 
 Añadir una capa común para:
 
