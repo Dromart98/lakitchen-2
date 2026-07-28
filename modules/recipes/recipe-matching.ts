@@ -38,13 +38,13 @@ export type RecipeInventoryItem = {
   protein_g?: number | null;
   carbs_g?: number | null;
   fat_g?: number | null;
-  foodIdentity?: RecipeFoodIdentity | null;
+  foodIdentity?: RecipeFoodIdentity;
 };
 
-export type RecipeFoodIdentity = {
-  normalizedName: string;
-  aliases: string[];
-};
+export type RecipeFoodIdentity =
+  | { status: "none" }
+  | { status: "unresolved" }
+  | { status: "resolved"; normalizedName: string; aliases: string[] };
 
 export type RecipeInventoryItemRow = Omit<RecipeInventoryItem, "foodIdentity"> & {
   food_catalog_item_id?: unknown;
@@ -97,9 +97,10 @@ type StockCopy = RecipeInventoryItem & {
 
 export function toRecipeInventoryItem(row: RecipeInventoryItemRow): RecipeInventoryItem {
   const relation = row.food_catalog_items;
-  let foodIdentity: RecipeFoodIdentity | null = null;
+  const hasIdentityReference = row.food_catalog_item_id !== null && row.food_catalog_item_id !== undefined;
+  let foodIdentity: RecipeFoodIdentity = hasIdentityReference ? { status: "unresolved" } : { status: "none" };
 
-  if (typeof row.food_catalog_item_id === "string" && row.food_catalog_item_id.trim() && relation && typeof relation === "object" && !Array.isArray(relation)) {
+  if (hasIdentityReference && relation && typeof relation === "object" && !Array.isArray(relation)) {
     const rawNormalizedName = Reflect.get(relation, "normalized_name");
     const normalizedName = typeof rawNormalizedName === "string" ? normalizeRecipeMatchTerm(rawNormalizedName) : "";
     const rawAliases = Reflect.get(relation, "aliases");
@@ -108,7 +109,7 @@ export function toRecipeInventoryItem(row: RecipeInventoryItemRow): RecipeInvent
         .filter((alias): alias is string => typeof alias === "string")
         .map(normalizeRecipeMatchTerm)
         .filter((alias) => alias && alias !== normalizedName))];
-      foodIdentity = { normalizedName, aliases };
+      foodIdentity = { status: "resolved", normalizedName, aliases };
     }
   }
 
@@ -237,9 +238,11 @@ export function matchRecipesToInventory(recipes: RecipeTemplate[], inventory: Re
   return recipes.map((recipe) => {
     const stock: StockCopy[] = inventory.map((item) => {
       const converted = convertRecipeQuantityToBase(item.quantity, item.unit);
-      const matchTerms = item.foodIdentity
+      const matchTerms = item.foodIdentity?.status === "resolved"
         ? new Set([item.foodIdentity.normalizedName, ...item.foodIdentity.aliases])
-        : new Set([normalizeRecipeMatchTerm(item.name)]);
+        : item.foodIdentity?.status === "unresolved"
+          ? new Set<string>()
+          : new Set([normalizeRecipeMatchTerm(item.name)]);
       return { ...item, matchTerms, remainingBaseQuantity: converted?.quantity ?? null, baseUnit: converted?.unit ?? null };
     });
 

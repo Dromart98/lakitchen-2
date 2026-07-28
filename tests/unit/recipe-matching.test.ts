@@ -48,19 +48,26 @@ describe("recipe matching", () => {
   it("matches sanitized identity aliases and ignores empty, invalid and duplicate aliases", () => {
     const item = toRecipeInventoryItem({ id: "1", name: "ave", quantity: 100, unit: "g", expires_at: null, food_catalog_item_id: "food-a", food_catalog_items: { normalized_name: "pavo", aliases: [" POLLO ", "pollo", "", null, 3] } });
 
-    expect(item.foodIdentity).toEqual({ normalizedName: "pavo", aliases: ["pollo"] });
+    expect(item.foodIdentity).toEqual({ status: "resolved", normalizedName: "pavo", aliases: ["pollo"] });
     expect(matchRecipesToInventory([recipe()], [item], "2026-07-14")[0].canCookNow).toBe(true);
   });
 
-  it("falls back to the exact visible name only without a valid central identity", () => {
+  it("falls back to the exact visible name only without a central identity reference", () => {
     const withoutIdentity = toRecipeInventoryItem({ id: "1", name: "pollo", quantity: 100, unit: "g", expires_at: null, food_catalog_item_id: null, food_catalog_items: null });
-    const malformedRelation = toRecipeInventoryItem({ id: "2", name: "pollo", quantity: 100, unit: "g", expires_at: null, food_catalog_item_id: "food-a", food_catalog_items: [{ normalized_name: "pavo", aliases: [] }] });
-    const malformedName = toRecipeInventoryItem({ id: "3", name: "pollo", quantity: 100, unit: "g", expires_at: null, food_catalog_item_id: "food-b", food_catalog_items: { normalized_name: 7, aliases: [] } });
 
-    expect(withoutIdentity.foodIdentity).toBeNull();
-    expect(malformedRelation.foodIdentity).toBeNull();
-    expect(malformedName.foodIdentity).toBeNull();
+    expect(withoutIdentity.foodIdentity).toEqual({ status: "none" });
     expect(matchRecipesToInventory([recipe()], [withoutIdentity], "2026-07-14")[0].canCookNow).toBe(true);
+  });
+
+  it.each([
+    ["null relation", null],
+    ["array relation", [{ normalized_name: "pavo", aliases: [] }]],
+    ["invalid normalized name", { normalized_name: 7, aliases: [] }],
+  ])("fails closed for a present identity id with %s", (_case, food_catalog_items) => {
+    const item = toRecipeInventoryItem({ id: "1", name: "pollo", quantity: 100, unit: "g", expires_at: null, food_catalog_item_id: "food-a", food_catalog_items });
+
+    expect(item.foodIdentity).toEqual({ status: "unresolved" });
+    expect(matchRecipesToInventory([recipe()], [item], "2026-07-14")[0].ingredientMatches[0].status).toBe("missing");
   });
 
   it("converts and validates units", () => {
