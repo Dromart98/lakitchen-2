@@ -149,7 +149,9 @@ Objetivo: no consultar APIs externas repetidamente y mantener resultados estable
   - **1.3B1 — Inventario — Implementada/cerrada:** la identidad nullable y protegida por propietario se propaga desde altas manuales, nutrición, códigos de barras y voz.
   - **1.3B2 — comidas y recetas guardadas — Implementada/cerrada:** hereda la identidad desde Inventario.
   - **1.3B3 — lista de compra y transferencia — Implementada/cerrada:** conserva la identidad central al transferir compras a Inventario.
-- **1.3C — Pendiente:** estrategia para planes JSON y recetas de plantilla/globales sin romper aislamiento.
+- **1.3C — En progreso:** adopción de identidad en planes sin romper aislamiento, dividida en:
+  - **1.3C1 — planes privados — En progreso:** proyección relacional de la identidad de cada ingrediente guardado, manteniendo el JSON como snapshot sin IDs privados del catálogo.
+  - **1.3C2 — plantillas/globales — Pendiente:** estrategia de identidad para plantillas globales.
 
 Crear una entidad central de alimento, por ejemplo `food_catalog_items`, utilizada por:
 
