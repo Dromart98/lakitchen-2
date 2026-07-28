@@ -3,15 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { estimateInventoryNutritionWithOpenAi } from "@/lib/openai/inventory-nutrition";
+import { resolveInventoryNutritionForUser } from "@/lib/nutrition/catalog-resolver";
 import { generateVoiceShoppingBatch } from "@/lib/openai/voice-shopping-batch-generation";
 import { parseVoiceShoppingBatchInput, type VoiceShoppingBatchResult } from "@/modules/shopping/voice-shopping-batch";
 import { toVoiceShoppingBatchSaveInput } from "@/modules/shopping/voice-shopping-batch-save";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
-  buildShoppingListTransferNutritionUpdate,
   getShoppingListTransferNutritionPlan,
+  planShoppingListTransferResolutionUpdate,
   type TransferredInventoryNutritionItem,
 } from "@/modules/shopping-list/shopping-list-transfer-nutrition";
 
@@ -146,6 +146,7 @@ export async function addShoppingListItemAction(formData: FormData) {
     name,
     quantity,
     unit,
+    food_catalog_item_id: null,
   });
 
   if (error) {
@@ -269,7 +270,7 @@ export async function transferShoppingListItemToInventoryAction(formData: FormDa
 
   const { data: transferredItem, error: transferredItemError } = await (supabase as any)
     .from("inventory_items")
-    .select("id, name, quantity, unit, category, nutrition_basis, calories, protein_g, carbs_g, fat_g")
+    .select("id, name, quantity, unit, category, nutrition_basis, calories, protein_g, carbs_g, fat_g, food_catalog_item_id")
     .eq("id", transferredInventoryItemId)
     .eq("user_id", user.id)
     .maybeSingle() as {
@@ -288,27 +289,25 @@ export async function transferShoppingListItemToInventoryAction(formData: FormDa
   if (nutritionPlan.status === "already-complete") {
     shoppingListSuccess = "item-transferred-with-nutrition";
   } else if (nutritionPlan.status === "estimate") {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const nutritionResult = await resolveInventoryNutritionForUser(supabase, user.id, nutritionPlan.input);
 
-    if (apiKey) {
-      const nutritionResult = await estimateInventoryNutritionWithOpenAi(nutritionPlan.input, {
-        apiKey,
-        model: process.env.OPENAI_INVENTORY_NUTRITION_MODEL || undefined,
-      });
-
-      if (nutritionResult.status === "success") {
-        const nutritionUpdate = buildShoppingListTransferNutritionUpdate(nutritionResult.estimate);
-        const { data: updatedNutritionRows, error: updateNutritionError } = await (supabase as any)
+    if (nutritionResult.status === "resolved") {
+      const resolutionUpdate = planShoppingListTransferResolutionUpdate(transferredItem.food_catalog_item_id, nutritionResult);
+      if (resolutionUpdate.status === "apply") {
+        let updateQuery = (supabase as any)
           .from("inventory_items")
-          .update(nutritionUpdate)
+          .update(resolutionUpdate.update)
           .eq("id", transferredInventoryItemId)
           .eq("user_id", user.id)
           .is("nutrition_basis", null)
           .is("calories", null)
           .is("protein_g", null)
           .is("carbs_g", null)
-          .is("fat_g", null)
-          .select("id") as {
+          .is("fat_g", null);
+        updateQuery = resolutionUpdate.expectedFoodCatalogItemId === null
+          ? updateQuery.is("food_catalog_item_id", null)
+          : updateQuery.eq("food_catalog_item_id", resolutionUpdate.expectedFoodCatalogItemId);
+        const { data: updatedNutritionRows, error: updateNutritionError } = await updateQuery.select("id") as {
             data: { id: string }[] | null;
             error: { message: string } | null;
           };
@@ -316,15 +315,17 @@ export async function transferShoppingListItemToInventoryAction(formData: FormDa
         if (updateNutritionError) {
           console.warn("Supabase could not save automatic nutrition after shopping list transfer:", updateNutritionError.message);
         } else if (updatedNutritionRows?.length === 1) {
-          shoppingListSuccess = "item-transferred-with-nutrition";
+          if (!resolutionUpdate.needsReview) {
+            shoppingListSuccess = "item-transferred-with-nutrition";
+          }
         } else {
           console.warn("Automatic nutrition after shopping list transfer was not saved because the transferred item changed concurrently.");
         }
       } else {
-        console.warn("Automatic nutrition after shopping list transfer was not completed:", nutritionResult.status);
+        console.warn("Automatic nutrition after shopping list transfer found conflicting food identities.");
       }
     } else {
-      console.warn("Automatic nutrition after shopping list transfer skipped because OpenAI is not configured.");
+      console.warn("Automatic nutrition after shopping list transfer was not completed:", nutritionResult.status);
     }
   }
 
