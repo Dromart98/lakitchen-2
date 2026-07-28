@@ -12,9 +12,11 @@ import {
   matchRecipesToInventory,
   normalizeRecipeFilterMode,
   sortRecipeMatches,
+  toRecipeInventoryItem,
   type RecipeFilterMode,
   type RecipeIngredient,
   type RecipeInventoryItem,
+  type RecipeInventoryItemRow,
   type RecipeTemplate,
 } from "@/modules/recipes/recipe-matching";
 import type { RecipeNutritionEstimate } from "@/modules/recipes/recipe-nutrition";
@@ -127,9 +129,9 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
 
   const { data: inventoryData, error: inventoryError } = await (supabase as any)
     .from("inventory_items")
-    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g")
+    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g, food_catalog_item_id, food_catalog_items!inventory_items_food_owner_fk(normalized_name, aliases)")
     .eq("user_id", user.id)
-    .gt("quantity", 0) as { data: RecipeInventoryItem[] | null; error: { message: string } | null };
+    .gt("quantity", 0) as { data: RecipeInventoryItemRow[] | null; error: { message: string } | null };
 
   const { data: savedRecipeData, error: savedRecipeError } = await (supabase as any)
     .from("user_saved_ai_recipes")
@@ -164,7 +166,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
     return validRecipes;
   }, []);
 
-  const inventoryItems = inventoryError ? [] : inventoryData ?? [];
+  const inventoryItems: RecipeInventoryItem[] = inventoryError ? [] : (inventoryData ?? []).map(toRecipeInventoryItem);
   const recipes = (recipeError ? [] : recipeData ?? []).map(toRecipeTemplate).filter((recipe): recipe is RecipeTemplate => Boolean(recipe));
   const recipeMatchesWithServingOptions = sortRecipeMatches(matchRecipesToInventory(recipes, inventoryItems, todayKey))
     .map((match) => buildRecipeMatchWithServingOptions(match, inventoryItems, todayKey));

@@ -142,16 +142,16 @@ Objetivo: no consultar APIs externas repetidamente y mantener resultados estable
 
 ### 1.3 Entidad única de alimento
 
-**En progreso.** La implementación se divide para mantener el aislamiento y evitar una adopción transversal insegura:
+**Implementada/cerrada.** La implementación se divide para mantener el aislamiento y evitar una adopción transversal insegura:
 
 - **1.3A — Implementada/cerrada:** núcleo privado desplegado, FK del catálogo nutricional desplegada y corrección de su índice compuesto aplicada y validada con el advisor.
 - **1.3B — Implementada/cerrada:** adopción segura por los datos operativos, dividida en:
   - **1.3B1 — Inventario — Implementada/cerrada:** la identidad nullable y protegida por propietario se propaga desde altas manuales, nutrición, códigos de barras y voz.
   - **1.3B2 — comidas y recetas guardadas — Implementada/cerrada:** hereda la identidad desde Inventario.
   - **1.3B3 — lista de compra y transferencia — Implementada/cerrada:** conserva la identidad central al transferir compras a Inventario.
-- **1.3C — En progreso:** adopción de identidad en planes sin romper aislamiento, dividida en:
-  - **1.3C1 — planes privados — En progreso:** proyección relacional de la identidad de cada ingrediente guardado, manteniendo el JSON como snapshot sin IDs privados del catálogo.
-  - **1.3C2 — plantillas/globales — Pendiente:** estrategia de identidad para plantillas globales.
+- **1.3C — Implementada/cerrada:** adopción de identidad en planes sin romper aislamiento, dividida en:
+  - **1.3C1 — planes privados — Implementada/cerrada:** proyección relacional de la identidad de cada ingrediente guardado, manteniendo el JSON como snapshot sin IDs privados del catálogo.
+  - **1.3C2 — plantillas/globales — Implementada/cerrada:** las plantillas conservan vocabulario semántico global y priorizan la identidad privada del inventario sin almacenar sus IDs.
 
 Crear una entidad central de alimento, por ejemplo `food_catalog_items`, utilizada por:
 

@@ -38,6 +38,17 @@ export type RecipeInventoryItem = {
   protein_g?: number | null;
   carbs_g?: number | null;
   fat_g?: number | null;
+  foodIdentity?: RecipeFoodIdentity;
+};
+
+export type RecipeFoodIdentity =
+  | { status: "none" }
+  | { status: "unresolved" }
+  | { status: "resolved"; normalizedName: string; aliases: string[] };
+
+export type RecipeInventoryItemRow = Omit<RecipeInventoryItem, "foodIdentity"> & {
+  food_catalog_item_id?: unknown;
+  food_catalog_items?: unknown;
 };
 
 export type RecipeIngredientAllocation = {
@@ -79,10 +90,32 @@ type UnitKind = "weight" | "volume" | "unit";
 type BaseUnit = "g" | "ml" | "ud";
 
 type StockCopy = RecipeInventoryItem & {
-  normalizedName: string;
+  matchTerms: Set<string>;
   remainingBaseQuantity: number | null;
   baseUnit: BaseUnit | null;
 };
+
+export function toRecipeInventoryItem(row: RecipeInventoryItemRow): RecipeInventoryItem {
+  const relation = row.food_catalog_items;
+  const hasIdentityReference = row.food_catalog_item_id !== null && row.food_catalog_item_id !== undefined;
+  let foodIdentity: RecipeFoodIdentity = hasIdentityReference ? { status: "unresolved" } : { status: "none" };
+
+  if (hasIdentityReference && relation && typeof relation === "object" && !Array.isArray(relation)) {
+    const rawNormalizedName = Reflect.get(relation, "normalized_name");
+    const normalizedName = typeof rawNormalizedName === "string" ? normalizeRecipeMatchTerm(rawNormalizedName) : "";
+    const rawAliases = Reflect.get(relation, "aliases");
+    if (normalizedName) {
+      const aliases = [...new Set((Array.isArray(rawAliases) ? rawAliases : [])
+        .filter((alias): alias is string => typeof alias === "string")
+        .map(normalizeRecipeMatchTerm)
+        .filter((alias) => alias && alias !== normalizedName))];
+      foodIdentity = { status: "resolved", normalizedName, aliases };
+    }
+  }
+
+  const { food_catalog_item_id: _foodCatalogItemId, food_catalog_items: _foodCatalogItems, ...inventoryItem } = row;
+  return { ...inventoryItem, foodIdentity };
+}
 
 const unitMetadata: Record<RecipeUnit, { kind: UnitKind; baseUnit: BaseUnit; factor: number }> = {
   g: { kind: "weight", baseUnit: "g", factor: 1 },
@@ -137,8 +170,8 @@ function isUrgent(expiresAt: string | null, todayKey: string): boolean {
 
 function matchIngredient(ingredient: RecipeIngredient, stock: StockCopy[], todayKey: string): RecipeIngredientMatch {
   const required = convertRecipeQuantityToBase(ingredient.required_quantity, ingredient.required_unit);
-  const terms = new Set(ingredient.match_terms.map(normalizeRecipeMatchTerm));
-  const nameMatches = stock.filter((item) => terms.has(item.normalizedName));
+  const terms = new Set(ingredient.match_terms.map(normalizeRecipeMatchTerm).filter(Boolean));
+  const nameMatches = stock.filter((item) => [...item.matchTerms].some((term) => terms.has(term)));
 
   if (!required || nameMatches.length === 0) {
     return { ingredient, status: "missing", availableQuantity: 0, requiredQuantity: required?.quantity ?? 0, baseUnit: required?.unit ?? null, matchedItemCount: 0, urgentItemCount: 0, nearestExpirationDate: null, allocations: [] };
@@ -205,7 +238,12 @@ export function matchRecipesToInventory(recipes: RecipeTemplate[], inventory: Re
   return recipes.map((recipe) => {
     const stock: StockCopy[] = inventory.map((item) => {
       const converted = convertRecipeQuantityToBase(item.quantity, item.unit);
-      return { ...item, normalizedName: normalizeRecipeMatchTerm(item.name), remainingBaseQuantity: converted?.quantity ?? null, baseUnit: converted?.unit ?? null };
+      const matchTerms = item.foodIdentity?.status === "resolved"
+        ? new Set([item.foodIdentity.normalizedName, ...item.foodIdentity.aliases])
+        : item.foodIdentity?.status === "unresolved"
+          ? new Set<string>()
+          : new Set([normalizeRecipeMatchTerm(item.name)]);
+      return { ...item, matchTerms, remainingBaseQuantity: converted?.quantity ?? null, baseUnit: converted?.unit ?? null };
     });
 
     const ingredients = [...recipe.recipe_ingredients].sort((first, second) => first.sort_order - second.sort_order || first.display_name.localeCompare(second.display_name, "es"));

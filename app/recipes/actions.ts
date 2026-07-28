@@ -39,8 +39,10 @@ import {
 import {
   matchRecipesToInventory,
   normalizeRecipeFilterMode,
+  toRecipeInventoryItem,
   type RecipeIngredient,
   type RecipeInventoryItem,
+  type RecipeInventoryItemRow,
   type RecipeTemplate,
 } from "@/modules/recipes/recipe-matching";
 import { estimateRecipeNutrition } from "@/modules/recipes/recipe-nutrition";
@@ -143,9 +145,9 @@ export async function cookRecipeAndLogMealAction(formData: FormData) {
 
   const { data: inventoryData, error: inventoryError } = await recipeClient
     .from("inventory_items")
-    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g")
+    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g, food_catalog_item_id, food_catalog_items!inventory_items_food_owner_fk(normalized_name, aliases)")
     .eq("user_id", user.id)
-    .gt("quantity", 0) as { data: RecipeInventoryItem[] | null; error: { message: string } | null };
+    .gt("quantity", 0) as { data: RecipeInventoryItemRow[] | null; error: { message: string } | null };
 
   if (inventoryError) {
     console.warn("Supabase could not load recipe consumption inventory items:", inventoryError.message);
@@ -165,7 +167,7 @@ export async function cookRecipeAndLogMealAction(formData: FormData) {
 
   if (!recipeData) redirectWithRecipeError(mode, "recipe-not-found");
 
-  const inventoryItems = inventoryData ?? [];
+  const inventoryItems: RecipeInventoryItem[] = (inventoryData ?? []).map(toRecipeInventoryItem);
   const recipe = toRecipeTemplate(recipeData);
   const scaledRecipe = scaleRecipeToServings(recipe, requestedServings);
   if (!scaledRecipe.ok) redirectWithRecipeError(mode, "invalid-servings");
