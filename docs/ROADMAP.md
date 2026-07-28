@@ -145,10 +145,10 @@ Objetivo: no consultar APIs externas repetidamente y mantener resultados estable
 **En progreso.** La implementación se divide para mantener el aislamiento y evitar una adopción transversal insegura:
 
 - **1.3A — Implementada/cerrada:** núcleo privado desplegado, FK del catálogo nutricional desplegada y corrección de su índice compuesto aplicada y validada con el advisor.
-- **1.3B — En progreso:** adopción segura por los datos operativos, dividida en:
+- **1.3B — Implementada/cerrada:** adopción segura por los datos operativos, dividida en:
   - **1.3B1 — Inventario — Implementada/cerrada:** la identidad nullable y protegida por propietario se propaga desde altas manuales, nutrición, códigos de barras y voz.
   - **1.3B2 — comidas y recetas guardadas — Implementada/cerrada:** hereda la identidad desde Inventario.
-  - **1.3B3 — lista de compra y transferencia — En progreso:** conserva la identidad central al transferir compras a Inventario.
+  - **1.3B3 — lista de compra y transferencia — Implementada/cerrada:** conserva la identidad central al transferir compras a Inventario.
 - **1.3C — Pendiente:** estrategia para planes JSON y recetas de plantilla/globales sin romper aislamiento.
 
 Crear una entidad central de alimento, por ejemplo `food_catalog_items`, utilizada por:
