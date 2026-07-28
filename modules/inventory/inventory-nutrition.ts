@@ -1,8 +1,8 @@
+import { convertFoodQuantity, isFoodQuantityUnit } from "@/modules/units/food-quantity";
+
 export const NUTRITION_BASES = ["per_100g", "per_unit", "per_100ml"] as const;
 
 export type InventoryNutritionBasis = (typeof NUTRITION_BASES)[number];
-
-type InventoryNutritionUnit = "ud" | "g" | "kg" | "ml" | "l";
 
 type InventoryNutritionValues = {
   calories: number | null;
@@ -64,34 +64,26 @@ export function hasCompleteInventoryNutritionValues(values: {
   );
 }
 
-function isInventoryNutritionUnit(value: string): value is InventoryNutritionUnit {
-  return value === "ud" || value === "g" || value === "kg" || value === "ml" || value === "l";
-}
-
 function getAvailableNutritionFactor(
   nutritionBasis: InventoryNutritionBasis | null,
   quantity: number,
   unit: string,
 ) {
-  if (!nutritionBasis || !Number.isFinite(quantity) || quantity <= 0 || !isInventoryNutritionUnit(unit)) {
+  if (!nutritionBasis || !isFoodQuantityUnit(unit)) {
     return null;
   }
 
   if (nutritionBasis === "per_100g") {
-    if (unit === "g") return quantity / 100;
-    if (unit === "kg") return quantity * 10;
-    return null;
+    const grams = convertFoodQuantity(quantity, unit, "g");
+    return grams === null ? null : grams / 100;
   }
 
   if (nutritionBasis === "per_100ml") {
-    if (unit === "ml") return quantity / 100;
-    if (unit === "l") return quantity * 10;
-    return null;
+    const milliliters = convertFoodQuantity(quantity, unit, "ml");
+    return milliliters === null ? null : milliliters / 100;
   }
 
-  if (unit === "ud") return quantity;
-
-  return null;
+  return convertFoodQuantity(quantity, unit, "ud");
 }
 
 function multiplyOptionalNutritionValue(value: number | null, factor: number) {

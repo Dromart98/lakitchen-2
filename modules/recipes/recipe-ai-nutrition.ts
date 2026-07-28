@@ -2,6 +2,7 @@ import type { InventoryNutritionBasis } from "@/modules/inventory/inventory-nutr
 import type { RecipeIngredientAllocation } from "@/modules/recipes/recipe-matching";
 import { estimateRecipeNutrition, type RecipeNutritionEstimate } from "@/modules/recipes/recipe-nutrition";
 import type { RecipeAiSuggestion } from "@/modules/recipes/recipe-ai-generation";
+import { convertFoodQuantityToCanonical, type CanonicalFoodQuantityUnit } from "@/modules/units/food-quantity";
 
 export type RecipeAiNutritionInventoryItem = {
   id: string;
@@ -26,18 +27,10 @@ export type RecipeAiSuggestionWithNutrition = RecipeAiSuggestion & {
   };
 };
 
-type BaseUnit = "g" | "ml" | "ud";
+type BaseUnit = CanonicalFoodQuantityUnit;
 
 export function convertRecipeAiQuantityToBase(quantity: number, unit: string): { quantity: number; unit: BaseUnit } | null {
-  if (!Number.isFinite(quantity) || quantity <= 0) return null;
-
-  if (unit === "g") return { quantity, unit: "g" };
-  if (unit === "kg") return { quantity: quantity * 1000, unit: "g" };
-  if (unit === "ml") return { quantity, unit: "ml" };
-  if (unit === "l") return { quantity: quantity * 1000, unit: "ml" };
-  if (unit === "ud") return { quantity, unit: "ud" };
-
-  return null;
+  return convertFoodQuantityToCanonical(quantity, unit);
 }
 
 function buildIncompleteNutritionEstimate(missingNutritionItemCount: number): RecipeNutritionEstimate {

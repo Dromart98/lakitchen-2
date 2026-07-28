@@ -1,6 +1,13 @@
+import {
+  convertFoodQuantity,
+  getFoodQuantityUnitDefinition,
+  type FoodQuantityDimension,
+  type FoodQuantityUnit,
+} from "@/modules/units/food-quantity";
+
 export const PACKAGE_SIZE_UNITS = ["g", "kg", "ml", "l"] as const;
-export type PackageSizeUnit = (typeof PACKAGE_SIZE_UNITS)[number];
-export type PackageDimension = "mass" | "volume";
+export type PackageSizeUnit = Exclude<FoodQuantityUnit, "ud">;
+export type PackageDimension = Exclude<FoodQuantityDimension, "units">;
 
 export type PackageFacts = {
   package_count: number | null;
@@ -18,18 +25,15 @@ export type ResolvedPackageQuantity = PackageFacts & {
   calculated_total_size_unit: "g" | "ml" | "l";
 };
 
-function unitDefinition(unit: PackageSizeUnit) {
-  if (unit === "g") return { dimension: "mass" as const, baseUnit: "g" as const, factor: 1 };
-  if (unit === "kg") return { dimension: "mass" as const, baseUnit: "g" as const, factor: 1000 };
-  if (unit === "ml") return { dimension: "volume" as const, baseUnit: "ml" as const, factor: 1 };
-  return { dimension: "volume" as const, baseUnit: "ml" as const, factor: 1000 };
+function getPackageUnitDefinition(unit: PackageSizeUnit) {
+  return getFoodQuantityUnitDefinition(unit)! as ReturnType<typeof getFoodQuantityUnitDefinition> & {
+    dimension: PackageDimension;
+    canonicalUnit: "g" | "ml";
+  };
 }
 
 export function convertPackageSize(value: number, from: PackageSizeUnit, to: PackageSizeUnit): number | null {
-  if (!Number.isFinite(value) || value <= 0) return null;
-  const source = unitDefinition(from);
-  const target = unitDefinition(to);
-  return source.dimension === target.dimension ? value * source.factor / target.factor : null;
+  return convertFoodQuantity(value, from, to);
 }
 
 /** Resolves observed package facts. It never supplies an unobserved weight or volume. */
@@ -37,20 +41,20 @@ export function resolvePackageQuantity(facts: PackageFacts): ResolvedPackageQuan
   if (!facts.package_count || !Number.isFinite(facts.package_count) || facts.package_count <= 0) return null;
   const count = facts.package_count;
   const individual = facts.package_size !== null && facts.package_size_unit
-    ? convertPackageSize(facts.package_size, facts.package_size_unit, unitDefinition(facts.package_size_unit).baseUnit)
+    ? convertPackageSize(facts.package_size, facts.package_size_unit, getPackageUnitDefinition(facts.package_size_unit).canonicalUnit)
     : null;
   const total = facts.total_size !== null && facts.total_size_unit
-    ? convertPackageSize(facts.total_size, facts.total_size_unit, unitDefinition(facts.total_size_unit).baseUnit)
+    ? convertPackageSize(facts.total_size, facts.total_size_unit, getPackageUnitDefinition(facts.total_size_unit).canonicalUnit)
     : null;
   if (individual === null && total === null) return null;
   if (individual !== null && total !== null) {
-    const individualDefinition = unitDefinition(facts.package_size_unit!);
-    const totalDefinition = unitDefinition(facts.total_size_unit!);
+    const individualDefinition = getPackageUnitDefinition(facts.package_size_unit!);
+    const totalDefinition = getPackageUnitDefinition(facts.total_size_unit!);
     if (individualDefinition.dimension !== totalDefinition.dimension) return null;
     const tolerance = Math.max(1, total) * Number.EPSILON * 8;
     if (Math.abs(individual * count - total) > tolerance) return null;
   }
-  const definition = individual !== null ? unitDefinition(facts.package_size_unit!) : unitDefinition(facts.total_size_unit!);
+  const definition = getPackageUnitDefinition(individual !== null ? facts.package_size_unit! : facts.total_size_unit!);
   const unitSize = individual ?? total! / count;
   const totalInBase = unitSize * count;
   const displayTotalAsLiters = definition.dimension === "volume" && totalInBase >= 1000;
@@ -58,9 +62,9 @@ export function resolvePackageQuantity(facts: PackageFacts): ResolvedPackageQuan
     ...facts,
     dimension: definition.dimension,
     derived_unit_size: unitSize,
-    derived_unit_size_unit: definition.baseUnit,
+    derived_unit_size_unit: definition.canonicalUnit,
     calculated_total_size: displayTotalAsLiters ? totalInBase / 1000 : totalInBase,
-    calculated_total_size_unit: displayTotalAsLiters ? "l" : definition.baseUnit,
+    calculated_total_size_unit: displayTotalAsLiters ? "l" : definition.canonicalUnit,
   };
 }
 
