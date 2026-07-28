@@ -57,8 +57,10 @@ begin
     from public.user_saved_daily_plans
     order by id
   loop
-    if jsonb_typeof(v_plan.meals) <> 'array' then
-      raise exception 'invalid_saved_plan_identity_backfill: plan % meals must be an array', v_plan.id;
+    if jsonb_typeof(v_plan.meals) <> 'array'
+      or jsonb_array_length(v_plan.meals) <> 4
+    then
+      raise exception 'invalid_saved_plan_identity_backfill: plan % must contain exactly four meals', v_plan.id;
     end if;
 
     for v_meal, v_meal_index in
@@ -133,6 +135,10 @@ declare
   v_step jsonb;
   v_inventory record;
   v_inventory_id uuid;
+  v_requested_inventory_ids uuid[] := '{}';
+  v_locked_inventory_ids uuid[] := '{}';
+  v_expected_identity_count integer;
+  v_inserted_identity_count integer;
   v_expected_meal_types constant text[] := array['breakfast', 'lunch', 'snack', 'dinner'];
   v_nutrition_keys constant text[] := array['calories', 'protein_g', 'carbs_g', 'fat_g'];
   v_meal_keys constant text[] := array[
@@ -266,37 +272,30 @@ begin
     end loop;
   end loop;
 
-  -- Resolve all inventory references only after the JSON is known to be safe to cast.
-  if (
-    select count(distinct ingredient ->> 'inventory_item_id')
+  -- Extract distinct references only after the JSON is known to be safe to cast.
+  select array_agg(requested.id order by requested.id)
+    into v_requested_inventory_ids
+  from (
+    select distinct (ingredient ->> 'inventory_item_id')::uuid as id
     from jsonb_array_elements(p_meals) meals(meal)
     cross join lateral jsonb_array_elements(meal -> 'ingredients') ingredients(ingredient)
-  ) <> (
-    select count(distinct inventory.id)
-    from jsonb_array_elements(p_meals) meals(meal)
-    cross join lateral jsonb_array_elements(meal -> 'ingredients') ingredients(ingredient)
-    join public.inventory_items inventory
-      on inventory.id = (ingredient ->> 'inventory_item_id')::uuid
-     and inventory.user_id = v_user_id
-  ) then
-    raise exception using errcode = 'P0002', message = 'inventory_item_not_found';
-  end if;
+  ) requested;
 
-  -- A deterministic row-lock order prevents concurrent edits/deletes and deadlocks.
+  -- Lock every surviving owner-scoped row before deciding whether all references exist.
   for v_inventory_id in
     select inventory.id
     from public.inventory_items inventory
-    join (
-      select distinct (ingredient ->> 'inventory_item_id')::uuid as id
-      from jsonb_array_elements(p_meals) meals(meal)
-      cross join lateral jsonb_array_elements(meal -> 'ingredients') ingredients(ingredient)
-    ) requested on requested.id = inventory.id
-    where inventory.user_id = v_user_id
+    where inventory.id = any(v_requested_inventory_ids)
+      and inventory.user_id = v_user_id
     order by inventory.id
     for update of inventory
   loop
-    null;
+    v_locked_inventory_ids := array_append(v_locked_inventory_ids, v_inventory_id);
   end loop;
+
+  if cardinality(v_locked_inventory_ids) <> cardinality(v_requested_inventory_ids) then
+    raise exception using errcode = 'P0002', message = 'inventory_item_not_found';
+  end if;
 
   for v_inventory in
     select
@@ -307,6 +306,7 @@ begin
     join public.inventory_items inventory
       on inventory.id = (ingredient ->> 'inventory_item_id')::uuid
      and inventory.user_id = v_user_id
+     and inventory.id = any(v_locked_inventory_ids)
     group by inventory.id, inventory.name, inventory.unit, inventory.quantity, inventory.expires_at
   loop
     if exists (
@@ -366,7 +366,18 @@ begin
   join public.inventory_items inventory
     on inventory.id = (ingredient ->> 'inventory_item_id')::uuid
    and inventory.user_id = v_user_id
+   and inventory.id = any(v_locked_inventory_ids)
   order by meal_ordinality, ingredient_ordinality;
+
+  get diagnostics v_inserted_identity_count = row_count;
+  select count(*)
+    into v_expected_identity_count
+  from jsonb_array_elements(p_meals) meals(meal)
+  cross join lateral jsonb_array_elements(meal -> 'ingredients');
+
+  if v_inserted_identity_count <> v_expected_identity_count then
+    raise exception using errcode = 'P0001', message = 'saved_plan_identity_projection_incomplete';
+  end if;
 
   return v_id;
 exception

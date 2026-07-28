@@ -50,6 +50,23 @@ describe("saved daily plan ingredient identity migration", () => {
     expect(sql).not.toMatch(/normalized_name|similarity|open food facts|usda|\bai\b/);
   });
 
+  it("rejects historical plans with three or five meals before any projection", () => {
+    const exactLength = sql.indexOf("jsonb_array_length(v_plan.meals) <> 4");
+    const mealLoop = sql.indexOf("for v_meal, v_meal_index in");
+    const backfillInsert = sql.indexOf(
+      "insert into public.user_saved_daily_plan_ingredient_identities",
+    );
+    expect(exactLength).toBeGreaterThanOrEqual(0);
+    expect(exactLength).toBeLessThan(mealLoop);
+    expect(exactLength).toBeLessThan(backfillInsert);
+    expect(sql.slice(exactLength, mealLoop)).toContain(
+      "invalid_saved_plan_identity_backfill",
+    );
+    expect(sql).toContain(
+      "v_meal ->> 'meal_type' <> (array['breakfast', 'lunch', 'snack', 'dinner'])[v_meal_index]",
+    );
+  });
+
   it("keeps the save RPC signature and exact JSON contract", () => {
     expect(sql).toMatch(
       /save_scheduled_daily_plan\s*\(\s*p_plan_date date,\s*p_priority_mode text,\s*p_max_minutes_per_meal integer,\s*p_target jsonb,\s*p_total jsonb,\s*p_difference jsonb,\s*p_fit text,\s*p_meals jsonb,\s*p_fingerprint text\s*\)/,
@@ -73,6 +90,24 @@ describe("saved daily plan ingredient identity migration", () => {
     expect(sql).toContain("v_inventory.expires_at < p_plan_date");
   });
 
+  it("checks existence only after collecting the deterministically locked set", () => {
+    const lock = sql.indexOf("for update of inventory");
+    const lockedAppend = sql.indexOf(
+      "v_locked_inventory_ids := array_append(v_locked_inventory_ids, v_inventory_id)",
+    );
+    const countCheck = sql.indexOf(
+      "cardinality(v_locked_inventory_ids) <> cardinality(v_requested_inventory_ids)",
+    );
+    const missingError = sql.indexOf("message = 'inventory_item_not_found'", countCheck);
+    const planInsert = sql.indexOf("insert into public.user_saved_daily_plans");
+    expect(lock).toBeGreaterThanOrEqual(0);
+    expect(lockedAppend).toBeGreaterThan(lock);
+    expect(countCheck).toBeGreaterThan(lockedAppend);
+    expect(missingError).toBeGreaterThan(countCheck);
+    expect(missingError).toBeLessThan(planInsert);
+    expect(sql.slice(0, lock)).not.toContain("message = 'inventory_item_not_found'");
+  });
+
   it("aggregates repeated quantities before comparing available stock", () => {
     expect(sql).toContain(
       "sum((ingredient ->> 'quantity')::numeric) as requested_quantity",
@@ -93,7 +128,16 @@ describe("saved daily plan ingredient identity migration", () => {
     expect(sql.slice(identityInsert)).toContain("with ordinality ingredients");
     expect(sql.slice(identityInsert)).toContain("inventory.food_catalog_item_id");
     expect(sql.slice(identityInsert)).toContain(
+      "inventory.id = any(v_locked_inventory_ids)",
+    );
+    expect(sql.slice(identityInsert)).toContain(
       "order by meal_ordinality, ingredient_ordinality",
+    );
+    expect(sql.slice(identityInsert)).toContain(
+      "get diagnostics v_inserted_identity_count = row_count",
+    );
+    expect(sql.slice(identityInsert)).toContain(
+      "v_inserted_identity_count <> v_expected_identity_count",
     );
     expect(sql).not.toContain("consume_saved_daily_plan_meal");
   });
