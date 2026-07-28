@@ -6,6 +6,7 @@ import {
   matchRecipesToInventory,
   normalizeRecipeMatchTerm,
   sortRecipeMatches,
+  toRecipeInventoryItem,
   type RecipeIngredient,
   type RecipeMatchResult,
   type RecipeTemplate,
@@ -34,6 +35,32 @@ describe("recipe matching", () => {
   it("does not use substring matching", () => {
     const [missing] = matchRecipesToInventory([recipe({ recipe_ingredients: [ingredient({ display_name: "Pan", match_terms: ["pan"], required_unit: "ud" })] })], [{ id: "1", name: "pan integral grande", quantity: 1, unit: "ud", expires_at: null }], "2026-07-14");
     expect(missing.ingredientMatches[0].status).toBe("missing");
+  });
+
+  it("matches the exact central identity before the visible inventory name", () => {
+    const matching = toRecipeInventoryItem({ id: "1", name: "pollo fresco", quantity: 100, unit: "g", expires_at: null, food_catalog_item_id: "food-a", food_catalog_items: { normalized_name: "pollo", aliases: [] } });
+    const contradictory = toRecipeInventoryItem({ id: "2", name: "pollo", quantity: 100, unit: "g", expires_at: null, food_catalog_item_id: "food-b", food_catalog_items: { normalized_name: "pavo", aliases: [] } });
+
+    expect(matchRecipesToInventory([recipe()], [matching], "2026-07-14")[0].canCookNow).toBe(true);
+    expect(matchRecipesToInventory([recipe()], [contradictory], "2026-07-14")[0].ingredientMatches[0].status).toBe("missing");
+  });
+
+  it("matches sanitized identity aliases and ignores empty, invalid and duplicate aliases", () => {
+    const item = toRecipeInventoryItem({ id: "1", name: "ave", quantity: 100, unit: "g", expires_at: null, food_catalog_item_id: "food-a", food_catalog_items: { normalized_name: "pavo", aliases: [" POLLO ", "pollo", "", null, 3] } });
+
+    expect(item.foodIdentity).toEqual({ normalizedName: "pavo", aliases: ["pollo"] });
+    expect(matchRecipesToInventory([recipe()], [item], "2026-07-14")[0].canCookNow).toBe(true);
+  });
+
+  it("falls back to the exact visible name only without a valid central identity", () => {
+    const withoutIdentity = toRecipeInventoryItem({ id: "1", name: "pollo", quantity: 100, unit: "g", expires_at: null, food_catalog_item_id: null, food_catalog_items: null });
+    const malformedRelation = toRecipeInventoryItem({ id: "2", name: "pollo", quantity: 100, unit: "g", expires_at: null, food_catalog_item_id: "food-a", food_catalog_items: [{ normalized_name: "pavo", aliases: [] }] });
+    const malformedName = toRecipeInventoryItem({ id: "3", name: "pollo", quantity: 100, unit: "g", expires_at: null, food_catalog_item_id: "food-b", food_catalog_items: { normalized_name: 7, aliases: [] } });
+
+    expect(withoutIdentity.foodIdentity).toBeNull();
+    expect(malformedRelation.foodIdentity).toBeNull();
+    expect(malformedName.foodIdentity).toBeNull();
+    expect(matchRecipesToInventory([recipe()], [withoutIdentity], "2026-07-14")[0].canCookNow).toBe(true);
   });
 
   it("converts and validates units", () => {
