@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildShoppingListTransferNutritionUpdate,
   getShoppingListTransferNutritionPlan,
+  planShoppingListTransferResolutionUpdate,
   type TransferredInventoryNutritionItem,
 } from "@/modules/shopping-list/shopping-list-transfer-nutrition";
 
@@ -20,6 +21,7 @@ function item(overrides: Partial<TransferredInventoryNutritionItem> = {}): Trans
     protein_g: null,
     carbs_g: null,
     fat_g: null,
+    food_catalog_item_id: null,
     ...overrides,
   };
 }
@@ -84,6 +86,49 @@ describe("getShoppingListTransferNutritionPlan", () => {
     getShoppingListTransferNutritionPlan(input);
 
     expect(input).toEqual(snapshot);
+  });
+});
+
+describe("planShoppingListTransferResolutionUpdate", () => {
+  const resolution = {
+    status: "resolved" as const,
+    normalizedName: "pasta",
+    foodState: "raw" as const,
+    nutritionBasis: "per_100g" as const,
+    calories: 350,
+    proteinG: 12,
+    carbsG: 70,
+    fatG: 2,
+    needsReview: false,
+    provenance: { source: "usda" as const, resolvedAt: "2026-07-28T00:00:00.000Z" },
+    assumptions: "",
+    foodCatalogItemId: "223e4567-e89b-42d3-a456-426614174000",
+  };
+
+  it("adds resolved identity only when the inventory item has none", () => {
+    expect(planShoppingListTransferResolutionUpdate(null, resolution)).toMatchObject({
+      status: "apply",
+      expectedFoodCatalogItemId: null,
+      update: { food_catalog_item_id: resolution.foodCatalogItemId, calories: 350 },
+    });
+  });
+
+  it("preserves an existing matching identity", () => {
+    expect(planShoppingListTransferResolutionUpdate(resolution.foodCatalogItemId, resolution)).toMatchObject({
+      status: "apply",
+      update: { food_catalog_item_id: resolution.foodCatalogItemId },
+    });
+  });
+
+  it("preserves an existing identity when the resolver has none", () => {
+    expect(planShoppingListTransferResolutionUpdate(validId, { ...resolution, foodCatalogItemId: null })).toMatchObject({
+      status: "apply",
+      update: { food_catalog_item_id: validId },
+    });
+  });
+
+  it("rejects two different non-null identities without producing an update", () => {
+    expect(planShoppingListTransferResolutionUpdate(validId, resolution)).toEqual({ status: "identity-conflict" });
   });
 });
 

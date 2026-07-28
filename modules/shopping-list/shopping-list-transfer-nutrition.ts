@@ -1,4 +1,5 @@
 import { type InventoryNutritionAiEstimate, type InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
+import type { ResolvedNutrition } from "@/modules/nutrition/resolution";
 import { isInventoryCategory, type InventoryCategory } from "@/modules/inventory/inventory-categories";
 import { isInventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
 
@@ -13,6 +14,7 @@ export type TransferredInventoryNutritionItem = {
   protein_g: number | null;
   carbs_g: number | null;
   fat_g: number | null;
+  food_catalog_item_id: string | null;
 };
 
 export type ShoppingListTransferNutritionPlan =
@@ -98,5 +100,34 @@ export function buildShoppingListTransferNutritionUpdate(estimate: InventoryNutr
     protein_g: estimate.protein_g,
     carbs_g: estimate.carbs_g,
     fat_g: estimate.fat_g,
+  };
+}
+
+export type ShoppingListTransferResolutionUpdate =
+  | { status: "apply"; update: ReturnType<typeof buildShoppingListTransferNutritionUpdate> & { food_catalog_item_id: string | null }; expectedFoodCatalogItemId: string | null; needsReview: boolean }
+  | { status: "identity-conflict" };
+
+/** Plans a compare-and-set update without allowing a resolver to replace known identity. */
+export function planShoppingListTransferResolutionUpdate(
+  existingFoodCatalogItemId: string | null,
+  resolution: ResolvedNutrition & { foodCatalogItemId?: string | null },
+): ShoppingListTransferResolutionUpdate {
+  const resolvedFoodCatalogItemId = resolution.foodCatalogItemId ?? null;
+  if (existingFoodCatalogItemId && resolvedFoodCatalogItemId && existingFoodCatalogItemId !== resolvedFoodCatalogItemId) {
+    return { status: "identity-conflict" };
+  }
+
+  return {
+    status: "apply",
+    expectedFoodCatalogItemId: existingFoodCatalogItemId,
+    needsReview: resolution.needsReview,
+    update: {
+      nutrition_basis: resolution.nutritionBasis,
+      calories: resolution.calories,
+      protein_g: resolution.proteinG,
+      carbs_g: resolution.carbsG,
+      fat_g: resolution.fatG,
+      food_catalog_item_id: existingFoodCatalogItemId ?? resolvedFoodCatalogItemId,
+    },
   };
 }
