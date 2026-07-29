@@ -49,4 +49,21 @@ describe("inventory confirmed unit measure selection", () => {
     });
     expect(selectInventoryUnitMeasures([row(), second], USER, [FOOD]).size).toBe(0);
   });
+
+  it.each([
+    ["58 g + 60 ml", row({
+      id: "00000000-0000-4000-8000-000000000005",
+      variant_key: "liquid",
+      canonical_quantity: 60,
+      canonical_unit: "ml",
+    })],
+    ["58 g + 1 ud", row({
+      id: "00000000-0000-4000-8000-000000000006",
+      variant_key: "count",
+      canonical_quantity: 1,
+      canonical_unit: "ud",
+    })],
+  ])("counts every confirmed unit before validation: %s", (_name, second) => {
+    expect(selectInventoryUnitMeasures([row(), second], USER, [FOOD]).size).toBe(0);
+  });
 });

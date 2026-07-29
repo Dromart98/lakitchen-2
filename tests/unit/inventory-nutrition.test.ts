@@ -157,6 +157,19 @@ describe("available inventory nutrition totals", () => {
     })).toBeNull();
   });
 
+  it("accepts the sole compatible mass and volume measures", () => {
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100g", consumed_quantity: 2, unit: "ud",
+      calories: 100, protein_g: 10, carbs_g: 5, fat_g: 2,
+      confirmedUnitMeasure: { canonicalQuantity: 58, canonicalUnit: "g" },
+    })?.calories).toBeCloseTo(116);
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100ml", consumed_quantity: 0.5, unit: "ud",
+      calories: 100, protein_g: 10, carbs_g: 5, fat_g: 2,
+      confirmedUnitMeasure: { canonicalQuantity: 250, canonicalUnit: "ml" },
+    })?.calories).toBe(125);
+  });
+
   it("uses factor 2.5 for 250 g with values per 100 g", () => {
     expect(calculateAvailableInventoryNutrition({
       nutrition_basis: "per_100g",

@@ -6,6 +6,40 @@ const sql = readFileSync(
   "utf8",
 ).toLowerCase();
 
+type Measure = { canonicalQuantity: number; canonicalUnit: "g" | "ml" | "ud" };
+
+function executeRpcMeasureSemantics(
+  nutritionBasis: "per_100g" | "per_100ml" | "per_unit",
+  inventoryUnit: "g" | "kg" | "ml" | "l" | "ud",
+  consumedQuantity: number,
+  candidates: Measure[],
+) {
+  if (nutritionBasis === "per_100g" && inventoryUnit === "g") return consumedQuantity / 100;
+  if (nutritionBasis === "per_100g" && inventoryUnit === "kg") return consumedQuantity * 10;
+  if (nutritionBasis === "per_100ml" && inventoryUnit === "ml") return consumedQuantity / 100;
+  if (nutritionBasis === "per_100ml" && inventoryUnit === "l") return consumedQuantity * 10;
+  if (nutritionBasis === "per_unit" && inventoryUnit === "ud") return consumedQuantity;
+  if (candidates.length !== 1) throw new Error("Incompatible inventory nutrition unit");
+
+  const [{ canonicalQuantity, canonicalUnit }] = candidates;
+  if (!Number.isFinite(canonicalQuantity) || canonicalQuantity <= 0 || canonicalUnit === "ud") {
+    throw new Error("Incompatible inventory nutrition unit");
+  }
+  if (nutritionBasis === "per_100g" && inventoryUnit === "ud" && canonicalUnit === "g") {
+    return consumedQuantity * canonicalQuantity / 100;
+  }
+  if (nutritionBasis === "per_100ml" && inventoryUnit === "ud" && canonicalUnit === "ml") {
+    return consumedQuantity * canonicalQuantity / 100;
+  }
+  if (nutritionBasis === "per_unit" && ["g", "kg"].includes(inventoryUnit) && canonicalUnit === "g") {
+    return consumedQuantity * (inventoryUnit === "kg" ? 1000 : 1) / canonicalQuantity;
+  }
+  if (nutritionBasis === "per_unit" && ["ml", "l"].includes(inventoryUnit) && canonicalUnit === "ml") {
+    return consumedQuantity * (inventoryUnit === "l" ? 1000 : 1) / canonicalQuantity;
+  }
+  throw new Error("Incompatible inventory nutrition unit");
+}
+
 describe("confirmed unit measure inventory meal migration", () => {
   it("keeps the RPC contract and permissions", () => {
     expect(sql).toContain("consume_inventory_item_and_log_meal(\n  p_item_id uuid,\n  p_consumed_quantity numeric,\n  p_meal_type text\n)");
@@ -15,12 +49,18 @@ describe("confirmed unit measure inventory meal migration", () => {
     expect(sql).toContain("grant execute on function public.consume_inventory_item_and_log_meal(uuid, numeric, text) to authenticated");
   });
 
-  it("locks the owned inventory first and compatible measures deterministically", () => {
+  it("locks the owned inventory first and all confirmed unit measures deterministically", () => {
     expect(sql.indexOf("from public.inventory_items")).toBeLessThan(sql.indexOf("from public.food_quantity_equivalences"));
     expect(sql).toContain("and user_id = v_user_id");
     expect(sql).toContain("and food_catalog_item_id = v_item.food_catalog_item_id");
     expect(sql).toContain("order by variant_key, id\n      for update");
     expect(sql).toContain("if v_equivalence_count <> 1 then");
+    const lockedQuery = sql.slice(
+      sql.indexOf("select *\n      from public.food_quantity_equivalences"),
+      sql.indexOf("    loop", sql.indexOf("from public.food_quantity_equivalences")),
+    );
+    expect(lockedQuery).not.toContain("canonical_unit");
+    expect(lockedQuery).not.toContain("canonical_quantity");
   });
 
   it("only accepts confirmed user unit measures and preserves exact conversions", () => {
@@ -38,5 +78,38 @@ describe("confirmed unit measure inventory meal migration", () => {
     expect(sql.indexOf("insert into public.daily_meal_log_items")).toBeLessThan(sql.indexOf("delete from public.inventory_items"));
     expect(sql).toContain("v_remaining_quantity := v_item.quantity - p_consumed_quantity");
     expect(sql).toContain("'incompatible inventory nutrition unit'");
+  });
+
+  it("fails closed on ambiguity before validating canonical unit", () => {
+    expect(() => executeRpcMeasureSemantics("per_100g", "ud", 2, [
+      { canonicalQuantity: 58, canonicalUnit: "g" },
+      { canonicalQuantity: 60, canonicalUnit: "ml" },
+    ])).toThrow("Incompatible inventory nutrition unit");
+    expect(() => executeRpcMeasureSemantics("per_100g", "ud", 2, [
+      { canonicalQuantity: 58, canonicalUnit: "g" },
+      { canonicalQuantity: 1, canonicalUnit: "ud" },
+    ])).toThrow("Incompatible inventory nutrition unit");
+  });
+
+  it("validates the sole candidate dimension and calculates compatible measures", () => {
+    expect(() => executeRpcMeasureSemantics("per_100g", "ud", 2, [
+      { canonicalQuantity: 60, canonicalUnit: "ml" },
+    ])).toThrow("Incompatible inventory nutrition unit");
+    expect(executeRpcMeasureSemantics("per_100g", "ud", 2, [
+      { canonicalQuantity: 58, canonicalUnit: "g" },
+    ])).toBe(1.16);
+    expect(executeRpcMeasureSemantics("per_100ml", "ud", 0.5, [
+      { canonicalQuantity: 250, canonicalUnit: "ml" },
+    ])).toBe(1.25);
+  });
+
+  it("keeps exact conversions independent from equivalence ambiguity", () => {
+    const ambiguous = [
+      { canonicalQuantity: 58, canonicalUnit: "g" as const },
+      { canonicalQuantity: 60, canonicalUnit: "ml" as const },
+    ];
+    expect(executeRpcMeasureSemantics("per_100g", "kg", 0.2, ambiguous)).toBe(2);
+    expect(executeRpcMeasureSemantics("per_100ml", "l", 0.25, ambiguous)).toBe(2.5);
+    expect(executeRpcMeasureSemantics("per_unit", "ud", 2, ambiguous)).toBe(2);
   });
 });

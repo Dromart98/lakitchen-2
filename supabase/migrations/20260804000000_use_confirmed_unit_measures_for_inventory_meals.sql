@@ -79,7 +79,7 @@ begin
   elsif v_item.nutrition_basis = 'per_100ml' and v_item.unit = 'l' then
     v_factor := p_consumed_quantity * 10;
   else
-    -- Lock every compatible candidate in a stable order so a concurrent edit or
+    -- Lock every confirmed unit candidate in a stable order so a concurrent edit or
     -- deletion cannot change the measurement used by this transaction.
     for v_equivalence in
       select *
@@ -89,15 +89,6 @@ begin
         and measure_kind = 'unit'
         and user_confirmed = true
         and source = 'user'
-        and canonical_quantity > 0
-        and canonical_quantity not in ('NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric)
-        and canonical_unit = case
-          when v_item.nutrition_basis = 'per_100g' and v_item.unit = 'ud' then 'g'
-          when v_item.nutrition_basis = 'per_100ml' and v_item.unit = 'ud' then 'ml'
-          when v_item.nutrition_basis = 'per_unit' and v_item.unit in ('g', 'kg') then 'g'
-          when v_item.nutrition_basis = 'per_unit' and v_item.unit in ('ml', 'l') then 'ml'
-          else null
-        end
       order by variant_key, id
       for update
     loop
@@ -108,17 +99,31 @@ begin
       raise exception using errcode = '22023', message = 'Incompatible inventory nutrition unit';
     end if;
 
-    if v_item.nutrition_basis = 'per_100g' and v_item.unit = 'ud' then
+    if v_equivalence.canonical_quantity is null
+      or v_equivalence.canonical_quantity <= 0
+      or v_equivalence.canonical_quantity in ('NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric)
+      or v_equivalence.canonical_unit is null
+      or v_equivalence.canonical_unit not in ('g', 'ml') then
+      raise exception using errcode = '22023', message = 'Incompatible inventory nutrition unit';
+    end if;
+
+    if v_item.nutrition_basis = 'per_100g' and v_item.unit = 'ud'
+      and v_equivalence.canonical_unit = 'g' then
       v_factor := p_consumed_quantity * v_equivalence.canonical_quantity / 100;
-    elsif v_item.nutrition_basis = 'per_100ml' and v_item.unit = 'ud' then
+    elsif v_item.nutrition_basis = 'per_100ml' and v_item.unit = 'ud'
+      and v_equivalence.canonical_unit = 'ml' then
       v_factor := p_consumed_quantity * v_equivalence.canonical_quantity / 100;
-    elsif v_item.nutrition_basis = 'per_unit' and v_item.unit = 'g' then
+    elsif v_item.nutrition_basis = 'per_unit' and v_item.unit = 'g'
+      and v_equivalence.canonical_unit = 'g' then
       v_factor := p_consumed_quantity / v_equivalence.canonical_quantity;
-    elsif v_item.nutrition_basis = 'per_unit' and v_item.unit = 'kg' then
+    elsif v_item.nutrition_basis = 'per_unit' and v_item.unit = 'kg'
+      and v_equivalence.canonical_unit = 'g' then
       v_factor := p_consumed_quantity * 1000 / v_equivalence.canonical_quantity;
-    elsif v_item.nutrition_basis = 'per_unit' and v_item.unit = 'ml' then
+    elsif v_item.nutrition_basis = 'per_unit' and v_item.unit = 'ml'
+      and v_equivalence.canonical_unit = 'ml' then
       v_factor := p_consumed_quantity / v_equivalence.canonical_quantity;
-    elsif v_item.nutrition_basis = 'per_unit' and v_item.unit = 'l' then
+    elsif v_item.nutrition_basis = 'per_unit' and v_item.unit = 'l'
+      and v_equivalence.canonical_unit = 'ml' then
       v_factor := p_consumed_quantity * 1000 / v_equivalence.canonical_quantity;
     else
       raise exception using errcode = '22023', message = 'Incompatible inventory nutrition unit';
