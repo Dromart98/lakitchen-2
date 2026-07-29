@@ -212,7 +212,7 @@ begin
     '|',
     p_batch_id::text,
     p_meal_type,
-    pg_catalog.extract(epoch from p_expected_batch_updated_at)::text,
+    extract(epoch from p_expected_batch_updated_at)::text,
     v_mode,
     pg_catalog.encode(pg_catalog.float8send(v_requested), 'hex')
   );
