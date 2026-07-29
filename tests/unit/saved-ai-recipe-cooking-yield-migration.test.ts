@@ -18,6 +18,15 @@ describe("saved recipe cooking yield migration", () => {
     expect(sql).toContain("revoke all on table public.user_saved_ai_recipe_cooking_yields from anon");
   });
 
+  it("rejects non-positive and non-finite observed weights", () => {
+    expect(sql).toContain("raw_weight_g > 0");
+    expect(sql).toContain("cooked_weight_g > 0");
+    expect(sql).toContain("raw_weight_g <> 'Infinity'::double precision");
+    expect(sql).toContain("cooked_weight_g <> 'Infinity'::double precision");
+    expect(sql).toContain("raw_weight_g <> 'NaN'::double precision");
+    expect(sql).toContain("cooked_weight_g <> 'NaN'::double precision");
+  });
+
   it("contains only observed weights, servings and lifecycle metadata", () => {
     expect(sql).not.toMatch(/calories|protein|carbs|fat|yield_factor|per_100|inventory|water|oil/);
   });
