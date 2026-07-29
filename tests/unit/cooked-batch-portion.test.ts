@@ -3,9 +3,17 @@ import { calculateCookedBatchPortion } from "@/modules/recipes/cooked-batch-port
 
 const nutrition = { calories: 900, proteinG: 60, carbsG: 90, fatG: 30 } as const;
 const confirmedMeasurement = { rawWeightG: 1_000, cookedWeightG: 750, servings: 3 } as const;
+const FLOATING_POINT_TOLERANCE_MULTIPLIER = 8;
 
 function calculate(consumption: { servingsConsumed: number } | { cookedWeightConsumedG: number }) {
   return calculateCookedBatchPortion({ resolvedNutritionTotal: nutrition, confirmedMeasurement, consumption });
+}
+
+function expectConserved(total: number, consumed: number, remaining: number): void {
+  const recombined = consumed + remaining;
+  const scale = Math.max(1, Math.abs(total), Math.abs(recombined));
+  expect(Math.abs(recombined - total))
+    .toBeLessThanOrEqual(Number.EPSILON * scale * FLOATING_POINT_TOLERANCE_MULTIPLIER);
 }
 
 describe("cooked batch portion", () => {
@@ -25,12 +33,37 @@ describe("cooked batch portion", () => {
     expect(calculate({ cookedWeightConsumedG: 250 })).toEqual(calculate({ servingsConsumed: 1 }));
   });
 
-  it("conserves every nutrition total exactly", () => {
+  it("conserves every nutrition total within the declared floating-point tolerance", () => {
     const result = calculate({ cookedWeightConsumedG: 175 });
 
     for (const nutrient of ["calories", "proteinG", "carbsG", "fatG"] as const) {
-      expect(result.consumedNutrition[nutrient] + result.remainingNutrition[nutrient])
-        .toBe(nutrition[nutrient]);
+      expectConserved(
+        nutrition[nutrient],
+        result.consumedNutrition[nutrient],
+        result.remainingNutrition[nutrient],
+      );
+    }
+  });
+
+  it("covers ordinary decimals that do not recombine with strict equality", () => {
+    const decimalNutrition = {
+      calories: 55_376.098924336395,
+      proteinG: 60,
+      carbsG: 90,
+      fatG: 30,
+    } as const;
+    const result = calculateCookedBatchPortion({
+      resolvedNutritionTotal: decimalNutrition,
+      confirmedMeasurement: { ...confirmedMeasurement, cookedWeightG: 1 },
+      consumption: { cookedWeightConsumedG: 0.37026716087687905 },
+    });
+
+    for (const nutrient of ["calories", "proteinG", "carbsG", "fatG"] as const) {
+      expectConserved(
+        decimalNutrition[nutrient],
+        result.consumedNutrition[nutrient],
+        result.remainingNutrition[nutrient],
+      );
     }
   });
 
