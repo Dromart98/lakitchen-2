@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const sql = readFileSync("supabase/migrations/20260806000000_create_saved_ai_recipe_cooked_batch_atomically.sql", "utf8");
-const retrySql = readFileSync("supabase/migrations/20260729164500_fix_cooked_batch_retry_idempotency.sql", "utf8");
+const retrySql = readFileSync("supabase/migrations/20260806001000_fix_cooked_batch_retry_idempotency.sql", "utf8");
 const action = readFileSync("app/recipes/actions.ts", "utf8");
 
 describe("atomic saved AI recipe cooked batch migration", () => {
