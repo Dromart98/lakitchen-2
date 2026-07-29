@@ -198,6 +198,7 @@ Toda conversión estimada debe poder corregirse y reutilizarse.
 - **1.5D — porción consumida de un lote confirmado — Implementada/cerrada:** un contrato determinista separa lote, consumo explícito por raciones o gramos cocinados y remanente, conservando la nutrición total sin redondeos intermedios; todavía no se integra en el flujo de cocinar ni registrar comidas.
 - **1.5E — lotes cocinados reales — Implementada/cerrada:** el modelo privado conserva cada cocinado como un snapshot independiente de título, pesos, raciones, nutrición total y gramos consumidos, aunque se elimine la receta de origen; las escrituras quedan reservadas para futuras operaciones atómicas.
 - **1.5F — creación atómica e idempotente del lote — Implementada/cerrada:** una operación autenticada valida la receta y la medición confirmada, bloquea y descuenta sus ingredientes, calcula la nutrición desde el inventario dentro de la transacción y crea una sola vez el lote con consumo inicial cero, sin registrar una comida ni aplicar presupuesto calórico.
+- **1.5G — consumo atómico de porciones cocinadas — Implementada/cerrada:** una operación independiente consume exactamente gramos o raciones de un lote, conserva su snapshot nutricional y registra una sola comida de forma transaccional e idempotente, sin volver a tocar el inventario.
 
 Modelar correctamente:
 
