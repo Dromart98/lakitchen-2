@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const sql = readFileSync("supabase/migrations/20260729000000_create_saved_ai_recipe_cooking_yields.sql", "utf8");
+const sql = readFileSync("supabase/migrations/20260729145112_create_saved_ai_recipe_cooking_yields.sql", "utf8");
 
 describe("saved recipe cooking yield migration", () => {
   it("stores one owner-bound measurement per recipe with cascade deletion", () => {
