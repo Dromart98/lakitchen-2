@@ -1,0 +1,4 @@
+drop index if exists public.user_saved_ai_recipe_cooked_batches_source_recipe_idx;
+
+create index user_saved_ai_recipe_cooked_batches_source_owner_idx
+  on public.user_saved_ai_recipe_cooked_batches(source_recipe_id, user_id);
