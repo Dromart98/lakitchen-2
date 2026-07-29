@@ -20,11 +20,13 @@ import { catalogRequestKey, confirmedCatalogRow, persistConfirmedNutritionBatchW
 import { parseInventoryNutritionAiInput, type InventoryNutritionAiEstimate, type InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
 import { toVoiceInventoryBatchSaveInput, VoiceInventoryBatchCatalogMetadataSchema } from "@/modules/inventory/voice-inventory-batch-save";
 import { buildObservedPackageEquivalenceProposals } from "@/modules/inventory/voice-inventory-package-equivalences";
+import { buildBarcodePackageEquivalenceProposal } from "@/modules/inventory/barcode-package-equivalence";
 
 type InventoryLocation = "pantry" | "fridge" | "freezer";
 type InventoryUnit = "ud" | "g" | "kg" | "ml" | "l";
 
 const INVENTORY_PATH = "/inventory";
+const INVENTORY_EQUIVALENCES_PATH = "/inventory/equivalences";
 const inventoryLocations = ["pantry", "fridge", "freezer"] as const;
 const inventoryUnits = ["ud", "g", "kg", "ml", "l"] as const;
 
@@ -283,6 +285,40 @@ export async function addInventoryItemAction(formData: FormData) {
       console.warn("Supabase could not remember the barcode product:", barcodeError?.message ?? "No barcode product was returned.");
       revalidatePath(INVENTORY_PATH);
       redirect(`${INVENTORY_PATH}?inventorySuccess=item-created-barcode-memory-failed`);
+    }
+
+    if (foodCatalogItemId) {
+      let proposalFailed = false;
+      try {
+        const external = await lookupOpenFoodFactsProduct(barcodeValidation.barcode);
+        if (external.status === "provider-error") {
+          console.warn("The package measure lookup failed while remembering a barcode product.");
+          proposalFailed = true;
+        } else if (external.status === "found" && external.product.package) {
+          const proposal = buildBarcodePackageEquivalenceProposal({ barcode: barcodeValidation.barcode, foodCatalogItemId, package: external.product.package });
+          if (proposal) {
+            const { error: proposalError } = await (supabase as any).rpc("save_food_quantity_equivalence_proposal", {
+              p_food_catalog_item_id: proposal.foodCatalogItemId,
+              p_measure_kind: proposal.measureKind,
+              p_variant_key: proposal.variantKey,
+              p_display_label: proposal.displayLabel,
+              p_canonical_quantity: proposal.canonicalQuantity,
+              p_canonical_unit: proposal.canonicalUnit,
+              p_source: "barcode-memory",
+            });
+            if (proposalError) {
+              console.warn("Supabase could not remember the barcode package measure:", proposalError.message);
+              proposalFailed = true;
+            }
+          }
+        }
+      } catch (proposalError) {
+        console.warn("An unexpected error prevented remembering the barcode package measure:", proposalError instanceof Error ? proposalError.message : proposalError);
+        proposalFailed = true;
+      }
+      revalidatePath(INVENTORY_PATH);
+      revalidatePath(INVENTORY_EQUIVALENCES_PATH);
+      if (proposalFailed) redirect(`${INVENTORY_PATH}?inventorySuccess=item-created-barcode-measure-failed`);
     }
   }
 
