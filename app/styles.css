@@ -4709,6 +4709,65 @@ h3 {
   margin-top: auto;
 }
 
+.cooking-yield-preview__body {
+  display: grid;
+  gap: 14px;
+  padding: 4px 0 8px;
+}
+
+.cooking-yield-preview__body > p,
+.cooking-yield-preview__notice,
+.cooking-yield-preview__error,
+.cooking-yield-preview__result p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.cooking-yield-preview__fields {
+  display: grid;
+  gap: 7px;
+}
+
+.cooking-yield-preview__fields label {
+  margin-top: 5px;
+  font-weight: 750;
+}
+
+.cooking-yield-preview__fields input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  padding: 12px 14px;
+}
+
+.cooking-yield-preview__notice,
+.cooking-yield-preview__error {
+  border-radius: 12px;
+  background: var(--card);
+  padding: 12px 14px;
+}
+
+.cooking-yield-preview__error {
+  color: #991b1b;
+}
+
+.cooking-yield-preview__result {
+  display: grid;
+  gap: 10px;
+  border-radius: 14px;
+  background: var(--brand-soft);
+  padding: 14px;
+}
+
+.cooking-yield-preview__result p {
+  display: grid;
+  gap: 3px;
+}
+
 .saved-recipe__delete button {
   width: 100%;
   border-color: var(--brand-accent);
