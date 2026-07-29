@@ -55,6 +55,30 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 const VARIANT_KEY_PATTERN = /^(?=.{1,80}$)[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const CANONICAL_UNITS: readonly CanonicalFoodQuantityUnit[] = ["g", "ml", "ud"];
 
+export const FOOD_QUANTITY_MEASURE_KIND_LABELS: Record<FoodQuantityMeasureKind, string> = {
+  unit: "Unidad",
+  tablespoon: "Cucharada",
+  teaspoon: "Cucharadita",
+  can: "Lata",
+  package: "Paquete",
+  serving: "Ración",
+};
+
+export const FOOD_QUANTITY_CANONICAL_UNITS = CANONICAL_UNITS;
+
+export function deriveFoodQuantityVariantKey(displayLabel: string): string | null {
+  const value = displayLabel
+    .trim()
+    .toLocaleLowerCase("es-ES")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80)
+    .replace(/-+$/g, "");
+  return value.length > 0 ? value : null;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

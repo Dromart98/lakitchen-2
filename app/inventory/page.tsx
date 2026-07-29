@@ -262,6 +262,9 @@ export default async function InventoryPage({
             </p>
           </div>
           <div className="inventory-header__actions">
+            <Link className="inventory-shopping-link" href="/inventory/equivalences">
+              Medidas habituales
+            </Link>
             <Link className="inventory-shopping-link" href="/shopping-list">
               Lista de la compra
             </Link>
