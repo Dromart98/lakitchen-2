@@ -43,6 +43,18 @@ describe("cooked batch consumption contract", () => {
     expect(parseConsumeCookedBatchInput({ ...base, ...consumption })).toEqual({ ...base, ...consumption });
   });
 
+  it("normalizes the millisecond UTC offset returned by PostgREST", () => {
+    expect(parseConsumeCookedBatchInput({
+      ...base,
+      expected_batch_updated_at: "2026-07-29T12:00:00.123+00:00",
+      servings_consumed: 0.5,
+    })).toEqual({
+      ...base,
+      expected_batch_updated_at: "2026-07-29T12:00:00.123Z",
+      servings_consumed: 0.5,
+    });
+  });
+
   it.each([
     {},
     { servings_consumed: 1, cooked_weight_consumed_g: 250 },
@@ -50,6 +62,7 @@ describe("cooked batch consumption contract", () => {
     { cooked_weight_consumed_g: Number.NaN },
     { servings_consumed: 1, user_id: base.batch_id },
     { servings_consumed: 1, expected_batch_updated_at: "2026-07-29T12:00:00Z" },
+    { servings_consumed: 1, expected_batch_updated_at: "2026-07-29T12:00:00.000+01:00" },
     { servings_consumed: 1, meal_type: "brunch" },
   ])("rejects malformed or over-posted input: %j", (change) => {
     expect(parseConsumeCookedBatchInput({ ...base, ...change })).toBeNull();
