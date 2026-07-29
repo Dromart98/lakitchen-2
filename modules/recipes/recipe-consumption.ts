@@ -61,7 +61,12 @@ export function buildRecipeConsumptionLines(
       return { ok: false, code: "invalid-quantity" };
     }
 
-    const convertedQuantity = convertBaseQuantityToInventoryUnit(allocation.usedQuantity, allocation.usedUnit, item.unit);
+    if (allocation.originalUnit !== undefined && allocation.originalUnit !== item.unit) {
+      return { ok: false, code: "incompatible-unit" };
+    }
+    const convertedQuantity = allocation.usedConfirmedUnitMeasure
+      ? allocation.originalQuantity ?? null
+      : convertBaseQuantityToInventoryUnit(allocation.usedQuantity, allocation.usedUnit, item.unit);
     if (convertedQuantity === null) return { ok: false, code: "incompatible-unit" };
     if (!isPositiveFiniteQuantity(convertedQuantity)) return { ok: false, code: "invalid-quantity" };
 

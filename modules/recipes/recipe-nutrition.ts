@@ -1,4 +1,5 @@
 import type { RecipeIngredientAllocation } from "@/modules/recipes/recipe-matching";
+import { calculateConsumedInventoryNutrition } from "@/modules/inventory/inventory-nutrition";
 
 type NutritionTotals = {
   calories: number;
@@ -14,31 +15,25 @@ export type RecipeNutritionEstimate = {
   missingNutritionItemCount: number;
 };
 
-function getNutritionFactor(allocation: RecipeIngredientAllocation): number | null {
-  if (!Number.isFinite(allocation.usedQuantity) || allocation.usedQuantity <= 0) return null;
-
-  if (allocation.nutritionBasis === "per_100g") return allocation.usedUnit === "g" ? allocation.usedQuantity / 100 : null;
-  if (allocation.nutritionBasis === "per_100ml") return allocation.usedUnit === "ml" ? allocation.usedQuantity / 100 : null;
-  if (allocation.nutritionBasis === "per_unit") return allocation.usedUnit === "ud" ? allocation.usedQuantity : null;
-
-  return null;
-}
-
-function hasCompleteNutritionValues(allocation: RecipeIngredientAllocation): boolean {
-  return [allocation.calories, allocation.proteinG, allocation.carbsG, allocation.fatG].every(
-    (value) => value !== null && Number.isFinite(value),
-  );
-}
-
-function isAllocationComplete(allocation: RecipeIngredientAllocation): boolean {
-  return getNutritionFactor(allocation) !== null && hasCompleteNutritionValues(allocation);
+function getAllocationNutrition(allocation: RecipeIngredientAllocation) {
+  return calculateConsumedInventoryNutrition({
+    consumed_quantity: allocation.usedQuantity,
+    unit: allocation.usedUnit,
+    nutrition_basis: allocation.nutritionBasis,
+    calories: allocation.calories,
+    protein_g: allocation.proteinG,
+    carbs_g: allocation.carbsG,
+    fat_g: allocation.fatG,
+    confirmedUnitMeasure: allocation.confirmedUnitMeasure,
+  });
 }
 
 function countMissingNutritionItems(allocations: RecipeIngredientAllocation[]): number {
   const missingItemIds = new Set<string>();
 
   for (const allocation of allocations) {
-    if (!isAllocationComplete(allocation)) {
+    const nutrition = getAllocationNutrition(allocation);
+    if (!nutrition || [nutrition.calories, nutrition.protein_g, nutrition.carbs_g, nutrition.fat_g].some((value) => value === null || !Number.isFinite(value))) {
       missingItemIds.add(allocation.inventoryItemId);
     }
   }
@@ -62,17 +57,16 @@ export function estimateRecipeNutrition(
   }
 
   const total = allocations.reduce<NutritionTotals>((sum, allocation) => {
-    const factor = getNutritionFactor(allocation);
-
-    if (factor === null || allocation.calories === null || allocation.proteinG === null || allocation.carbsG === null || allocation.fatG === null) {
+    const nutrition = getAllocationNutrition(allocation);
+    if (!nutrition || nutrition.calories === null || nutrition.protein_g === null || nutrition.carbs_g === null || nutrition.fat_g === null) {
       return sum;
     }
 
     return {
-      calories: sum.calories + allocation.calories * factor,
-      proteinG: sum.proteinG + allocation.proteinG * factor,
-      carbsG: sum.carbsG + allocation.carbsG * factor,
-      fatG: sum.fatG + allocation.fatG * factor,
+      calories: sum.calories + nutrition.calories,
+      proteinG: sum.proteinG + nutrition.protein_g,
+      carbsG: sum.carbsG + nutrition.carbs_g,
+      fatG: sum.fatG + nutrition.fat_g,
     };
   }, { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 });
 

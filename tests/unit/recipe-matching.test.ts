@@ -91,6 +91,26 @@ describe("recipe matching", () => {
     expect(match.canCookNow).toBe(true);
   });
 
+  it("uses a confirmed unit measure in both directions and preserves original deductions", () => {
+    const measure = { canonicalQuantity: 58, canonicalUnit: "g" as const };
+    const gramsRecipe = recipe({ recipe_ingredients: [ingredient({ required_quantity: 116 })] });
+    const [fromUnits] = matchRecipesToInventory([gramsRecipe], [{ id: "units", name: "pollo", quantity: 3, unit: "ud", expires_at: null, confirmedUnitMeasure: measure }], "2026-07-14");
+    expect(fromUnits.canCookNow).toBe(true);
+    expect(fromUnits.ingredientMatches[0].allocations[0]).toMatchObject({ usedQuantity: 116, usedUnit: "g", originalQuantity: 2, originalUnit: "ud", usedConfirmedUnitMeasure: true });
+
+    const unitsRecipe = recipe({ recipe_ingredients: [ingredient({ required_quantity: 2, required_unit: "ud" })] });
+    const [fromGrams] = matchRecipesToInventory([unitsRecipe], [{ id: "grams", name: "pollo", quantity: 174, unit: "g", expires_at: null, confirmedUnitMeasure: measure }], "2026-07-14");
+    expect(fromGrams.canCookNow).toBe(true);
+    expect(fromGrams.ingredientMatches[0].allocations[0]).toMatchObject({ usedQuantity: 2, usedUnit: "ud", originalQuantity: 116, originalUnit: "g", usedConfirmedUnitMeasure: true });
+  });
+
+  it("does not reuse measure-backed stock across ingredients", () => {
+    const [match] = matchRecipesToInventory([recipe({ recipe_ingredients: [ingredient({ id: "a", required_quantity: 116 }), ingredient({ id: "b", required_quantity: 116, sort_order: 2 })] })], [
+      { id: "units", name: "pollo", quantity: 3, unit: "ud", expires_at: null, confirmedUnitMeasure: { canonicalQuantity: 58, canonicalUnit: "g" } },
+    ], "2026-07-14");
+    expect(match.ingredientMatches.map((item) => item.status)).toEqual(["available", "insufficient"]);
+  });
+
   it("distinguishes missing, insufficient, incompatible and expired", () => {
     expect(matchRecipesToInventory([recipe()], [], "2026-07-14")[0].ingredientMatches[0].status).toBe("missing");
     expect(matchRecipesToInventory([recipe()], [{ id: "1", name: "pollo", quantity: 50, unit: "g", expires_at: null }], "2026-07-14")[0].ingredientMatches[0].status).toBe("insufficient");
@@ -197,6 +217,10 @@ describe("recipe matching", () => {
       inventoryItemName: "pollo",
       usedQuantity: 100,
       usedUnit: "g",
+      originalQuantity: 100,
+      originalUnit: "g",
+      confirmedUnitMeasure: null,
+      usedConfirmedUnitMeasure: false,
       nutritionBasis: "per_100g",
       calories: 165,
       proteinG: 31,

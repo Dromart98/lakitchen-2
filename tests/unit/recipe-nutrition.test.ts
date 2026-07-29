@@ -30,6 +30,12 @@ describe("recipe nutrition", () => {
     expect(estimateRecipeNutrition([allocation({ usedQuantity: 3, usedUnit: "ud", nutritionBasis: "per_unit", calories: 70, proteinG: 6, carbsG: 1, fatG: 4 })], 1).total).toEqual({ calories: 210, proteinG: 18, carbsG: 3, fatG: 12 });
   });
 
+  it("uses the shared confirmed-measure nutrition rules", () => {
+    const measure = { canonicalQuantity: 58, canonicalUnit: "g" as const };
+    expect(estimateRecipeNutrition([allocation({ usedQuantity: 2, usedUnit: "ud", confirmedUnitMeasure: measure })], 1).total?.calories).toBeCloseTo(232);
+    expect(estimateRecipeNutrition([allocation({ usedQuantity: 116, usedUnit: "g", nutritionBasis: "per_unit", confirmedUnitMeasure: measure })], 1).total?.calories).toBe(400);
+  });
+
   it("sums several products", () => {
     const estimate = estimateRecipeNutrition([
       allocation({ inventoryItemId: "a", usedQuantity: 100, calories: 100, proteinG: 10, carbsG: 20, fatG: 1 }),

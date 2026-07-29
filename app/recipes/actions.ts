@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateRecipesWithOpenAi } from "@/lib/openai/recipe-generation";
 import { buildRecipeAiNutritionAllocations } from "@/modules/recipes/recipe-ai-nutrition";
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
+import { selectInventoryUnitMeasures } from "@/modules/inventory/inventory-unit-equivalence";
 import { isMealType } from "@/modules/meals/meal-types";
 import { buildRecipeConsumptionLines } from "@/modules/recipes/recipe-consumption";
 import {
@@ -38,8 +39,8 @@ import {
 } from "@/modules/recipes/recipe-ai-consumption";
 import {
   matchRecipesToInventory,
+  attachRecipeInventoryUnitMeasures,
   normalizeRecipeFilterMode,
-  toRecipeInventoryItem,
   type RecipeIngredient,
   type RecipeInventoryItem,
   type RecipeInventoryItemRow,
@@ -67,9 +68,10 @@ type RecipeTemplateConsumptionRow = Omit<RecipeTemplate, "instructions" | "recip
 
 type SupabaseQueryBuilder = {
   select(columns: string): SupabaseQueryBuilder;
-  eq(column: string, value: string): SupabaseQueryBuilder;
+  eq(column: string, value: string | boolean): SupabaseQueryBuilder;
   gt(column: string, value: number): Promise<unknown>;
   maybeSingle(): Promise<unknown>;
+  in(column: string, values: string[]): Promise<unknown>;
 };
 
 type SupabaseRecipeClient = {
@@ -167,7 +169,21 @@ export async function cookRecipeAndLogMealAction(formData: FormData) {
 
   if (!recipeData) redirectWithRecipeError(mode, "recipe-not-found");
 
-  const inventoryItems: RecipeInventoryItem[] = (inventoryData ?? []).map(toRecipeInventoryItem);
+  const identityIds = [...new Set((inventoryData ?? []).map((row) => typeof row.food_catalog_item_id === "string" ? row.food_catalog_item_id : "").filter(Boolean))];
+  let unitMeasures = new Map();
+  if (identityIds.length > 0) {
+    const { data, error } = await recipeClient
+      .from("food_quantity_equivalences")
+      .select("id, food_catalog_item_id, user_id, measure_kind, variant_key, display_label, canonical_quantity, canonical_unit, source, user_confirmed, updated_at")
+      .eq("user_id", user.id)
+      .eq("measure_kind", "unit")
+      .eq("user_confirmed", true)
+      .eq("source", "user")
+      .in("food_catalog_item_id", identityIds) as { data: unknown[] | null; error: { message: string } | null };
+    if (error) console.warn("Supabase could not load recipe consumption unit measures:", error.message);
+    else unitMeasures = new Map(selectInventoryUnitMeasures(data ?? [], user.id, identityIds));
+  }
+  const inventoryItems: RecipeInventoryItem[] = attachRecipeInventoryUnitMeasures(inventoryData ?? [], unitMeasures);
   const recipe = toRecipeTemplate(recipeData);
   const scaledRecipe = scaleRecipeToServings(recipe, requestedServings);
   if (!scaledRecipe.ok) redirectWithRecipeError(mode, "invalid-servings");

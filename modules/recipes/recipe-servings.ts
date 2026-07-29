@@ -12,6 +12,7 @@ export type RecipeServingOption = {
   canLog: boolean;
   urgentItemCount: number;
   nearestExpirationDate: string | null;
+  usedConfirmedUnitMeasure: boolean;
 };
 
 export type RecipeMatchWithServingOptions = {
@@ -72,14 +73,14 @@ export function getRecipeServingOptions(recipe: RecipeTemplate, inventory: Recip
     const [match] = matchRecipesToInventory([scaledRecipe.recipe], inventory, todayKey);
     const canCookNow = match?.canCookNow === true;
     if (!canCookNow || !match) {
-      options.push({ servings, canCookNow: false, nutrition: null, canLog: false, urgentItemCount: 0, nearestExpirationDate: null });
+      options.push({ servings, canCookNow: false, nutrition: null, canLog: false, urgentItemCount: 0, nearestExpirationDate: null, usedConfirmedUnitMeasure: false });
       continue;
     }
 
     const allocations = match.ingredientMatches.flatMap((ingredientMatch) => ingredientMatch.allocations);
     const nutrition = estimateRecipeNutrition(allocations, match.recipe.servings);
     const canLog = nutrition.isComplete && Boolean(nutrition.total) && Boolean(nutrition.perServing);
-    options.push({ servings, canCookNow, nutrition, canLog, urgentItemCount: match.urgentItemCount, nearestExpirationDate: match.nearestExpirationDate });
+    options.push({ servings, canCookNow, nutrition, canLog, urgentItemCount: match.urgentItemCount, nearestExpirationDate: match.nearestExpirationDate, usedConfirmedUnitMeasure: allocations.some((allocation) => allocation.usedConfirmedUnitMeasure) });
   }
 
   return options;

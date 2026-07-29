@@ -47,6 +47,12 @@ function item(overrides: Partial<RecipeConsumptionInventoryItem> = {}): RecipeCo
 }
 
 describe("buildRecipeConsumptionLines", () => {
+  it("uses and sums server-calculated original quantities for measure-backed allocations", () => {
+    expect(buildRecipeConsumptionLines([
+      allocation({ usedQuantity: 58, usedUnit: "g", originalQuantity: 1, originalUnit: "ud", usedConfirmedUnitMeasure: true }),
+      allocation({ usedQuantity: 58, usedUnit: "g", originalQuantity: 1, originalUnit: "ud", usedConfirmedUnitMeasure: true }),
+    ], [item({ unit: "ud" })])).toEqual({ ok: true, lines: [{ item_id: ids[0], consumed_quantity: 2 }] });
+  });
   it("keeps grams stored as grams", () => {
     expect(buildRecipeConsumptionLines([allocation({ usedQuantity: 250, usedUnit: "g" })], [item({ unit: "g" })])).toEqual({ ok: true, lines: [{ item_id: ids[0], consumed_quantity: 250 }] });
   });
