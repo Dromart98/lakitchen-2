@@ -185,6 +185,8 @@ begin
   if p_request_id is null
     or p_batch_id is null
     or p_expected_batch_updated_at is null
+    or not pg_catalog.isfinite(p_expected_batch_updated_at)
+    or p_meal_type is null
     or p_meal_type not in ('breakfast', 'lunch', 'snack', 'dinner', 'other')
     or (p_servings_consumed is null) = (p_cooked_weight_consumed_g is null) then
     raise exception using errcode = '22023', message = 'invalid_input';
@@ -205,13 +207,14 @@ begin
     raise exception using errcode = '22023', message = 'invalid_input';
   end if;
 
+  -- Use timezone-independent and representation-independent components.
   v_fingerprint := concat_ws(
     '|',
     p_batch_id::text,
     p_meal_type,
-    p_expected_batch_updated_at::text,
+    pg_catalog.extract(epoch from p_expected_batch_updated_at)::text,
     v_mode,
-    v_requested::text
+    pg_catalog.encode(pg_catalog.float8send(v_requested), 'hex')
   );
 
   -- Serialize the request key so concurrent retries observe the first
