@@ -171,7 +171,8 @@ Evitar que variaciones como “pollo”, “pechuga de pollo” y “pollo fresc
   - **1.4B1 — modelo, almacenamiento y resolvedor — Implementada/cerrada.**
   - **1.4B2 — revisión y corrección visual — Implementada/cerrada.**
 - **1.4C — adopción transversal de equivalencias — En progreso.**
-  - **1.4C1 — observaciones de envases por voz — En progreso.**
+  - **1.4C1 — observaciones de envases por voz — Implementada/cerrada.**
+  - **1.4C2 — reutilización confirmada por voz — En progreso.**
 
 Añadir una capa común para:
 
