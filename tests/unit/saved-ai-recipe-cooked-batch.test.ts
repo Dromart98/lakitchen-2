@@ -41,9 +41,15 @@ describe("saved AI recipe cooked batch row parser", () => {
     expect(parsed).not.toHaveProperty("sourceRecipeId");
   });
 
+  it("uses Unicode characters rather than UTF-16 code units for the title limit", () => {
+    expect(parseSavedAiRecipeCookedBatchRow({ ...validRow, recipe_title: "🍲".repeat(90) })).not.toBeNull();
+    expect(parseSavedAiRecipeCookedBatchRow({ ...validRow, recipe_title: "🍲".repeat(91) })).toBeNull();
+  });
+
   it.each([
     { recipe_title: "" },
     { raw_weight_g: 0 },
+    { raw_weight_g: " 800.5" },
     { raw_weight_g: Infinity },
     { cooked_weight_g: NaN },
     { servings: 1.5 },
@@ -56,6 +62,7 @@ describe("saved AI recipe cooked batch row parser", () => {
     { consumed_cooked_weight_g: 651 },
     { created_at: "not-a-date" },
     { updated_at: null },
+    { updated_at: "2026-07-29T11:59:59.999Z" },
   ])("rejects a corrupt row atomically: %#", (change) => {
     expect(parseSavedAiRecipeCookedBatchRow({ ...validRow, ...change })).toBeNull();
   });
