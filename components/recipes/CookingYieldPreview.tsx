@@ -9,6 +9,7 @@ import type { SavedRecipeCookingYieldMeasurement } from "@/modules/recipes/saved
 
 type FieldName = "rawWeightG" | "cookedWeightG" | "servings";
 type Fields = Record<FieldName, string>;
+type PendingOperation = "save" | "delete" | null;
 
 function fieldsFromMeasurement(measurement: SavedRecipeCookingYieldMeasurement | null): Fields {
   return measurement ? { rawWeightG: String(measurement.rawWeightG), cookedWeightG: String(measurement.cookedWeightG), servings: String(measurement.servings) } : { rawWeightG: "", cookedWeightG: "", servings: "" };
@@ -33,6 +34,7 @@ export function CookingYieldPreview({ recipeId, nutrition, initialMeasurement }:
   const [result, setResult] = useState<CookingYieldResult | null>(() => calculateResult(initialMeasurement, nutrition));
   const [message, setMessage] = useState<{ kind: "error" | "success"; text: string } | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [pendingOperation, setPendingOperation] = useState<PendingOperation>(null);
   const [pending, startTransition] = useTransition();
 
   function measurementFromFields(): SavedRecipeCookingYieldMeasurement | null {
@@ -63,24 +65,34 @@ export function CookingYieldPreview({ recipeId, nutrition, initialMeasurement }:
     const measurement = measurementFromFields();
     if (!measurement) return;
     setConfirmingDelete(false);
+    setPendingOperation("save");
     startTransition(async () => {
-      const response = await saveSavedRecipeCookingYieldAction({ recipeId, ...measurement });
-      if (response.status === "error") { setMessage({ kind: "error", text: response.code === "unauthenticated" ? "Tu sesión ha caducado. Vuelve a iniciar sesión para guardar la medición." : response.code === "recipe-not-found" ? "La receta ya no está disponible." : response.code === "invalid-input" ? "Revisa los pesos y las raciones antes de guardar." : "No se pudo guardar la medición. Inténtalo de nuevo." }); return; }
-      setSavedMeasurement(measurement);
-      setResult(calculateResult(measurement, nutrition));
-      setMessage({ kind: "success", text: response.code === "saved" ? "Medición guardada." : "Medición corregida y guardada." });
+      try {
+        const response = await saveSavedRecipeCookingYieldAction({ recipeId, ...measurement });
+        if (response.status === "error") { setMessage({ kind: "error", text: response.code === "unauthenticated" ? "Tu sesión ha caducado. Vuelve a iniciar sesión para guardar la medición." : response.code === "recipe-not-found" ? "La receta ya no está disponible." : response.code === "invalid-input" ? "Revisa los pesos y las raciones antes de guardar." : "No se pudo guardar la medición. Inténtalo de nuevo." }); return; }
+        setSavedMeasurement(measurement);
+        setResult(calculateResult(measurement, nutrition));
+        setMessage({ kind: "success", text: response.code === "saved" ? "Medición guardada." : "Medición corregida y guardada." });
+      } finally {
+        setPendingOperation(null);
+      }
     });
   }
 
   function remove() {
+    setPendingOperation("delete");
     startTransition(async () => {
-      const response = await deleteSavedRecipeCookingYieldAction(recipeId);
-      if (response.status === "error") { setMessage({ kind: "error", text: "No se pudo eliminar la medición. Inténtalo de nuevo." }); return; }
-      setSavedMeasurement(null);
-      setFields(fieldsFromMeasurement(null));
-      setResult(null);
-      setConfirmingDelete(false);
-      setMessage({ kind: "success", text: "Medición eliminada." });
+      try {
+        const response = await deleteSavedRecipeCookingYieldAction(recipeId);
+        if (response.status === "error") { setMessage({ kind: "error", text: "No se pudo eliminar la medición. Inténtalo de nuevo." }); return; }
+        setSavedMeasurement(null);
+        setFields(fieldsFromMeasurement(null));
+        setResult(null);
+        setConfirmingDelete(false);
+        setMessage({ kind: "success", text: "Medición eliminada." });
+      } finally {
+        setPendingOperation(null);
+      }
     });
   }
 
@@ -97,12 +109,12 @@ export function CookingYieldPreview({ recipeId, nutrition, initialMeasurement }:
         </div>
         <div className="cooking-yield-preview__actions">
           <button type="button" disabled={pending || nutrition.status === "incomplete"} onClick={preview}>Ver previsualización</button>
-          <button type="button" disabled={pending} onClick={save}>{pending ? "Guardando…" : savedMeasurement ? "Guardar corrección" : "Guardar medición"}</button>
+          <button type="button" disabled={pending} onClick={save}>{pendingOperation === "save" ? "Guardando…" : savedMeasurement ? "Guardar corrección" : "Guardar medición"}</button>
           {savedMeasurement && !confirmingDelete ? <button type="button" disabled={pending} onClick={() => { setConfirmingDelete(true); setMessage(null); }}>Eliminar medición</button> : null}
           {savedMeasurement && confirmingDelete ? (
             <div className="cooking-yield-preview__delete-confirmation" role="group" aria-labelledby={`${fieldId}-delete-confirmation`}>
               <p id={`${fieldId}-delete-confirmation`}>¿Eliminar esta medición guardada? Esta acción no se puede deshacer.</p>
-              <button type="button" disabled={pending} onClick={remove}>{pending ? "Eliminando…" : "Confirmar eliminación"}</button>
+              <button type="button" disabled={pending} onClick={remove}>{pendingOperation === "delete" ? "Eliminando…" : "Confirmar eliminación"}</button>
               <button type="button" disabled={pending} onClick={() => setConfirmingDelete(false)}>Cancelar</button>
             </div>
           ) : null}
