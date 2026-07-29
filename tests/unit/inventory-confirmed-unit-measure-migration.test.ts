@@ -44,9 +44,35 @@ describe("confirmed unit measure inventory meal migration", () => {
   it("keeps the RPC contract and permissions", () => {
     expect(sql).toContain("consume_inventory_item_and_log_meal(\n  p_item_id uuid,\n  p_consumed_quantity numeric,\n  p_meal_type text\n)");
     expect(sql).toContain("returns numeric");
-    expect(sql).toContain("security invoker");
+    expect(sql).toContain("security definer");
+    expect(sql).toContain("set search_path = ''");
     expect(sql).toContain("revoke execute on function public.consume_inventory_item_and_log_meal(uuid, numeric, text) from public");
+    expect(sql).toContain("revoke execute on function public.consume_inventory_item_and_log_meal(uuid, numeric, text) from anon");
     expect(sql).toContain("grant execute on function public.consume_inventory_item_and_log_meal(uuid, numeric, text) to authenticated");
+    expect(sql).not.toMatch(/grant\s+update\s+on\s+(?:table\s+)?public\.food_quantity_equivalences/);
+  });
+
+  it("keeps the definer boundary owner-scoped and schema-qualified", () => {
+    expect(sql).toContain("v_user_id uuid := auth.uid()");
+    expect(sql).toContain("if v_user_id is null then");
+    for (const relation of [
+      "public.inventory_items",
+      "public.food_quantity_equivalences",
+      "public.daily_meal_logs",
+      "public.daily_meal_log_items",
+    ]) expect(sql).toContain(relation);
+
+    const inventoryQuery = sql.slice(sql.indexOf("from public.inventory_items"), sql.indexOf("for update", sql.indexOf("from public.inventory_items")));
+    const equivalenceQuery = sql.slice(sql.indexOf("from public.food_quantity_equivalences"), sql.indexOf("for update", sql.indexOf("from public.food_quantity_equivalences")));
+    expect(inventoryQuery).toContain("user_id = v_user_id");
+    expect(equivalenceQuery).toContain("user_id = v_user_id");
+    expect(sql).not.toMatch(/\bexecute\s+(?:format|\$|')/);
+    expect(sql).not.toContain("service_role");
+  });
+
+  it("rejects an untrusted effective function owner", () => {
+    expect(sql).toContain("pg_catalog.pg_get_userbyid");
+    expect(sql).toContain("v_owner in ('authenticated', 'anon')");
   });
 
   it("locks the owned inventory first and all confirmed unit measures deterministically", () => {

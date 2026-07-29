@@ -5,8 +5,8 @@ create or replace function public.consume_inventory_item_and_log_meal(
 )
 returns numeric
 language plpgsql
-security invoker
-set search_path = public, auth
+security definer
+set search_path = ''
 as $$
 declare
   v_user_id uuid := auth.uid();
@@ -177,6 +177,23 @@ begin
   return v_remaining_quantity;
 end;
 $$;
+
+do $ownership_check$
+declare
+  v_owner name;
+begin
+  select pg_catalog.pg_get_userbyid(p.proowner)
+    into v_owner
+  from pg_catalog.pg_proc p
+  where p.oid = pg_catalog.to_regprocedure(
+    'public.consume_inventory_item_and_log_meal(uuid,numeric,text)'
+  );
+
+  if v_owner is null or v_owner in ('authenticated', 'anon') then
+    raise exception 'Untrusted consume_inventory_item_and_log_meal owner';
+  end if;
+end;
+$ownership_check$;
 
 revoke execute on function public.consume_inventory_item_and_log_meal(uuid, numeric, text) from public;
 revoke execute on function public.consume_inventory_item_and_log_meal(uuid, numeric, text) from anon;
