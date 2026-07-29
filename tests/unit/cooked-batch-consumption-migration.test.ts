@@ -41,8 +41,9 @@ describe("atomic cooked batch consumption migration", () => {
   it("rejects null or non-finite direct RPC versions and canonicalizes fingerprints", () => {
     expect(sql).toContain("or not pg_catalog.isfinite(p_expected_batch_updated_at)");
     expect(sql).toContain("or p_meal_type is null");
-    expect(sql).toContain("pg_catalog.extract(epoch from p_expected_batch_updated_at)::text");
+    expect(sql).toContain("extract(epoch from p_expected_batch_updated_at)::text");
     expect(sql).toContain("pg_catalog.encode(pg_catalog.float8send(v_requested), 'hex')");
+    expect(sql).not.toContain("pg_catalog.extract(");
     expect(sql).not.toContain("p_expected_batch_updated_at::text");
   });
 
