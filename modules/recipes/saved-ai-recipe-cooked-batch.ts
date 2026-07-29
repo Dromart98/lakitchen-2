@@ -13,7 +13,7 @@ export type SavedAiRecipeCookedBatchSnapshot = Readonly<{
 
 function parseFiniteNumber(value: unknown): number | null {
   if (typeof value !== "number" && typeof value !== "string") return null;
-  if (typeof value === "string" && value.trim() === "") return null;
+  if (typeof value === "string" && (value.trim() === "" || value.trim() !== value)) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -30,6 +30,8 @@ function parseTimestamp(value: unknown): string | null {
 export function parseSavedAiRecipeCookedBatchRow(row: unknown): SavedAiRecipeCookedBatchSnapshot | null {
   if (!row || typeof row !== "object" || Array.isArray(row)) return null;
   const value = row as Record<string, unknown>;
+  const recipeTitle = typeof value.recipe_title === "string" ? value.recipe_title : null;
+  const recipeTitleLength = recipeTitle === null ? 0 : Array.from(recipeTitle).length;
   const rawWeightG = parseFiniteNumber(value.raw_weight_g);
   const cookedWeightG = parseFiniteNumber(value.cooked_weight_g);
   const servings = parseFiniteNumber(value.servings);
@@ -42,10 +44,10 @@ export function parseSavedAiRecipeCookedBatchRow(row: unknown): SavedAiRecipeCoo
   const updatedAt = parseTimestamp(value.updated_at);
 
   if (
-    typeof value.recipe_title !== "string"
-    || value.recipe_title.trim() !== value.recipe_title
-    || value.recipe_title.length < 1
-    || value.recipe_title.length > 90
+    recipeTitle === null
+    || recipeTitle.trim() !== recipeTitle
+    || recipeTitleLength < 1
+    || recipeTitleLength > 90
     || rawWeightG === null
     || rawWeightG <= 0
     || cookedWeightG === null
@@ -66,11 +68,12 @@ export function parseSavedAiRecipeCookedBatchRow(row: unknown): SavedAiRecipeCoo
     || consumedCookedWeightG > cookedWeightG
     || createdAt === null
     || updatedAt === null
+    || Date.parse(updatedAt) < Date.parse(createdAt)
   ) return null;
 
   const totalNutrition = Object.freeze({ calories, proteinG, carbsG, fatG });
   return Object.freeze({
-    recipeTitle: value.recipe_title,
+    recipeTitle,
     rawWeightG,
     cookedWeightG,
     servings,
