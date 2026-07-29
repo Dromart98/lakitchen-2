@@ -11,7 +11,7 @@ const requestId = "77777777-7777-4777-8777-777777777777";
 const updatedAt = "2026-07-29T12:00:00.000Z";
 
 describe("saved AI recipe cooked batch creation contract", () => {
-  it("accepts only recipe, request and confirmed-measurement version", () => {
+  it("accepts only recipe, request and a canonical millisecond measurement version", () => {
     const input = { recipe_id: recipeId, request_id: requestId, expected_measurement_updated_at: updatedAt };
     expect(parseCreateSavedAiRecipeCookedBatchInput(input)).toEqual(input);
     expect(parseCreateSavedAiRecipeCookedBatchInput({ ...input, user_id: requestId })).toBeNull();
@@ -19,6 +19,9 @@ describe("saved AI recipe cooked batch creation contract", () => {
     expect(parseCreateSavedAiRecipeCookedBatchInput({ ...input, macros: {} })).toBeNull();
     expect(parseCreateSavedAiRecipeCookedBatchInput({ ...input, consumed_cooked_weight_g: 2 })).toBeNull();
     expect(parseCreateSavedAiRecipeCookedBatchInput({ ...input, expected_measurement_updated_at: "not-a-date" })).toBeNull();
+    expect(parseCreateSavedAiRecipeCookedBatchInput({ ...input, expected_measurement_updated_at: "2026-07-29T12:00:00.000999Z" })).toBeNull();
+    expect(parseCreateSavedAiRecipeCookedBatchInput({ ...input, expected_measurement_updated_at: "2026-07-29T12:00:00+00:00" })).toBeNull();
+    expect(parseCreateSavedAiRecipeCookedBatchInput({ ...input, expected_measurement_updated_at: "2026-02-30T12:00:00.000Z" })).toBeNull();
   });
 
   it("passes only identity, optimistic version and shared consumption lines to the RPC", () => {
