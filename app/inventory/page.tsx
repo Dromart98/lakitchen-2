@@ -33,6 +33,10 @@ import type {
   InventoryItemRecord,
   InventoryLocation,
 } from "@/modules/inventory/inventory.types";
+import {
+  selectInventoryUnitMeasures,
+  type InventoryConfirmedUnitMeasure,
+} from "@/modules/inventory/inventory-unit-equivalence";
 
 import {
   addInventoryItemAction,
@@ -198,6 +202,25 @@ export default async function InventoryPage({
   }
 
   const items = error ? [] : (data ?? []);
+  const foodCatalogItemIds = [...new Set(items
+    .map((item) => item.food_catalog_item_id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0))];
+  let unitMeasures = new Map<string, InventoryConfirmedUnitMeasure>();
+  if (foodCatalogItemIds.length > 0) {
+    const { data: equivalenceRows, error: equivalenceError } = await (supabase as any)
+      .from("food_quantity_equivalences")
+      .select("id, user_id, food_catalog_item_id, measure_kind, variant_key, display_label, canonical_quantity, canonical_unit, source, user_confirmed, updated_at")
+      .eq("user_id", user.id)
+      .eq("measure_kind", "unit")
+      .eq("user_confirmed", true)
+      .eq("source", "user")
+      .in("food_catalog_item_id", foodCatalogItemIds);
+    if (equivalenceError) {
+      console.warn("Supabase could not load habitual food measures:", equivalenceError.message);
+    } else {
+      unitMeasures = new Map(selectInventoryUnitMeasures(equivalenceRows ?? [], user.id, foodCatalogItemIds));
+    }
+  }
   const todayKey = getCurrentInventoryExpirationDateKey(new Date());
   const expirationAlertItems = getInventoryExpirationAlertItems(
     items,
@@ -537,6 +560,9 @@ export default async function InventoryPage({
                                     protein_g={item.protein_g}
                                     carbs_g={item.carbs_g}
                                     fat_g={item.fat_g}
+                                    confirmedUnitMeasure={item.food_catalog_item_id
+                                      ? unitMeasures.get(item.food_catalog_item_id) ?? null
+                                      : null}
                                   />
                                 </div>
                               </details>
