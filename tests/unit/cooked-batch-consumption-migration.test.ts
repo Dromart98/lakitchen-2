@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const sql = readFileSync("supabase/migrations/20260729180000_consume_cooked_batch_atomically.sql", "utf8");
+const sql = readFileSync("supabase/migrations/20260729174910_consume_cooked_batch_atomically.sql", "utf8");
 const action = readFileSync("app/recipes/actions.ts", "utf8");
 const portion = readFileSync("modules/recipes/cooked-batch-portion.ts", "utf8");
 
