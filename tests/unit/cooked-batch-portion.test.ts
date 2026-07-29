@@ -45,6 +45,20 @@ describe("cooked batch portion", () => {
     expect(result.remainingNutrition).toEqual({ calories: 0, proteinG: 0, carbsG: 0, fatG: 0 });
   });
 
+  it("normalizes an equivalent full-batch decimal without negative remainders", () => {
+    const result = calculateCookedBatchPortion({
+      resolvedNutritionTotal: nutrition,
+      confirmedMeasurement: { ...confirmedMeasurement, cookedWeightG: 0.3 },
+      consumption: { cookedWeightConsumedG: 0.1 + 0.2 },
+    });
+
+    expect(result.consumedFraction).toBe(1);
+    expect(result.consumedWeightG).toBe(0.3);
+    expect(result.remainingWeightG).toBe(0);
+    expect(result.remainingServings).toBe(0);
+    expect(result.remainingNutrition).toEqual({ calories: 0, proteinG: 0, carbsG: 0, fatG: 0 });
+  });
+
   it("preserves fractional servings without intermediate rounding", () => {
     const result = calculate({ servingsConsumed: 0.7 });
 
