@@ -172,6 +172,7 @@ describe("mapSavedAiRecipeCookRpcError", () => {
     expect(mapSavedAiRecipeCookRpcError({ message: "Quantity exceeds available stock" })).toBe("insufficient-stock");
     expect(mapSavedAiRecipeCookRpcError({ message: "Incomplete inventory nutrition" })).toBe("nutrition-unavailable");
     expect(mapSavedAiRecipeCookRpcError({ message: "Incompatible inventory nutrition unit" })).toBe("incompatible-unit");
+    expect(mapSavedAiRecipeCookRpcError({ message: "equivalence_conflict" })).toBe("equivalence-conflict");
     expect(mapSavedAiRecipeCookRpcError({ message: "relation inventory_items does not exist" })).toBe("consumption-conflict");
   });
 });

@@ -41,7 +41,7 @@ describe("enrichRecipeAiSuggestionsWithNutrition", () => {
   });
 
   it("calculates per_100g nutrition with kilograms converted to grams", () => {
-    const nutrition = enrich({ ...baseRecipe, ingredients: [{ inventory_item_id: "rice", name: "Arroz", quantity: 0.25, unit: "kg" }] });
+    const nutrition = enrich({ ...baseRecipe, ingredients: [{ inventory_item_id: "rice", name: "Arroz", quantity: 0.25, unit: "kg" }] }, [{ ...rice, quantity: 0.5, unit: "kg" }]);
     expect(nutrition.total?.calories).toBe(875);
     expect(nutrition.perServing?.calories).toBe(437.5);
   });
@@ -64,6 +64,25 @@ describe("enrichRecipeAiSuggestionsWithNutrition", () => {
     expect(nutrition.total).toEqual({ calories: 210, proteinG: 18, carbsG: 0, fatG: 15 });
   });
 
+  it("uses a confirmed 58 g unit measure for unit stock with per_100g nutrition", () => {
+    const item: RecipeAiNutritionInventoryItem = { ...rice, id: "egg", name: "Huevo", quantity: 2, unit: "ud", confirmedUnitMeasure: { id: "10000000-0000-4000-8000-000000000001", updatedAt: "2026-07-29T10:00:00.000Z", canonicalQuantity: 58, canonicalUnit: "g" } };
+    const nutrition = enrich({ ...baseRecipe, servings: 1, ingredients: [{ inventory_item_id: "egg", name: "Huevo", quantity: 2, unit: "ud" }] }, [item]);
+    expect(nutrition.total?.calories).toBe(406);
+    expect(nutrition.usedConfirmedUnitMeasure).toBe(true);
+  });
+
+  it("uses a confirmed 58 g unit measure for gram stock with per_unit nutrition", () => {
+    const item: RecipeAiNutritionInventoryItem = { ...rice, quantity: 116, nutrition_basis: "per_unit", calories: 70, protein_g: 6, carbs_g: 0, fat_g: 5, confirmedUnitMeasure: { id: "10000000-0000-4000-8000-000000000001", updatedAt: "2026-07-29T10:00:00.000Z", canonicalQuantity: 58, canonicalUnit: "g" } };
+    const nutrition = enrich({ ...baseRecipe, servings: 1, ingredients: [{ ...baseRecipe.ingredients[0], quantity: 116 }] }, [item]);
+    expect(nutrition.total).toEqual({ calories: 140, proteinG: 12, carbsG: 0, fatG: 10 });
+    expect(nutrition.usedConfirmedUnitMeasure).toBe(true);
+  });
+
+  it("does not use an ambiguous or missing confirmed measure", () => {
+    const item: RecipeAiNutritionInventoryItem = { ...rice, quantity: 2, unit: "ud", confirmedUnitMeasure: null };
+    expect(enrich({ ...baseRecipe, ingredients: [{ inventory_item_id: "rice", name: "Arroz", quantity: 2, unit: "ud" }] }, [item]).isComplete).toBe(false);
+  });
+
   it("sums several ingredients and calculates per serving", () => {
     const oil: RecipeAiNutritionInventoryItem = { id: "oil", name: "Aceite", quantity: 50, unit: "ml", category: "fat", expires_at: null, nutrition_basis: "per_100ml", calories: 800, protein_g: 0, carbs_g: 0, fat_g: 90 };
     const nutrition = enrich({ ...baseRecipe, servings: 4, ingredients: [...baseRecipe.ingredients, { inventory_item_id: "oil", name: "Aceite", quantity: 10, unit: "ml" }] }, [rice, oil]);
@@ -79,7 +98,7 @@ describe("enrichRecipeAiSuggestionsWithNutrition", () => {
   });
 
   it("treats zero nutrition values as complete", () => {
-    const water: RecipeAiNutritionInventoryItem = { id: "water", name: "Agua", quantity: 1, unit: "l", category: "other", expires_at: null, nutrition_basis: "per_100ml", calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
+    const water: RecipeAiNutritionInventoryItem = { id: "water", name: "Agua", quantity: 1000, unit: "ml", category: "other", expires_at: null, nutrition_basis: "per_100ml", calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
     const nutrition = enrich({ ...baseRecipe, ingredients: [{ inventory_item_id: "water", name: "Agua", quantity: 250, unit: "ml" }] }, [water]);
     expect(nutrition).toEqual({ total: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 }, perServing: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 }, isComplete: true, missingNutritionItemCount: 0, usedConfirmedUnitMeasure: false });
   });

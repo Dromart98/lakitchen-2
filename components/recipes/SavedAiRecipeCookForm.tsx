@@ -20,6 +20,7 @@ const ERROR_MESSAGES: Record<SavedAiRecipeCookErrorCode, string> = {
   "too-many-items": "Esta receta supera el máximo de 20 ingredientes permitido.",
   "calorie-budget-exceeded": "Esta receta supera las calorías que te quedan hoy. Genera otra opción.",
   "consumption-conflict": "No se pudo cocinar la receta.",
+  "equivalence-conflict": "La medida habitual cambió mientras preparábamos la receta. Revísala y vuelve a intentarlo.",
   "unexpected-error": "No se pudo cocinar la receta.",
 };
 

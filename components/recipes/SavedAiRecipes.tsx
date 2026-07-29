@@ -10,7 +10,9 @@ function formatSavedDate(value: string): string {
   return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
-export function SavedAiRecipes({ recipes }: { recipes: SavedAiRecipe[] }) {
+export type SavedAiRecipeView = SavedAiRecipe & { usesConfirmedUnitMeasure: boolean };
+
+export function SavedAiRecipes({ recipes }: { recipes: SavedAiRecipeView[] }) {
   return (
     <section className="recipes-section saved-recipes" aria-labelledby="saved-recipes-title">
       <div className="recipes-section__heading">
@@ -27,6 +29,7 @@ export function SavedAiRecipes({ recipes }: { recipes: SavedAiRecipe[] }) {
           <h3>{recipe.title}</h3>
           <p>{recipe.description}</p>
           <p className="recipes-card__meta">{recipe.estimated_minutes} minutos · {recipe.servings} ración{recipe.servings === 1 ? "" : "es"} · Guardada el {formatSavedDate(recipe.created_at)}</p>
+          {recipe.usesConfirmedUnitMeasure ? <p className="muted">La nutrición actual usa una medida habitual guardada.</p> : null}
           <details className="recipes-card__details">
             <summary>Ingredientes</summary>
             <ul>{recipe.ingredients.map((ingredient) => <li key={ingredient.id}>{ingredient.name}: {formatQuantity(ingredient.quantity)} {ingredient.unit}</li>)}</ul>

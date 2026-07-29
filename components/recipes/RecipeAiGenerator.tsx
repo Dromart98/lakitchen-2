@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import { cookGeneratedRecipeAndLogMealAction, generateRecipeAiSuggestionsAction, saveGeneratedRecipeAction } from "@/app/recipes/actions";
 import { MEAL_TYPE_LABELS, MEAL_TYPES, type MealType } from "@/modules/meals/meal-types";
@@ -122,6 +123,7 @@ export function RecipeAiGenerator() {
       "expired-item": "La receta contiene un producto caducado.",
       "incomplete-nutrition": "Completa los datos nutricionales del inventario antes de cocinar y registrar esta receta.",
       "calorie-budget-exceeded": "Esta receta supera las calorías que te quedan hoy. Genera otra opción.",
+      "equivalence-conflict": "La medida habitual cambió mientras preparábamos la receta. Revísala y vuelve a intentarlo.",
     };
 
     setResult({ status: "needs-clarification", message: messageByCode[cookResult.code] ?? "No se pudo cocinar y registrar la receta." });
@@ -217,6 +219,9 @@ export function RecipeAiGenerator() {
                 ) : (
                   <p className="muted">{getMissingNutritionMessage(recipe.nutrition.missingNutritionItemCount)}</p>
                 )}
+                {recipe.nutrition.usedConfirmedUnitMeasure ? (
+                  <p className="muted">Se ha usado una medida habitual guardada para calcular la nutrición. <Link href="/inventory/equivalences">Revisar medidas habituales</Link></p>
+                ) : null}
               </section>
               <div className="recipe-ai__card-controls">
                 <label htmlFor={`recipe-ai-meal-type-${recipe.title}`}>Tipo de comida</label>
