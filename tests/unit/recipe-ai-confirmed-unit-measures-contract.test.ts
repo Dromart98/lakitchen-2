@@ -7,9 +7,9 @@ const generator = readFileSync("modules/recipes/recipe-ai-generation.ts", "utf8"
 const savedRecipes = readFileSync("components/recipes/SavedAiRecipes.tsx", "utf8");
 
 describe("AI recipe confirmed unit measure contract", () => {
-  it("enriches all four AI recipe actions through one grouped owner-scoped helper", () => {
-    expect(actions.match(/loadAndAttachRecipeAiUnitMeasures\(/g)).toHaveLength(4);
-    expect(actions.match(/food_catalog_item_id"\)/g)).toHaveLength(4);
+  it("enriches all five AI recipe actions through one grouped owner-scoped helper", () => {
+    expect(actions.match(/loadAndAttachRecipeAiUnitMeasures\(/g)).toHaveLength(5);
+    expect(actions.match(/food_catalog_item_id"\)/g)).toHaveLength(5);
     expect(helper).toContain('.from("food_quantity_equivalences")');
     expect(helper).toContain('.eq("user_id", userId)');
     expect(helper).toContain('.eq("measure_kind", "unit")');

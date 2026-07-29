@@ -60,6 +60,13 @@ import { buildRecipeMealName, scaleRecipeToServings } from "@/modules/recipes/re
 import { buildRecipeCalorieBudget, isRecipeServingWithinCalorieBudget, validateAndAdjustAiRecipeCalories, type RecipeCalorieBudget } from "@/modules/recipes/recipe-calorie-budget";
 import { getTodayUtcDate } from "@/modules/meals/meal-date";
 import { parseSavedRecipeCookingYieldMeasurement } from "@/modules/recipes/saved-ai-recipe-cooking-yield-measurement";
+import {
+  buildSavedAiRecipeCookedBatchRpcPayload,
+  mapCreateSavedAiRecipeCookedBatchRpcError,
+  parseCreateSavedAiRecipeCookedBatchInput,
+  type CreateSavedAiRecipeCookedBatchErrorCode,
+  type CreateSavedAiRecipeCookedBatchResult,
+} from "@/modules/recipes/saved-ai-recipe-batch-creation";
 
 const RECIPES_PATH = "/recipes";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -595,6 +602,85 @@ export async function cookSavedAiRecipeAndLogMealAction(input: unknown): Promise
   revalidatePath("/meal-history");
   revalidatePath("/weekly-summary");
 
+  return { status: "success" };
+}
+
+/** Creates a cooked batch while consuming inventory, without recording a meal. */
+export async function createSavedAiRecipeCookedBatchAction(input: unknown): Promise<CreateSavedAiRecipeCookedBatchResult> {
+  const request = parseCreateSavedAiRecipeCookedBatchInput(input);
+  if (!request) return { status: "error", code: "invalid-input" };
+
+  const supabase = await createClient();
+  let user: { id: string };
+  try {
+    user = await requireAuthenticatedUser(supabase, "saved AI recipe cooked batch creation");
+  } catch {
+    return { status: "error", code: "unauthenticated" };
+  }
+
+  const recipeClient = supabase as unknown as CookSavedAiRecipeSupabaseClient;
+  const { data: existingBatch, error: existingBatchError } = await recipeClient
+    .from("user_saved_ai_recipe_cooked_batches")
+    .select("source_recipe_id, source_measurement_updated_at")
+    .eq("id", request.request_id)
+    .eq("user_id", user.id)
+    .maybeSingle() as {
+      data: { source_recipe_id: string | null; source_measurement_updated_at: string | null } | null;
+      error: { message: string } | null;
+    };
+  if (existingBatchError) return { status: "error", code: "unexpected-error" };
+  if (existingBatch) {
+    return existingBatch.source_recipe_id === request.recipe_id
+      && existingBatch.source_measurement_updated_at !== null
+      && Date.parse(existingBatch.source_measurement_updated_at) === Date.parse(request.expected_measurement_updated_at)
+      ? { status: "success" }
+      : { status: "error", code: "idempotency-conflict" };
+  }
+  const { data: recipeData, error: recipeError } = await recipeClient
+    .from("user_saved_ai_recipes")
+    .select("id, user_id, title, description, estimated_minutes, servings, steps, source_priority_mode, fingerprint, created_at, user_saved_ai_recipe_ingredients(id, recipe_id, user_id, inventory_item_id, name, quantity, unit, sort_order, created_at)")
+    .eq("id", request.recipe_id)
+    .eq("user_id", user.id)
+    .maybeSingle() as { data: SavedAiRecipeRow | null; error: { message: string } | null };
+  if (recipeError) return { status: "error", code: "unexpected-error" };
+  if (!recipeData) return { status: "error", code: "recipe-not-found" };
+
+  const recipe = toSavedAiRecipe(recipeData);
+  if (!recipe || recipe.user_id !== user.id || recipe.id !== request.recipe_id) return { status: "error", code: "recipe-corrupt" };
+  const inventoryItemIds = recipe.ingredients.map((ingredient) => ingredient.inventory_item_id);
+  if (inventoryItemIds.length === 0 || new Set(inventoryItemIds).size !== inventoryItemIds.length) return { status: "error", code: "recipe-corrupt" };
+
+  const { data: inventoryData, error: inventoryError } = await recipeClient
+    .from("inventory_items")
+    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g, food_catalog_item_id")
+    .eq("user_id", user.id)
+    .in("id", inventoryItemIds) as { data: SavedAiRecipeCookInventoryItem[] | null; error: { message: string } | null };
+  if (inventoryError) return { status: "error", code: "unexpected-error" };
+
+  const inventoryItems = await loadAndAttachRecipeAiUnitMeasures(recipeClient as unknown as RecipeAiUnitMeasureClient, user.id, inventoryData ?? [], "saved AI recipe cooked batch creation");
+  const validationError = validateSavedAiRecipeCookInventory(recipe, inventoryItems, getCurrentInventoryExpirationDateKey());
+  if (validationError) {
+    if (["recipe-corrupt", "recipe-stale", "insufficient-stock", "expired-item", "nutrition-unavailable", "incompatible-unit", "too-many-items"].includes(validationError)) {
+      return { status: "error", code: validationError as CreateSavedAiRecipeCookedBatchErrorCode };
+    }
+    return { status: "error", code: "unexpected-error" };
+  }
+  const plan = buildSavedAiRecipeCookPlan(recipe, inventoryItems, "other");
+  if (!plan.ok) {
+    if (["recipe-corrupt", "recipe-stale", "insufficient-stock", "expired-item", "nutrition-unavailable", "incompatible-unit", "too-many-items"].includes(plan.code)) {
+      return { status: "error", code: plan.code as CreateSavedAiRecipeCookedBatchErrorCode };
+    }
+    return { status: "error", code: "unexpected-error" };
+  }
+
+  const { error } = await recipeClient.rpc(
+    "create_saved_ai_recipe_cooked_batch",
+    buildSavedAiRecipeCookedBatchRpcPayload(request, plan.plan.lines),
+  ) as { data: string | null; error: { message: string } | null };
+  if (error) return { status: "error", code: mapCreateSavedAiRecipeCookedBatchRpcError(error) };
+
+  revalidatePath(RECIPES_PATH);
+  revalidatePath("/inventory");
   return { status: "success" };
 }
 
