@@ -11,9 +11,17 @@ create table public.user_saved_ai_recipe_cooking_yields (
     references public.user_saved_ai_recipes(id, user_id)
     on delete cascade,
   constraint user_saved_ai_recipe_cooking_yields_raw_weight_check
-    check (raw_weight_g > 0 and raw_weight_g <> 'Infinity'::double precision),
+    check (
+      raw_weight_g > 0
+      and raw_weight_g <> 'Infinity'::double precision
+      and raw_weight_g <> 'NaN'::double precision
+    ),
   constraint user_saved_ai_recipe_cooking_yields_cooked_weight_check
-    check (cooked_weight_g > 0 and cooked_weight_g <> 'Infinity'::double precision),
+    check (
+      cooked_weight_g > 0
+      and cooked_weight_g <> 'Infinity'::double precision
+      and cooked_weight_g <> 'NaN'::double precision
+    ),
   constraint user_saved_ai_recipe_cooking_yields_servings_check
     check (servings > 0)
 );
