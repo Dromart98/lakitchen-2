@@ -43,6 +43,18 @@ function areEquivalentValues(left: number, right: number): boolean {
   return Math.abs(left - right) <= Number.EPSILON * scale * FLOATING_POINT_TOLERANCE_MULTIPLIER;
 }
 
+function requireNutritionConservation(
+  total: Readonly<NutritionTotals>,
+  consumed: Readonly<NutritionTotals>,
+  remaining: Readonly<NutritionTotals>,
+): void {
+  for (const key of NUTRIENT_KEYS) {
+    if (!areEquivalentValues(consumed[key] + remaining[key], total[key])) {
+      throw new RangeError(`nutrition split exceeds floating-point tolerance for ${key}`);
+    }
+  }
+}
+
 function splitNutrition(
   total: Readonly<NutritionTotals>,
   consumedFraction: number,
@@ -59,13 +71,16 @@ function splitNutrition(
     carbsG: total.carbsG - consumed.carbsG,
     fatG: total.fatG - consumed.fatG,
   });
+  requireNutritionConservation(total, consumed, remaining);
 
   return [consumed, remaining];
 }
 
 /**
  * Splits a confirmed cooked batch using exactly one explicit consumption basis.
- * All values retain full floating-point precision and no input is mutated.
+ * No decimal rounding is applied. Nutrition conservation is enforced with the
+ * scale-aware IEEE-754 tolerance `Number.EPSILON * scale * 8`.
+ * No input is mutated.
  */
 export function calculateCookedBatchPortion(input: CookedBatchPortionInput): CookedBatchPortionResult {
   const { cookedWeightG, servings } = input.confirmedMeasurement;
