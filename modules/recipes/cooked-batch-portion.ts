@@ -22,6 +22,7 @@ export type CookedBatchPortionResult = Readonly<{
 }>;
 
 const NUTRIENT_KEYS = ["calories", "proteinG", "carbsG", "fatG"] as const;
+const FLOATING_POINT_TOLERANCE_MULTIPLIER = 8;
 
 function requirePositiveFinite(value: number, name: string): void {
   if (!Number.isFinite(value) || value <= 0) {
@@ -35,6 +36,11 @@ function requireNutritionTotals(nutrition: Readonly<NutritionTotals>): void {
       throw new RangeError(`resolvedNutritionTotal.${key} must be a non-negative finite number`);
     }
   }
+}
+
+function areEquivalentValues(left: number, right: number): boolean {
+  const scale = Math.max(1, Math.abs(left), Math.abs(right));
+  return Math.abs(left - right) <= Number.EPSILON * scale * FLOATING_POINT_TOLERANCE_MULTIPLIER;
 }
 
 function splitNutrition(
@@ -85,11 +91,13 @@ export function calculateCookedBatchPortion(input: CookedBatchPortionInput): Coo
   requirePositiveFinite(consumedValue, consumedName);
 
   const batchValue = hasServings ? servings : cookedWeightG;
-  if (consumedValue > batchValue) {
+  const isCompleteBatch = areEquivalentValues(consumedValue, batchValue);
+  if (consumedValue > batchValue && !isCompleteBatch) {
     throw new RangeError(`${consumedName} cannot exceed the confirmed batch`);
   }
 
-  const consumedFraction = consumedValue / batchValue;
+  const normalizedConsumedValue = isCompleteBatch ? batchValue : consumedValue;
+  const consumedFraction = normalizedConsumedValue / batchValue;
   const consumedWeightG = cookedWeightG * consumedFraction;
   const consumedServings = servings * consumedFraction;
   const [consumedNutrition, remainingNutrition] = splitNutrition(
