@@ -1,6 +1,7 @@
 import type { RecipeConsumptionLine } from "@/modules/recipes/recipe-consumption";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MEASUREMENT_VERSION_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const INPUT_KEYS = ["recipe_id", "request_id", "expected_measurement_updated_at"] as const;
 
 export type CreateSavedAiRecipeCookedBatchRequest = Readonly<{
@@ -35,14 +36,19 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isCanonicalMeasurementVersion(value: string): boolean {
+  if (!MEASUREMENT_VERSION_PATTERN.test(value)) return false;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString() === value;
+}
+
 export function parseCreateSavedAiRecipeCookedBatchInput(input: unknown): CreateSavedAiRecipeCookedBatchRequest | null {
   if (!isPlainObject(input)) return null;
   const keys = Object.keys(input);
   if (keys.length !== INPUT_KEYS.length || keys.some((key) => !INPUT_KEYS.includes(key as typeof INPUT_KEYS[number]))) return null;
   if (typeof input.recipe_id !== "string" || !UUID_PATTERN.test(input.recipe_id)) return null;
   if (typeof input.request_id !== "string" || !UUID_PATTERN.test(input.request_id)) return null;
-  if (typeof input.expected_measurement_updated_at !== "string" || input.expected_measurement_updated_at.trim() !== input.expected_measurement_updated_at) return null;
-  if (!Number.isFinite(Date.parse(input.expected_measurement_updated_at))) return null;
+  if (typeof input.expected_measurement_updated_at !== "string" || !isCanonicalMeasurementVersion(input.expected_measurement_updated_at)) return null;
   return Object.freeze({
     recipe_id: input.recipe_id,
     request_id: input.request_id,
