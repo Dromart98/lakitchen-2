@@ -59,6 +59,7 @@ import {
 import { buildRecipeMealName, scaleRecipeToServings } from "@/modules/recipes/recipe-servings";
 import { buildRecipeCalorieBudget, isRecipeServingWithinCalorieBudget, validateAndAdjustAiRecipeCalories, type RecipeCalorieBudget } from "@/modules/recipes/recipe-calorie-budget";
 import { getTodayUtcDate } from "@/modules/meals/meal-date";
+import { parseSavedRecipeCookingYieldMeasurement } from "@/modules/recipes/saved-ai-recipe-cooking-yield-measurement";
 
 const RECIPES_PATH = "/recipes";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -442,6 +443,66 @@ export async function deleteSavedAiRecipeAction(formData: FormData) {
   }
 
   revalidatePath(RECIPES_PATH);
+}
+
+export type SavedRecipeCookingYieldMutationResult =
+  | { status: "success"; code: "saved" | "updated" | "deleted" }
+  | { status: "error"; code: "invalid-input" | "unauthenticated" | "recipe-not-found" | "save-failed" | "delete-failed" };
+
+type CookingYieldMutationQuery = PromiseLike<unknown> & {
+  select(columns: string): CookingYieldMutationQuery;
+  eq(column: string, value: string): CookingYieldMutationQuery;
+  maybeSingle(): Promise<unknown>;
+  insert(values: Record<string, unknown>): CookingYieldMutationQuery;
+  update(values: Record<string, unknown>): CookingYieldMutationQuery;
+  delete(): CookingYieldMutationQuery;
+};
+type CookingYieldMutationClient = { from(table: string): CookingYieldMutationQuery };
+
+export async function saveSavedRecipeCookingYieldAction(input: unknown): Promise<SavedRecipeCookingYieldMutationResult> {
+  const measurement = parseSavedRecipeCookingYieldMeasurement(input);
+  if (!measurement) return { status: "error", code: "invalid-input" };
+  const supabase = await createClient();
+  let user: { id: string };
+  try {
+    user = await requireAuthenticatedUser(supabase, "saved recipe cooking yield saving");
+  } catch {
+    return { status: "error", code: "unauthenticated" };
+  }
+
+  const client = supabase as unknown as CookingYieldMutationClient;
+  const { data: recipe, error: recipeError } = await client.from("user_saved_ai_recipes").select("id").eq("id", measurement.recipeId).eq("user_id", user.id).maybeSingle() as { data: { id: string } | null; error: unknown };
+  if (recipeError) return { status: "error", code: "save-failed" };
+  if (!recipe) return { status: "error", code: "recipe-not-found" };
+  const { data: existing, error: existingError } = await client.from("user_saved_ai_recipe_cooking_yields").select("recipe_id").eq("recipe_id", measurement.recipeId).eq("user_id", user.id).maybeSingle() as { data: { recipe_id: string } | null; error: unknown };
+  if (existingError) return { status: "error", code: "save-failed" };
+
+  const values = { recipe_id: measurement.recipeId, user_id: user.id, raw_weight_g: measurement.rawWeightG, cooked_weight_g: measurement.cookedWeightG, servings: measurement.servings, updated_at: new Date().toISOString() };
+  const mutation = (existing
+    ? await client.from("user_saved_ai_recipe_cooking_yields").update(values).eq("recipe_id", measurement.recipeId).eq("user_id", user.id).select("recipe_id").maybeSingle()
+    : await client.from("user_saved_ai_recipe_cooking_yields").insert(values).select("recipe_id").maybeSingle()) as { data: { recipe_id: string } | null; error: unknown };
+  if (mutation.error || !mutation.data) return { status: "error", code: "save-failed" };
+  revalidatePath(RECIPES_PATH);
+  return { status: "success", code: existing ? "updated" : "saved" };
+}
+
+export async function deleteSavedRecipeCookingYieldAction(recipeId: string): Promise<SavedRecipeCookingYieldMutationResult> {
+  if (!UUID_PATTERN.test(recipeId)) return { status: "error", code: "invalid-input" };
+  const supabase = await createClient();
+  let user: { id: string };
+  try {
+    user = await requireAuthenticatedUser(supabase, "saved recipe cooking yield deletion");
+  } catch {
+    return { status: "error", code: "unauthenticated" };
+  }
+  const client = supabase as unknown as CookingYieldMutationClient;
+  const { data: recipe, error: recipeError } = await client.from("user_saved_ai_recipes").select("id").eq("id", recipeId).eq("user_id", user.id).maybeSingle() as { data: { id: string } | null; error: unknown };
+  if (recipeError) return { status: "error", code: "delete-failed" };
+  if (!recipe) return { status: "error", code: "recipe-not-found" };
+  const { error } = await client.from("user_saved_ai_recipe_cooking_yields").delete().eq("recipe_id", recipeId).eq("user_id", user.id) as { error: unknown };
+  if (error) return { status: "error", code: "delete-failed" };
+  revalidatePath(RECIPES_PATH);
+  return { status: "success", code: "deleted" };
 }
 
 

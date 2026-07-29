@@ -194,6 +194,7 @@ Toda conversión estimada debe poder corregirse y reutilizarse.
 
 - **1.5A — núcleo determinista de rendimiento — Implementada/cerrada:** validación y cálculo común de pesos observados, cambio neto de agua y aceite explícitos, rendimiento, peso por ración y redistribución de nutrición total.
 - **1.5B — previsualización revisable en recetas IA guardadas — Implementada/cerrada:** pesos observados y raciones permiten consultar, sin persistencia, el rendimiento y la nutrición reconstruida desde el inventario actual; los datos incompletos quedan pendientes de revisión.
+- **1.5C — medición confirmada reutilizable — Implementada/cerrada:** cada receta IA guardada admite una medición corregible y eliminable de peso previo, peso cocinado y raciones; al cargarla se recalculan los resultados con la nutrición actual sin persistir valores derivados.
 
 Modelar correctamente:
 

@@ -27,6 +27,7 @@ import { toSavedAiRecipe, type SavedAiRecipe } from "@/modules/recipes/saved-ai-
 import { buildRecipeAiNutritionAllocations } from "@/modules/recipes/recipe-ai-nutrition";
 import { estimateRecipeNutrition } from "@/modules/recipes/recipe-nutrition";
 import { buildSavedRecipeCookingYieldNutrition } from "@/modules/recipes/saved-ai-recipe-cooking-yield";
+import { toSavedRecipeCookingYieldMeasurement } from "@/modules/recipes/saved-ai-recipe-cooking-yield-measurement";
 import { buildRecipeCalorieBudget, isRecipeServingWithinCalorieBudget } from "@/modules/recipes/recipe-calorie-budget";
 import { getTodayUtcDate } from "@/modules/meals/meal-date";
 
@@ -127,28 +128,37 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
   const todayKey = getCurrentInventoryExpirationDateKey();
   const today = getTodayUtcDate();
 
-  const [{ data: profileData, error: profileError }, { data: todayMealsData, error: todayMealsError }] = await Promise.all([
+  const [
+    { data: profileData, error: profileError },
+    { data: todayMealsData, error: todayMealsError },
+    { data: inventoryData, error: inventoryError },
+    { data: savedRecipeData, error: savedRecipeError },
+    { data: cookingYieldData, error: cookingYieldError },
+    { data: recipeData, error: recipeError },
+  ] = await Promise.all([
     (supabase as unknown as RecipesPageBudgetClient).from("user_nutrition_profiles").select("target_calories").eq("user_id", user.id).maybeSingle() as Promise<{ data: { target_calories: number | null } | null; error: { message: string } | null }>,
     (supabase as unknown as RecipesPageBudgetClient).from("daily_meal_logs").select("calories").eq("user_id", user.id).eq("consumed_on", today) as unknown as Promise<{ data: { calories: number | null }[] | null; error: { message: string } | null }>,
+    (supabase as any)
+      .from("inventory_items")
+      .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g, food_catalog_item_id, food_catalog_items!inventory_items_food_owner_fk(normalized_name, aliases)")
+      .eq("user_id", user.id)
+      .gt("quantity", 0) as Promise<{ data: RecipeInventoryItemRow[] | null; error: { message: string } | null }>,
+    (supabase as any)
+      .from("user_saved_ai_recipes")
+      .select("id, user_id, title, description, estimated_minutes, servings, steps, source_priority_mode, fingerprint, created_at, user_saved_ai_recipe_ingredients(id, recipe_id, user_id, inventory_item_id, name, quantity, unit, sort_order, created_at)")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false }) as Promise<{ data: unknown[] | null; error: { message: string } | null }>,
+    (supabase as any)
+      .from("user_saved_ai_recipe_cooking_yields")
+      .select("recipe_id, raw_weight_g, cooked_weight_g, servings")
+      .eq("user_id", user.id) as Promise<{ data: unknown[] | null; error: { message: string } | null }>,
+    (supabase as any)
+      .from("recipe_templates")
+      .select("id, slug, title, description, prep_minutes, servings, instructions, recipe_ingredients(id, recipe_id, display_name, match_terms, required_quantity, required_unit, is_required, sort_order)")
+      .order("title", { ascending: true }) as Promise<{ data: RecipeTemplateRow[] | null; error: { message: string } | null }>,
   ]);
+
   const calorieBudget = profileError || todayMealsError ? null : buildRecipeCalorieBudget(profileData?.target_calories ?? null, (todayMealsData ?? []).reduce((sum, meal) => sum + (meal.calories ?? 0), 0));
-
-  const { data: inventoryData, error: inventoryError } = await (supabase as any)
-    .from("inventory_items")
-    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g, food_catalog_item_id, food_catalog_items!inventory_items_food_owner_fk(normalized_name, aliases)")
-    .eq("user_id", user.id)
-    .gt("quantity", 0) as { data: RecipeInventoryItemRow[] | null; error: { message: string } | null };
-
-  const { data: savedRecipeData, error: savedRecipeError } = await (supabase as any)
-    .from("user_saved_ai_recipes")
-    .select("id, user_id, title, description, estimated_minutes, servings, steps, source_priority_mode, fingerprint, created_at, user_saved_ai_recipe_ingredients(id, recipe_id, user_id, inventory_item_id, name, quantity, unit, sort_order, created_at)")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false }) as { data: unknown[] | null; error: { message: string } | null };
-
-  const { data: recipeData, error: recipeError } = await (supabase as any)
-    .from("recipe_templates")
-    .select("id, slug, title, description, prep_minutes, servings, instructions, recipe_ingredients(id, recipe_id, display_name, match_terms, required_quantity, required_unit, is_required, sort_order)")
-    .order("title", { ascending: true }) as { data: RecipeTemplateRow[] | null; error: { message: string } | null };
 
   if (inventoryError) {
     console.warn("Supabase could not load recipe inventory items:", inventoryError.message);
@@ -161,6 +171,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
   if (savedRecipeError) {
     console.warn("Supabase could not load saved AI recipes:", savedRecipeError.message);
   }
+  if (cookingYieldError) console.warn("Supabase could not load saved recipe cooking yields:", cookingYieldError.message);
 
   const identityIds = [...new Set((inventoryData ?? []).map((row) => typeof row.food_catalog_item_id === "string" ? row.food_catalog_item_id : "").filter(Boolean))];
   let unitMeasures = new Map();
@@ -189,6 +200,12 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
 
   const inventoryItems: RecipeInventoryItem[] = inventoryError ? [] : attachRecipeInventoryUnitMeasures(inventoryData ?? [], unitMeasures);
   const aiInventoryById = new Map(inventoryItems.map((item) => [item.id, item]));
+  const cookingYieldByRecipeId = new Map((cookingYieldError ? [] : cookingYieldData ?? []).flatMap((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return [];
+    const recipeId = (row as Record<string, unknown>).recipe_id;
+    const measurement = toSavedRecipeCookingYieldMeasurement(row);
+    return typeof recipeId === "string" && measurement ? [[recipeId, measurement] as const] : [];
+  }));
   const savedRecipeViews: SavedAiRecipeView[] = savedRecipes.map((recipe) => {
     const suggestion = {
       title: recipe.title,
@@ -204,6 +221,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
       ...recipe,
       usesConfirmedUnitMeasure: missingItemIds.size === 0 && nutrition.usedConfirmedUnitMeasure,
       cookingYieldNutrition: buildSavedRecipeCookingYieldNutrition(recipe, aiInventoryById),
+      cookingYieldMeasurement: cookingYieldByRecipeId.get(recipe.id) ?? null,
     };
   });
   const recipes = (recipeError ? [] : recipeData ?? []).map(toRecipeTemplate).filter((recipe): recipe is RecipeTemplate => Boolean(recipe));

@@ -4751,6 +4751,19 @@ h3 {
   padding: 12px 14px;
 }
 
+.cooking-yield-preview__success {
+  margin: 0;
+  border-radius: 12px;
+  background: var(--brand-soft);
+  padding: 12px 14px;
+  color: var(--brand-dark);
+}
+
+.cooking-yield-preview__actions {
+  display: grid;
+  gap: 8px;
+}
+
 .cooking-yield-preview__error {
   color: #991b1b;
 }
