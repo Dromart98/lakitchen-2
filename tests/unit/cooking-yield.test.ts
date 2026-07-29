@@ -30,10 +30,10 @@ describe("cooking yield", () => {
     });
 
     expect(result.nutritionTotal).toEqual(nutrition);
-    expect(result.nutritionPerServing.calories * result.servings).toBe(nutrition.calories);
+    expect(result.nutritionPerServing!.calories * result.servings).toBe(nutrition.calories);
   });
 
-  it("adds oil nutrition only when it is explicitly supplied", () => {
+  it("keeps nutrition unresolved without oil macros and adds them when supplied", () => {
     const withoutNutrition = calculateCookingYield({
       rawWeightG: 500,
       cookedWeightG: 420,
@@ -54,7 +54,9 @@ describe("cooking yield", () => {
       },
     });
 
-    expect(withoutNutrition.nutritionTotal).toEqual(nutrition);
+    expect(withoutNutrition.nutritionTotal).toBeNull();
+    expect(withoutNutrition.nutritionPerServing).toBeNull();
+    expect(withoutNutrition.nutritionPer100gCooked).toBeNull();
     expect(withNutrition.nutritionTotal).toEqual({ calories: 1080, proteinG: 60, carbsG: 90, fatG: 50 });
   });
 
@@ -139,7 +141,7 @@ describe("cooking yield", () => {
 
     expect(JSON.stringify(input)).toBe(before);
     expect(result.yieldFactor).toBe(2 / 3);
-    expect(result.nutritionPer100gCooked.calories).toBe(50);
+    expect(result.nutritionPer100gCooked!.calories).toBe(50);
     expect(Object.isFrozen(result)).toBe(true);
   });
 });
