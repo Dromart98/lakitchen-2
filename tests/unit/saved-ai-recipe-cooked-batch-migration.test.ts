@@ -23,7 +23,7 @@ describe("saved AI recipe cooked batch migration", () => {
     expect(sql).not.toMatch(/references public\.user_saved_ai_recipes\(id, user_id\)\s+on delete cascade/);
   });
 
-  it("constrains finite positive weights, whole servings, nutrition and consumption", () => {
+  it("constrains finite positive weights, whole servings, nutrition, consumption and timestamps", () => {
     expect(sql).toMatch(/raw_weight_g > 0[\s\S]*raw_weight_g <> 'Infinity'[\s\S]*raw_weight_g <> 'NaN'/);
     expect(sql).toMatch(/cooked_weight_g > 0[\s\S]*cooked_weight_g <> 'Infinity'[\s\S]*cooked_weight_g <> 'NaN'/);
     expect(sql).toContain("check (servings > 0)");
@@ -33,9 +33,10 @@ describe("saved AI recipe cooked batch migration", () => {
     expect(sql).toContain("consumed_cooked_weight_g double precision not null default 0");
     expect(sql).toContain("consumed_cooked_weight_g >= 0");
     expect(sql).toContain("consumed_cooked_weight_g <= cooked_weight_g");
+    expect(sql).toContain("check (updated_at >= created_at)");
   });
 
-  it("forces owner-only reads and reserves every write", () => {
+  it("forces owner-only reads and reserves every direct write", () => {
     expect(sql).toContain("enable row level security");
     expect(sql).toContain("force row level security");
     expect(sql).toContain("for select");
@@ -46,8 +47,14 @@ describe("saved AI recipe cooked batch migration", () => {
     expect(sql).not.toMatch(/create policy[\s\S]*for (insert|update|delete)/);
   });
 
-  it("prevents owner changes even from a future privileged write path", () => {
-    expect(sql).toContain("before update of user_id");
-    expect(sql).toContain("if new.user_id is distinct from old.user_id");
+  it("keeps the original snapshot immutable while allowing consumption progress", () => {
+    expect(sql).toContain("create or replace function public.prevent_cooked_batch_snapshot_change()");
+    for (const field of ["id", "user_id", "recipe_title", "raw_weight_g", "cooked_weight_g", "servings", "total_calories", "total_protein_g", "total_carbs_g", "total_fat_g", "created_at"]) {
+      expect(sql).toContain(`new.${field} is distinct from old.${field}`);
+    }
+    expect(sql).toContain("old.source_recipe_id is not null and new.source_recipe_id is null");
+    expect(sql).toContain("before update on public.user_saved_ai_recipe_cooked_batches");
+    expect(sql).not.toContain("new.consumed_cooked_weight_g is distinct from old.consumed_cooked_weight_g");
+    expect(sql).not.toContain("new.updated_at is distinct from old.updated_at");
   });
 });
