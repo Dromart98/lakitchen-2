@@ -36,11 +36,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 function normalizeBatchVersion(value: unknown): string | null {
   if (typeof value !== "string" || !BATCH_VERSION_PATTERN.test(value)) return null;
   const parsed = new Date(value);
-  if (!Number.isFinite(parsed.getTime())) return null;
-  const canonical = parsed.toISOString();
-  return canonical.endsWith(".000Z") || /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(canonical)
-    ? canonical
-    : null;
+  return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
 }
 
 export function parseConsumeCookedBatchInput(input: unknown): ConsumeCookedBatchRequest | null {
