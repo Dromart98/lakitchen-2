@@ -6,6 +6,24 @@ alter table public.user_saved_ai_recipe_cooked_batches
   alter column source_measurement_updated_at type timestamptz(3)
   using date_trunc('milliseconds', source_measurement_updated_at);
 
+create or replace function public.set_saved_ai_recipe_cooking_yield_version()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  new.updated_at := greatest(
+    date_trunc('milliseconds', pg_catalog.clock_timestamp()),
+    old.updated_at + interval '1 millisecond'
+  );
+  return new;
+end;
+$$;
+
+create trigger set_user_saved_ai_recipe_cooking_yield_version
+before update on public.user_saved_ai_recipe_cooking_yields
+for each row execute function public.set_saved_ai_recipe_cooking_yield_version();
+
 alter table public.user_saved_ai_recipe_cooked_batches
   rename column source_recipe_id to live_source_recipe_id;
 
@@ -81,6 +99,9 @@ begin
 end;
 $$;
 
+revoke execute on function public.set_saved_ai_recipe_cooking_yield_version() from public;
+revoke execute on function public.set_saved_ai_recipe_cooking_yield_version() from anon;
+revoke execute on function public.set_saved_ai_recipe_cooking_yield_version() from authenticated;
 revoke execute on function public.prepare_cooked_batch_source_snapshot() from public;
 revoke execute on function public.prepare_cooked_batch_source_snapshot() from anon;
 revoke execute on function public.prepare_cooked_batch_source_snapshot() from authenticated;
