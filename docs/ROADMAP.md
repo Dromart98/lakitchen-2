@@ -190,7 +190,9 @@ Añadir una capa común para:
 
 Toda conversión estimada debe poder corregirse y reutilizarse.
 
-### 1.5 Rendimiento de cocinado
+### 1.5 Rendimiento de cocinado — En progreso
+
+- **1.5A — núcleo determinista de rendimiento — Implementada/cerrada:** validación y cálculo común de pesos observados, cambio neto de agua y aceite explícitos, rendimiento, peso por ración y redistribución de nutrición total.
 
 Modelar correctamente:
 
