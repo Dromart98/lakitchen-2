@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const sql = readFileSync("supabase/migrations/20260806000000_create_saved_ai_recipe_cooked_batch_atomically.sql", "utf8");
+const retrySql = readFileSync("supabase/migrations/20260729164500_fix_cooked_batch_retry_idempotency.sql", "utf8");
 const action = readFileSync("app/recipes/actions.ts", "utf8");
 
 describe("atomic saved AI recipe cooked batch migration", () => {
@@ -50,6 +51,23 @@ describe("atomic saved AI recipe cooked batch migration", () => {
     expect(sql).toContain("message = 'idempotency_conflict'");
     expect(sql).toContain("creation_fingerprint, source_measurement_updated_at");
     expect(sql).toContain("new.creation_fingerprint is distinct from old.creation_fingerprint");
+  });
+
+  it("returns an already-created compatible request before revalidating mutable source rows", () => {
+    expect(retrySql).toContain("rename to create_saved_ai_recipe_cooked_batch_impl");
+    expect(retrySql).toContain("where id = p_request_id\n  for update");
+    expect(retrySql).toContain("v_existing.user_id = v_user_id");
+    expect(retrySql).toContain("v_existing.creation_fingerprint = v_fingerprint");
+    expect(retrySql).toMatch(/if found then[\s\S]*return v_existing\.id;[\s\S]*return public\.create_saved_ai_recipe_cooked_batch_impl/);
+    expect(retrySql).toContain("count(distinct item_id)");
+    expect(retrySql).toContain("message = 'idempotency_conflict'");
+  });
+
+  it("keeps the internal implementation unreachable to authenticated callers", () => {
+    expect(retrySql).toContain("revoke execute on function public.create_saved_ai_recipe_cooked_batch_impl(uuid, uuid, timestamptz, jsonb) from public");
+    expect(retrySql).toContain("revoke execute on function public.create_saved_ai_recipe_cooked_batch_impl(uuid, uuid, timestamptz, jsonb) from anon");
+    expect(retrySql).toContain("revoke execute on function public.create_saved_ai_recipe_cooked_batch_impl(uuid, uuid, timestamptz, jsonb) from authenticated");
+    expect(retrySql).toContain("grant execute on function public.create_saved_ai_recipe_cooked_batch(uuid, uuid, timestamptz, jsonb) to authenticated");
   });
 
   it("inserts the batch and then fully deletes or partially reduces inventory in the same function", () => {
