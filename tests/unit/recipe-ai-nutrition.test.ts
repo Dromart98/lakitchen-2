@@ -35,7 +35,7 @@ function enrich(recipe: RecipeAiSuggestion, inventory: RecipeAiNutritionInventor
 describe("enrichRecipeAiSuggestionsWithNutrition", () => {
   it("calculates per_100g nutrition with grams", () => {
     const nutrition = enrich(baseRecipe);
-    expect(nutrition).toMatchObject({ isComplete: true, missingNutritionItemCount: 0 });
+    expect(nutrition).toMatchObject({ isComplete: true, missingNutritionItemCount: 0, usedConfirmedUnitMeasure: false });
     expect(nutrition.total).toEqual({ calories: 350, proteinG: 7, carbsG: 77, fatG: 1.2 });
     expect(nutrition.perServing).toEqual({ calories: 175, proteinG: 3.5, carbsG: 38.5, fatG: 0.6 });
   });
@@ -81,7 +81,7 @@ describe("enrichRecipeAiSuggestionsWithNutrition", () => {
   it("treats zero nutrition values as complete", () => {
     const water: RecipeAiNutritionInventoryItem = { id: "water", name: "Agua", quantity: 1, unit: "l", category: "other", expires_at: null, nutrition_basis: "per_100ml", calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
     const nutrition = enrich({ ...baseRecipe, ingredients: [{ inventory_item_id: "water", name: "Agua", quantity: 250, unit: "ml" }] }, [water]);
-    expect(nutrition).toEqual({ total: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 }, perServing: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 }, isComplete: true, missingNutritionItemCount: 0 });
+    expect(nutrition).toEqual({ total: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 }, perServing: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 }, isComplete: true, missingNutritionItemCount: 0, usedConfirmedUnitMeasure: false });
   });
 
   it.each([
@@ -91,17 +91,17 @@ describe("enrichRecipeAiSuggestionsWithNutrition", () => {
     [{ ...rice, calories: Infinity }, "non-finite value"],
   ] as const)("marks nutrition incomplete for %s", (item, _label) => {
     const nutrition = enrich(baseRecipe, [item]);
-    expect(nutrition).toEqual({ total: null, perServing: null, isComplete: false, missingNutritionItemCount: 1 });
+    expect(nutrition).toEqual({ total: null, perServing: null, isComplete: false, missingNutritionItemCount: 1, usedConfirmedUnitMeasure: false });
   });
 
   it("marks nutrition incomplete for non-finite quantities", () => {
     const nutrition = enrich({ ...baseRecipe, ingredients: [{ inventory_item_id: "rice", name: "Arroz", quantity: Infinity, unit: "g" }] });
-    expect(nutrition).toEqual({ total: null, perServing: null, isComplete: false, missingNutritionItemCount: 1 });
+    expect(nutrition).toEqual({ total: null, perServing: null, isComplete: false, missingNutritionItemCount: 1, usedConfirmedUnitMeasure: false });
   });
 
   it("marks nutrition incomplete for unknown units", () => {
     const nutrition = enrich({ ...baseRecipe, ingredients: [{ inventory_item_id: "rice", name: "Arroz", quantity: 100, unit: "oz" }] });
-    expect(nutrition).toEqual({ total: null, perServing: null, isComplete: false, missingNutritionItemCount: 1 });
+    expect(nutrition).toEqual({ total: null, perServing: null, isComplete: false, missingNutritionItemCount: 1, usedConfirmedUnitMeasure: false });
   });
 
   it("counts unique products with missing nutrition", () => {
@@ -116,7 +116,7 @@ describe("enrichRecipeAiSuggestionsWithNutrition", () => {
 
   it("handles missing inventory products defensively", () => {
     const nutrition = enrich(baseRecipe, []);
-    expect(nutrition).toEqual({ total: null, perServing: null, isComplete: false, missingNutritionItemCount: 1 });
+    expect(nutrition).toEqual({ total: null, perServing: null, isComplete: false, missingNutritionItemCount: 1, usedConfirmedUnitMeasure: false });
   });
 
   it("does not mutate recipes or inventory", () => {

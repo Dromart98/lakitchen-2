@@ -26,6 +26,12 @@ const ids = [
   "00000014-0020-4020-8020-000000000020",
   "00000015-0021-4021-8021-000000000021",
 ];
+const measure = {
+  id: "00000000-0000-4000-8000-000000000003",
+  updatedAt: "2026-07-29T12:00:00.000Z",
+  canonicalQuantity: 58,
+  canonicalUnit: "g" as const,
+};
 
 function allocation(overrides: Partial<RecipeIngredientAllocation> = {}): RecipeIngredientAllocation {
   return {
@@ -47,6 +53,31 @@ function item(overrides: Partial<RecipeConsumptionInventoryItem> = {}): RecipeCo
 }
 
 describe("buildRecipeConsumptionLines", () => {
+  it("uses and sums server-calculated original quantities for measure-backed allocations", () => {
+    expect(buildRecipeConsumptionLines([
+      allocation({ usedQuantity: 58, usedUnit: "g", originalQuantity: 1, originalUnit: "ud", confirmedUnitMeasure: measure, usedConfirmedUnitMeasure: true }),
+      allocation({ usedQuantity: 58, usedUnit: "g", originalQuantity: 1, originalUnit: "ud", confirmedUnitMeasure: measure, usedConfirmedUnitMeasure: true }),
+    ], [item({ unit: "ud" })])).toEqual({ ok: true, lines: [{
+      item_id: ids[0],
+      consumed_quantity: 2,
+      expected_equivalence_id: measure.id,
+      expected_equivalence_updated_at: measure.updatedAt,
+      expected_canonical_quantity: 58,
+      expected_canonical_unit: "g",
+    }] });
+  });
+
+  it("keeps exact-only lines free of equivalence expectations", () => {
+    expect(buildRecipeConsumptionLines([allocation()], [item()])).toEqual({ ok: true, lines: [{ item_id: ids[0], consumed_quantity: 100 }] });
+  });
+
+  it("rejects incomplete or contradictory server-side measure metadata", () => {
+    expect(buildRecipeConsumptionLines([allocation({ originalQuantity: 100, originalUnit: "g", usedConfirmedUnitMeasure: true })], [item()])).toEqual({ ok: false, code: "incompatible-unit" });
+    expect(buildRecipeConsumptionLines([
+      allocation({ originalQuantity: 100, originalUnit: "g", confirmedUnitMeasure: measure, usedConfirmedUnitMeasure: true }),
+      allocation({ originalQuantity: 100, originalUnit: "g", confirmedUnitMeasure: { ...measure, canonicalQuantity: 60 }, usedConfirmedUnitMeasure: true }),
+    ], [item()])).toEqual({ ok: false, code: "incompatible-unit" });
+  });
   it("keeps grams stored as grams", () => {
     expect(buildRecipeConsumptionLines([allocation({ usedQuantity: 250, usedUnit: "g" })], [item({ unit: "g" })])).toEqual({ ok: true, lines: [{ item_id: ids[0], consumed_quantity: 250 }] });
   });

@@ -30,6 +30,12 @@ describe("recipe nutrition", () => {
     expect(estimateRecipeNutrition([allocation({ usedQuantity: 3, usedUnit: "ud", nutritionBasis: "per_unit", calories: 70, proteinG: 6, carbsG: 1, fatG: 4 })], 1).total).toEqual({ calories: 210, proteinG: 18, carbsG: 3, fatG: 12 });
   });
 
+  it("uses the shared confirmed-measure nutrition rules", () => {
+    const measure = { id: "00000000-0000-4000-8000-000000000003", updatedAt: "2026-07-29T12:00:00.000Z", canonicalQuantity: 58, canonicalUnit: "g" as const };
+    expect(estimateRecipeNutrition([allocation({ usedQuantity: 2, usedUnit: "ud", confirmedUnitMeasure: measure })], 1).total?.calories).toBeCloseTo(232);
+    expect(estimateRecipeNutrition([allocation({ usedQuantity: 116, usedUnit: "g", nutritionBasis: "per_unit", confirmedUnitMeasure: measure })], 1).total?.calories).toBe(400);
+  });
+
   it("sums several products", () => {
     const estimate = estimateRecipeNutrition([
       allocation({ inventoryItemId: "a", usedQuantity: 100, calories: 100, proteinG: 10, carbsG: 20, fatG: 1 }),
@@ -44,7 +50,7 @@ describe("recipe nutrition", () => {
 
   it("rejects partial data", () => {
     const estimate = estimateRecipeNutrition([allocation({ proteinG: null })], 1);
-    expect(estimate).toEqual({ total: null, perServing: null, isComplete: false, missingNutritionItemCount: 1 });
+    expect(estimate).toEqual({ total: null, perServing: null, isComplete: false, missingNutritionItemCount: 1, usedConfirmedUnitMeasure: false });
   });
 
   it("rejects incompatible basis", () => {
@@ -60,7 +66,7 @@ describe("recipe nutrition", () => {
 
   it("accepts zero as valid nutrition", () => {
     const estimate = estimateRecipeNutrition([allocation({ calories: 0, proteinG: 0, carbsG: 0, fatG: 0 })], 1);
-    expect(estimate).toEqual({ total: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 }, perServing: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 }, isComplete: true, missingNutritionItemCount: 0 });
+    expect(estimate).toEqual({ total: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 }, perServing: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 }, isComplete: true, missingNutritionItemCount: 0, usedConfirmedUnitMeasure: false });
   });
 
   it("rejects invalid servings", () => {
@@ -69,7 +75,7 @@ describe("recipe nutrition", () => {
   });
 
   it("rejects absence of allocations", () => {
-    expect(estimateRecipeNutrition([], 1)).toEqual({ total: null, perServing: null, isComplete: false, missingNutritionItemCount: 0 });
+    expect(estimateRecipeNutrition([], 1)).toEqual({ total: null, perServing: null, isComplete: false, missingNutritionItemCount: 0, usedConfirmedUnitMeasure: false });
   });
 
   it("does not mutate allocations", () => {

@@ -7,12 +7,13 @@ import { AppShell } from "@/components/layout/AppShell";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
+import { selectInventoryUnitMeasures } from "@/modules/inventory/inventory-unit-equivalence";
 import { MEAL_TYPE_LABELS, MEAL_TYPES } from "@/modules/meals/meal-types";
 import {
   matchRecipesToInventory,
+  attachRecipeInventoryUnitMeasures,
   normalizeRecipeFilterMode,
   sortRecipeMatches,
-  toRecipeInventoryItem,
   type RecipeFilterMode,
   type RecipeIngredient,
   type RecipeInventoryItem,
@@ -59,6 +60,7 @@ const recipeErrorMessages: Record<string, string> = {
   "insufficient-stock": "Ya no tienes cantidad suficiente para cocinar esta receta.",
   "incomplete-nutrition": "Faltan datos nutricionales completos en los productos utilizados.",
   "incompatible-nutrition-unit": "Algún producto tiene una unidad nutricional incompatible.",
+  "equivalence-conflict": "La medida habitual cambió mientras preparábamos la receta. Revísala y vuelve a intentarlo.",
   "consume-failed": "No se pudo registrar la receta.",
   "invalid-servings": "Selecciona un número válido de raciones.",
   "calorie-budget-exceeded": "Esta receta supera las calorías que te quedan hoy. Elige otra opción.",
@@ -68,7 +70,7 @@ const ingredientStatusMessages = {
   available: "Disponible.",
   missing: "No está en tu inventario.",
   insufficient: "No tienes cantidad suficiente.",
-  incompatible: "Revisa la unidad del producto en el inventario.",
+  incompatible: "Revisa la unidad o las medidas habituales del producto.",
   expired: "El producto coincidente está caducado.",
 };
 
@@ -156,6 +158,21 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
     console.warn("Supabase could not load saved AI recipes:", savedRecipeError.message);
   }
 
+  const identityIds = [...new Set((inventoryData ?? []).map((row) => typeof row.food_catalog_item_id === "string" ? row.food_catalog_item_id : "").filter(Boolean))];
+  let unitMeasures = new Map();
+  if (!inventoryError && identityIds.length > 0) {
+    const { data, error } = await (supabase as any)
+      .from("food_quantity_equivalences")
+      .select("id, food_catalog_item_id, user_id, measure_kind, variant_key, display_label, canonical_quantity, canonical_unit, source, user_confirmed, updated_at")
+      .eq("user_id", user.id)
+      .eq("measure_kind", "unit")
+      .eq("user_confirmed", true)
+      .eq("source", "user")
+      .in("food_catalog_item_id", identityIds) as { data: unknown[] | null; error: { message: string } | null };
+    if (error) console.warn("Supabase could not load recipe unit measures:", error.message);
+    else unitMeasures = new Map(selectInventoryUnitMeasures(data ?? [], user.id, identityIds));
+  }
+
   const savedRecipes = (savedRecipeError ? [] : savedRecipeData ?? []).reduce<SavedAiRecipe[]>((validRecipes, row) => {
     const recipe = toSavedAiRecipe(row);
     if (!recipe) {
@@ -166,7 +183,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
     return validRecipes;
   }, []);
 
-  const inventoryItems: RecipeInventoryItem[] = inventoryError ? [] : (inventoryData ?? []).map(toRecipeInventoryItem);
+  const inventoryItems: RecipeInventoryItem[] = inventoryError ? [] : attachRecipeInventoryUnitMeasures(inventoryData ?? [], unitMeasures);
   const recipes = (recipeError ? [] : recipeData ?? []).map(toRecipeTemplate).filter((recipe): recipe is RecipeTemplate => Boolean(recipe));
   const recipeMatchesWithServingOptions = sortRecipeMatches(matchRecipesToInventory(recipes, inventoryItems, todayKey))
     .map((match) => buildRecipeMatchWithServingOptions(match, inventoryItems, todayKey));
@@ -224,6 +241,8 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
           const budgetedServingOptions = loggableServingOptions.filter((option) => !calorieBudget || isRecipeServingWithinCalorieBudget(option.nutrition!.perServing!.calories, calorieBudget));
           const hasCookableButUnloggableServings = servingOptions.some((option) => option.canCookNow && !option.canLog);
           const urgentItemCount = getMaxUrgentItemCountForCookableServings(servingOptions);
+          const usedConfirmedUnitMeasure = servingOptions.some((option) => option.usedConfirmedUnitMeasure)
+            || match.ingredientMatches.some((ingredient) => ingredient.allocations.some((allocation) => allocation.usedConfirmedUnitMeasure));
 
           return (
           <article className="recipes-card" key={match.recipe.id}>
@@ -240,6 +259,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
             {urgentItemCount > 0 ? <p className="recipes-badge recipes-badge--urgent">Usa pronto {urgentItemCount} producto{urgentItemCount === 1 ? "" : "s"}.</p> : null}
             {match.recipe.prep_minutes <= 15 ? <p className="recipes-badge">Lista en 15 minutos.</p> : null}
             </div>
+            {usedConfirmedUnitMeasure ? <p className="muted">Se ha usado una medida habitual guardada para calcular las cantidades. <Link href="/inventory/equivalences">Revisar medidas habituales</Link></p> : null}
 
             {budgetedServingOptions.length > 0 ? (
               <section className="recipes-card__nutrition">

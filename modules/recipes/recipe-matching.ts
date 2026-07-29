@@ -1,8 +1,10 @@
 import { getInventoryExpirationDayDifference } from "@/modules/inventory/inventory-expiration";
-import type { InventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
+import { calculateConsumedInventoryNutritionWithMetadata, type InventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
+import type { InventoryConfirmedUnitMeasure } from "@/modules/inventory/inventory-unit-equivalence";
 import {
   areFoodQuantityUnitsCompatible,
   convertFoodQuantityToCanonical,
+  convertFoodQuantity,
   type CanonicalFoodQuantityUnit,
   type FoodQuantityUnit,
 } from "@/modules/units/food-quantity";
@@ -45,6 +47,7 @@ export type RecipeInventoryItem = {
   carbs_g?: number | null;
   fat_g?: number | null;
   foodIdentity?: RecipeFoodIdentity;
+  confirmedUnitMeasure?: InventoryConfirmedUnitMeasure | null;
 };
 
 export type RecipeFoodIdentity =
@@ -57,11 +60,25 @@ export type RecipeInventoryItemRow = Omit<RecipeInventoryItem, "foodIdentity"> &
   food_catalog_items?: unknown;
 };
 
+export function attachRecipeInventoryUnitMeasures(
+  rows: readonly RecipeInventoryItemRow[],
+  measures: ReadonlyMap<string, InventoryConfirmedUnitMeasure>,
+): RecipeInventoryItem[] {
+  return rows.map((row) => {
+    const identity = typeof row.food_catalog_item_id === "string" ? row.food_catalog_item_id : "";
+    return toRecipeInventoryItem({ ...row, confirmedUnitMeasure: measures.get(identity) ?? null });
+  });
+}
+
 export type RecipeIngredientAllocation = {
   inventoryItemId: string;
   inventoryItemName: string;
   usedQuantity: number;
   usedUnit: "g" | "ml" | "ud";
+  originalQuantity?: number;
+  originalUnit?: string;
+  confirmedUnitMeasure?: InventoryConfirmedUnitMeasure | null;
+  usedConfirmedUnitMeasure?: boolean;
   nutritionBasis: InventoryNutritionBasis | null;
   calories: number | null;
   proteinG: number | null;
@@ -96,8 +113,7 @@ type BaseUnit = CanonicalFoodQuantityUnit;
 
 type StockCopy = RecipeInventoryItem & {
   matchTerms: Set<string>;
-  remainingBaseQuantity: number | null;
-  baseUnit: BaseUnit | null;
+  remainingOriginalQuantity: number;
 };
 
 export function toRecipeInventoryItem(row: RecipeInventoryItemRow): RecipeInventoryItem {
@@ -158,6 +174,48 @@ function isUrgent(expiresAt: string | null, todayKey: string): boolean {
   return difference >= 0 && difference <= 7;
 }
 
+function convertStockQuantity(
+  quantity: number,
+  fromUnit: string,
+  toUnit: BaseUnit,
+  measure: InventoryConfirmedUnitMeasure | null | undefined,
+): { quantity: number; usedMeasure: boolean } | null {
+  const exact = convertFoodQuantityToCanonical(quantity, fromUnit);
+  if (exact?.unit === toUnit) return { quantity: exact.quantity, usedMeasure: false };
+  if (!measure || !Number.isFinite(measure.canonicalQuantity) || measure.canonicalQuantity <= 0) return null;
+  if (fromUnit === "ud" && measure.canonicalUnit === toUnit) {
+    return { quantity: quantity * measure.canonicalQuantity, usedMeasure: true };
+  }
+  if (toUnit === "ud") {
+    const canonical = convertFoodQuantityToCanonical(quantity, fromUnit);
+    if (canonical?.unit === measure.canonicalUnit) {
+      return { quantity: canonical.quantity / measure.canonicalQuantity, usedMeasure: true };
+    }
+  }
+  return null;
+}
+
+function convertAllocationToOriginal(
+  quantity: number,
+  fromUnit: BaseUnit,
+  item: StockCopy,
+): { quantity: number; usedMeasure: boolean } | null {
+  const exact = convertFoodQuantity(quantity, fromUnit, item.unit);
+  if (exact !== null) return { quantity: exact, usedMeasure: false };
+  const measure = item.confirmedUnitMeasure;
+  if (!measure || !Number.isFinite(measure.canonicalQuantity) || measure.canonicalQuantity <= 0) return null;
+  if (item.unit === "ud" && fromUnit === measure.canonicalUnit) {
+    return { quantity: quantity / measure.canonicalQuantity, usedMeasure: true };
+  }
+  if (fromUnit === "ud") {
+    const originalCanonical = convertFoodQuantityToCanonical(1, item.unit);
+    if (originalCanonical?.unit === measure.canonicalUnit) {
+      return { quantity: quantity * measure.canonicalQuantity / originalCanonical.quantity, usedMeasure: true };
+    }
+  }
+  return null;
+}
+
 function matchIngredient(ingredient: RecipeIngredient, stock: StockCopy[], todayKey: string): RecipeIngredientMatch {
   const required = convertRecipeQuantityToBase(ingredient.required_quantity, ingredient.required_unit);
   const terms = new Set(ingredient.match_terms.map(normalizeRecipeMatchTerm).filter(Boolean));
@@ -167,39 +225,58 @@ function matchIngredient(ingredient: RecipeIngredient, stock: StockCopy[], today
     return { ingredient, status: "missing", availableQuantity: 0, requiredQuantity: required?.quantity ?? 0, baseUnit: required?.unit ?? null, matchedItemCount: 0, urgentItemCount: 0, nearestExpirationDate: null, allocations: [] };
   }
 
-  const compatible = nameMatches.filter((item) => item.baseUnit === required.unit);
+  const compatible = nameMatches.filter((item) => convertStockQuantity(1, item.unit, required.unit, item.confirmedUnitMeasure) !== null);
   if (compatible.length === 0) {
     return { ingredient, status: "incompatible", availableQuantity: 0, requiredQuantity: required.quantity, baseUnit: required.unit, matchedItemCount: nameMatches.length, urgentItemCount: 0, nearestExpirationDate: null, allocations: [] };
   }
 
   const valid = compatible
-    .filter((item) => !isExpired(item.expires_at, todayKey) && (item.remainingBaseQuantity ?? 0) > 0)
+    .filter((item) => !isExpired(item.expires_at, todayKey) && item.remainingOriginalQuantity > 0)
     .sort((first, second) => compareExpiration(first.expires_at, second.expires_at) || first.name.localeCompare(second.name, "es") || first.id.localeCompare(second.id));
 
-  const expiredCompatibleCount = compatible.filter((item) => isExpired(item.expires_at, todayKey) && (item.remainingBaseQuantity ?? 0) > 0).length;
+  const expiredCompatibleCount = compatible.filter((item) => isExpired(item.expires_at, todayKey) && item.remainingOriginalQuantity > 0).length;
   let availableQuantity = 0;
   const used: StockCopy[] = [];
   const allocations: RecipeIngredientAllocation[] = [];
 
   for (const item of valid) {
     if (availableQuantity >= required.quantity) break;
-    const remaining = item.remainingBaseQuantity ?? 0;
-    const usedQuantity = Math.min(required.quantity - availableQuantity, remaining);
+    const available = convertStockQuantity(item.remainingOriginalQuantity, item.unit, required.unit, item.confirmedUnitMeasure);
+    if (!available) continue;
+    const usedQuantity = Math.min(required.quantity - availableQuantity, available.quantity);
     if (usedQuantity > 0) {
+      const original = convertAllocationToOriginal(usedQuantity, required.unit, item);
+      if (!original || original.quantity > item.remainingOriginalQuantity) continue;
       availableQuantity += usedQuantity;
-      item.remainingBaseQuantity = remaining - usedQuantity;
+      item.remainingOriginalQuantity -= original.quantity;
       used.push(item);
-      allocations.push({
+      const allocation: RecipeIngredientAllocation = {
         inventoryItemId: item.id,
         inventoryItemName: item.name,
         usedQuantity,
         usedUnit: required.unit,
+        originalQuantity: original.quantity,
+        originalUnit: item.unit,
+        confirmedUnitMeasure: item.confirmedUnitMeasure ?? null,
+        usedConfirmedUnitMeasure: available.usedMeasure || original.usedMeasure,
         nutritionBasis: item.nutrition_basis ?? null,
         calories: item.calories ?? null,
         proteinG: item.protein_g ?? null,
         carbsG: item.carbs_g ?? null,
         fatG: item.fat_g ?? null,
+      };
+      const nutrition = calculateConsumedInventoryNutritionWithMetadata({
+        consumed_quantity: allocation.usedQuantity,
+        unit: allocation.usedUnit,
+        nutrition_basis: allocation.nutritionBasis,
+        calories: allocation.calories,
+        protein_g: allocation.proteinG,
+        carbs_g: allocation.carbsG,
+        fat_g: allocation.fatG,
+        confirmedUnitMeasure: allocation.confirmedUnitMeasure,
       });
+      allocation.usedConfirmedUnitMeasure ||= nutrition?.usedConfirmedUnitMeasure === true;
+      allocations.push(allocation);
     }
   }
 
@@ -227,13 +304,12 @@ function matchIngredient(ingredient: RecipeIngredient, stock: StockCopy[], today
 export function matchRecipesToInventory(recipes: RecipeTemplate[], inventory: RecipeInventoryItem[], todayKey: string): RecipeMatchResult[] {
   return recipes.map((recipe) => {
     const stock: StockCopy[] = inventory.map((item) => {
-      const converted = convertRecipeQuantityToBase(item.quantity, item.unit);
       const matchTerms = item.foodIdentity?.status === "resolved"
         ? new Set([item.foodIdentity.normalizedName, ...item.foodIdentity.aliases])
         : item.foodIdentity?.status === "unresolved"
           ? new Set<string>()
           : new Set([normalizeRecipeMatchTerm(item.name)]);
-      return { ...item, matchTerms, remainingBaseQuantity: converted?.quantity ?? null, baseUnit: converted?.unit ?? null };
+      return { ...item, matchTerms, remainingOriginalQuantity: item.quantity };
     });
 
     const ingredients = [...recipe.recipe_ingredients].sort((first, second) => first.sort_order - second.sort_order || first.display_name.localeCompare(second.display_name, "es"));

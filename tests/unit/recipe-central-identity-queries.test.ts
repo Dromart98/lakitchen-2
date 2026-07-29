@@ -9,7 +9,7 @@ describe("global recipe inventory identity queries", () => {
   it.each([["recipes page", page], ["cook action", actions]])("loads the same owner-scoped identity for the %s", (_name, source) => {
     expect(source).toContain(identitySelection);
     expect(source).toMatch(/\.from\("inventory_items"\)[\s\S]*?food_catalog_items!inventory_items_food_owner_fk\(normalized_name, aliases\)[\s\S]*?\.eq\("user_id", user\.id\)[\s\S]*?\.gt\("quantity", 0\)/);
-    expect(source).toContain(".map(toRecipeInventoryItem)");
+    expect(source).toContain("attachRecipeInventoryUnitMeasures(inventoryData ?? [], unitMeasures)");
   });
 
   it("does not add private identity columns to global recipe queries", () => {

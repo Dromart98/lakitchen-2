@@ -5,6 +5,10 @@ import { convertFoodQuantity } from "@/modules/units/food-quantity";
 export type RecipeConsumptionLine = {
   item_id: string;
   consumed_quantity: number;
+  expected_equivalence_id?: string;
+  expected_equivalence_updated_at?: string;
+  expected_canonical_quantity?: number;
+  expected_canonical_unit?: "g" | "ml";
 };
 
 export type RecipeConsumptionInventoryItem = {
@@ -48,6 +52,7 @@ export function buildRecipeConsumptionLines(
 
   const inventoryById = new Map(inventoryItems.map((item) => [item.id, item]));
   const quantitiesByItemId = new Map<string, number>();
+  const expectationsByItemId = new Map<string, Omit<RecipeConsumptionLine, "item_id" | "consumed_quantity">>();
 
   for (const allocation of allocations) {
     const itemId = allocation.inventoryItemId.trim();
@@ -61,7 +66,12 @@ export function buildRecipeConsumptionLines(
       return { ok: false, code: "invalid-quantity" };
     }
 
-    const convertedQuantity = convertBaseQuantityToInventoryUnit(allocation.usedQuantity, allocation.usedUnit, item.unit);
+    if (allocation.originalUnit !== undefined && allocation.originalUnit !== item.unit) {
+      return { ok: false, code: "incompatible-unit" };
+    }
+    const convertedQuantity = allocation.usedConfirmedUnitMeasure
+      ? allocation.originalQuantity ?? null
+      : convertBaseQuantityToInventoryUnit(allocation.usedQuantity, allocation.usedUnit, item.unit);
     if (convertedQuantity === null) return { ok: false, code: "incompatible-unit" };
     if (!isPositiveFiniteQuantity(convertedQuantity)) return { ok: false, code: "invalid-quantity" };
 
@@ -70,12 +80,28 @@ export function buildRecipeConsumptionLines(
 
     quantitiesByItemId.set(itemId, summedQuantity);
 
+    if (allocation.usedConfirmedUnitMeasure) {
+      const measure = allocation.confirmedUnitMeasure;
+      if (!measure || !isValidItemId(measure.id) || !Number.isFinite(Date.parse(measure.updatedAt)) || !isPositiveFiniteQuantity(measure.canonicalQuantity)) {
+        return { ok: false, code: "incompatible-unit" };
+      }
+      const expectation = {
+        expected_equivalence_id: measure.id,
+        expected_equivalence_updated_at: measure.updatedAt,
+        expected_canonical_quantity: measure.canonicalQuantity,
+        expected_canonical_unit: measure.canonicalUnit,
+      };
+      const existing = expectationsByItemId.get(itemId);
+      if (existing && JSON.stringify(existing) !== JSON.stringify(expectation)) return { ok: false, code: "incompatible-unit" };
+      expectationsByItemId.set(itemId, expectation);
+    }
+
     if (quantitiesByItemId.size > RECIPE_MAX_INGREDIENTS) return { ok: false, code: "too-many-items" };
   }
 
   const lines = [...quantitiesByItemId]
     .sort(([firstItemId], [secondItemId]) => firstItemId.localeCompare(secondItemId))
-    .map(([item_id, consumed_quantity]) => ({ item_id, consumed_quantity }));
+    .map(([item_id, consumed_quantity]) => ({ item_id, consumed_quantity, ...expectationsByItemId.get(item_id) }));
 
   if (lines.length === 0) return { ok: false, code: "empty" };
 

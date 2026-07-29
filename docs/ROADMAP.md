@@ -174,7 +174,8 @@ Evitar que variaciones como “pollo”, “pechuga de pollo” y “pollo fresc
   - **1.4C1 — observaciones de envases por voz — Implementada/cerrada.**
   - **1.4C2 — reutilización confirmada por voz — Implementada/cerrada.**
   - **1.4C3 — medidas obtenidas por código de barras — Implementada/cerrada.**
-  - **1.4C4 — consumo unitario y registro de macros — En progreso.**
+  - **1.4C4 — consumo unitario y registro de macros — Implementada/cerrada.**
+  - **1.4C5 — recetas del catálogo — En progreso.**
 
 Añadir una capa común para:
 

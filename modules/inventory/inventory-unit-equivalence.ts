@@ -3,9 +3,25 @@ import {
 } from "@/modules/units/food-quantity-equivalence";
 
 export type InventoryConfirmedUnitMeasure = Readonly<{
+  id: string;
+  updatedAt: string;
   canonicalQuantity: number;
   canonicalUnit: "g" | "ml";
 }>;
+
+export type InventoryUnitMeasureValue = Readonly<{
+  canonicalQuantity: number;
+  canonicalUnit: "g" | "ml";
+}>;
+
+export function toInventoryUnitMeasureValue(
+  measure: InventoryConfirmedUnitMeasure,
+): InventoryUnitMeasureValue {
+  return {
+    canonicalQuantity: measure.canonicalQuantity,
+    canonicalUnit: measure.canonicalUnit,
+  };
+}
 
 type EquivalenceRow = Record<string, unknown>;
 
@@ -45,6 +61,8 @@ export function selectInventoryUnitMeasures(
       || (equivalence.canonicalUnit !== "g" && equivalence.canonicalUnit !== "ml")
     ) continue;
     selected.set(foodCatalogItemId, {
+      id: equivalence.id,
+      updatedAt: equivalence.updatedAt,
       canonicalQuantity: equivalence.canonicalQuantity,
       canonicalUnit: equivalence.canonicalUnit,
     });

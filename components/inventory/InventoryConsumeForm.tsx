@@ -11,6 +11,7 @@ import {
   hasInventoryNutritionValues,
 } from "@/modules/inventory/inventory-nutrition";
 import type { InventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
+import type { InventoryUnitMeasureValue } from "@/modules/inventory/inventory-unit-equivalence";
 import { MEAL_TYPE_LABELS, MEAL_TYPES } from "@/modules/meals/meal-types";
 
 type InventoryConsumeFormProps = {
@@ -22,10 +23,7 @@ type InventoryConsumeFormProps = {
   protein_g: number | null;
   carbs_g: number | null;
   fat_g: number | null;
-  confirmedUnitMeasure?: {
-    canonicalQuantity: number;
-    canonicalUnit: "g" | "ml";
-  } | null;
+  confirmedUnitMeasure?: InventoryUnitMeasureValue | null;
 };
 
 function formatOptionalPreviewValue(value: number | null, suffix: string) {
