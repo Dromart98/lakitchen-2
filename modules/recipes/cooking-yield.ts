@@ -22,9 +22,9 @@ export type CookingYieldResult = Readonly<{
   incorporatedOil: ExplicitIncorporatedOil | null;
   yieldFactor: number;
   cookedWeightPerServingG: number;
-  nutritionTotal: Readonly<NutritionTotals>;
-  nutritionPerServing: Readonly<NutritionTotals>;
-  nutritionPer100gCooked: Readonly<NutritionTotals>;
+  nutritionTotal: Readonly<NutritionTotals> | null;
+  nutritionPerServing: Readonly<NutritionTotals> | null;
+  nutritionPer100gCooked: Readonly<NutritionTotals> | null;
 }>;
 
 const NUTRIENT_KEYS = ["calories", "proteinG", "carbsG", "fatG"] as const;
@@ -57,17 +57,18 @@ function mapNutrition(
   });
 }
 
-function addNutrition(
+function resolveNutritionTotal(
   resolved: Readonly<NutritionTotals>,
-  added?: Readonly<NutritionTotals>,
-): Readonly<NutritionTotals> {
-  if (!added) return Object.freeze({ ...resolved });
+  oil?: ExplicitIncorporatedOil,
+): Readonly<NutritionTotals> | null {
+  if (oil && !oil.nutritionTotal) return null;
+  if (!oil) return Object.freeze({ ...resolved });
 
   return Object.freeze({
-    calories: resolved.calories + added.calories,
-    proteinG: resolved.proteinG + added.proteinG,
-    carbsG: resolved.carbsG + added.carbsG,
-    fatG: resolved.fatG + added.fatG,
+    calories: resolved.calories + oil.nutritionTotal!.calories,
+    proteinG: resolved.proteinG + oil.nutritionTotal!.proteinG,
+    carbsG: resolved.carbsG + oil.nutritionTotal!.carbsG,
+    fatG: resolved.fatG + oil.nutritionTotal!.fatG,
   });
 }
 
@@ -80,6 +81,7 @@ function areEquivalentWeights(left: number, right: number): boolean {
  * Redistributes already-resolved nutrition using observed cooking weights.
  * Missing water change or incorporated oil remain unresolved (`null`); this
  * function never estimates either value and performs no intermediate rounding.
+ * Nutrition also remains unresolved when incorporated oil lacks nutrition data.
  */
 export function calculateCookingYield(input: CookingYieldInput): CookingYieldResult {
   requirePositiveFinite(input.rawWeightG, "rawWeightG");
@@ -109,7 +111,7 @@ export function calculateCookingYield(input: CookingYieldInput): CookingYieldRes
     }
   }
 
-  const nutritionTotal = addNutrition(input.resolvedNutritionTotal, oil?.nutritionTotal);
+  const nutritionTotal = resolveNutritionTotal(input.resolvedNutritionTotal, oil);
   const incorporatedOil = oil
     ? Object.freeze({
         weightG: oil.weightG,
@@ -126,7 +128,7 @@ export function calculateCookingYield(input: CookingYieldInput): CookingYieldRes
     yieldFactor: input.cookedWeightG / input.rawWeightG,
     cookedWeightPerServingG: input.cookedWeightG / input.servings,
     nutritionTotal,
-    nutritionPerServing: mapNutrition(nutritionTotal, input.servings),
-    nutritionPer100gCooked: mapNutrition(nutritionTotal, input.cookedWeightG / 100),
+    nutritionPerServing: nutritionTotal ? mapNutrition(nutritionTotal, input.servings) : null,
+    nutritionPer100gCooked: nutritionTotal ? mapNutrition(nutritionTotal, input.cookedWeightG / 100) : null,
   });
 }
