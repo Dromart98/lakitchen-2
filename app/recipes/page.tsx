@@ -60,6 +60,7 @@ const recipeErrorMessages: Record<string, string> = {
   "insufficient-stock": "Ya no tienes cantidad suficiente para cocinar esta receta.",
   "incomplete-nutrition": "Faltan datos nutricionales completos en los productos utilizados.",
   "incompatible-nutrition-unit": "Algún producto tiene una unidad nutricional incompatible.",
+  "equivalence-conflict": "La medida habitual cambió mientras preparábamos la receta. Revísala y vuelve a intentarlo.",
   "consume-failed": "No se pudo registrar la receta.",
   "invalid-servings": "Selecciona un número válido de raciones.",
   "calorie-budget-exceeded": "Esta receta supera las calorías que te quedan hoy. Elige otra opción.",

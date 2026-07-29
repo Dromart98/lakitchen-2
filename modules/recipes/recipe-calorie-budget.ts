@@ -46,7 +46,7 @@ export function isRecipeServingWithinCalorieBudget(caloriesPerServing: number, b
 function nutritionFor(recipe: RecipeAiSuggestion, inventory: RecipeAiNutritionInventoryItem[]): RecipeNutritionEstimate {
   const { allocations, missingItemIds } = buildRecipeAiNutritionAllocations(recipe, new Map(inventory.map((item) => [item.id, item])));
   const nutrition = estimateRecipeNutrition(allocations, recipe.servings);
-  return missingItemIds.size === 0 ? nutrition : { total: null, perServing: null, isComplete: false, missingNutritionItemCount: missingItemIds.size + nutrition.missingNutritionItemCount };
+  return missingItemIds.size === 0 ? nutrition : { total: null, perServing: null, isComplete: false, missingNutritionItemCount: missingItemIds.size + nutrition.missingNutritionItemCount, usedConfirmedUnitMeasure: nutrition.usedConfirmedUnitMeasure };
 }
 
 function scaleRecipe(recipe: RecipeAiSuggestion, scale: number): RecipeAiSuggestion | null {

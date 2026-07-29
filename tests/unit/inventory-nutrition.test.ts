@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateAvailableInventoryNutrition,
   calculateConsumedInventoryNutrition,
+  calculateConsumedInventoryNutritionWithMetadata,
   formatInventoryNutritionTotalValue,
   getInventoryNutritionBasisLabel,
   hasCompleteInventoryNutritionValues,
@@ -600,6 +601,16 @@ describe("consumed inventory nutrition preview totals", () => {
       carbs_g: null,
       fat_g: null,
     })).toBeNull();
+  });
+});
+
+describe("inventory consumed nutrition metadata", () => {
+  const base = { calories: 100, protein_g: 10, carbs_g: 5, fat_g: 2 };
+
+  it("reports whether a confirmed measure was actually necessary", () => {
+    expect(calculateConsumedInventoryNutritionWithMetadata({ ...base, nutrition_basis: "per_unit", consumed_quantity: 116, unit: "g", confirmedUnitMeasure: { canonicalQuantity: 58, canonicalUnit: "g" } })?.usedConfirmedUnitMeasure).toBe(true);
+    expect(calculateConsumedInventoryNutritionWithMetadata({ ...base, nutrition_basis: "per_unit", consumed_quantity: 116, unit: "ml", confirmedUnitMeasure: { canonicalQuantity: 58, canonicalUnit: "ml" } })?.usedConfirmedUnitMeasure).toBe(true);
+    expect(calculateConsumedInventoryNutritionWithMetadata({ ...base, nutrition_basis: "per_100g", consumed_quantity: 116, unit: "g", confirmedUnitMeasure: { canonicalQuantity: 58, canonicalUnit: "g" } })?.usedConfirmedUnitMeasure).toBe(false);
   });
 });
 

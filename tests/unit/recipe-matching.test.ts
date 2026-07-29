@@ -92,7 +92,7 @@ describe("recipe matching", () => {
   });
 
   it("uses a confirmed unit measure in both directions and preserves original deductions", () => {
-    const measure = { canonicalQuantity: 58, canonicalUnit: "g" as const };
+    const measure = { id: "00000000-0000-4000-8000-000000000003", updatedAt: "2026-07-29T12:00:00.000Z", canonicalQuantity: 58, canonicalUnit: "g" as const };
     const gramsRecipe = recipe({ recipe_ingredients: [ingredient({ required_quantity: 116 })] });
     const [fromUnits] = matchRecipesToInventory([gramsRecipe], [{ id: "units", name: "pollo", quantity: 3, unit: "ud", expires_at: null, confirmedUnitMeasure: measure }], "2026-07-14");
     expect(fromUnits.canCookNow).toBe(true);
@@ -106,9 +106,26 @@ describe("recipe matching", () => {
 
   it("does not reuse measure-backed stock across ingredients", () => {
     const [match] = matchRecipesToInventory([recipe({ recipe_ingredients: [ingredient({ id: "a", required_quantity: 116 }), ingredient({ id: "b", required_quantity: 116, sort_order: 2 })] })], [
-      { id: "units", name: "pollo", quantity: 3, unit: "ud", expires_at: null, confirmedUnitMeasure: { canonicalQuantity: 58, canonicalUnit: "g" } },
+      { id: "units", name: "pollo", quantity: 3, unit: "ud", expires_at: null, confirmedUnitMeasure: { id: "00000000-0000-4000-8000-000000000003", updatedAt: "2026-07-29T12:00:00.000Z", canonicalQuantity: 58, canonicalUnit: "g" } },
     ], "2026-07-14");
     expect(match.ingredientMatches.map((item) => item.status)).toEqual(["available", "insufficient"]);
+  });
+
+  it.each([
+    ["g", "per_unit" as const, "g" as const],
+    ["ml", "per_unit" as const, "ml" as const],
+  ])("marks exact %s matching when nutrition needs the confirmed measure", (unit, nutrition_basis, canonicalUnit) => {
+    const [match] = matchRecipesToInventory([recipe({ recipe_ingredients: [ingredient({ required_quantity: 116, required_unit: unit as "g" | "ml" })] })], [{
+      id: "lot", name: "pollo", quantity: 174, unit, expires_at: null,
+      nutrition_basis, calories: 100, protein_g: 10, carbs_g: 5, fat_g: 2,
+      confirmedUnitMeasure: { id: "00000000-0000-4000-8000-000000000003", updatedAt: "2026-07-29T12:00:00.000Z", canonicalQuantity: 58, canonicalUnit },
+    }], "2026-07-14");
+    expect(match.ingredientMatches[0].allocations[0].usedConfirmedUnitMeasure).toBe(true);
+  });
+
+  it("does not mark exact gram nutrition as measure-backed", () => {
+    const [match] = matchRecipesToInventory([recipe()], [{ id: "lot", name: "pollo", quantity: 100, unit: "g", expires_at: null, nutrition_basis: "per_100g", calories: 100, protein_g: 10, carbs_g: 5, fat_g: 2, confirmedUnitMeasure: { id: "00000000-0000-4000-8000-000000000003", updatedAt: "2026-07-29T12:00:00.000Z", canonicalQuantity: 58, canonicalUnit: "g" } }], "2026-07-14");
+    expect(match.ingredientMatches[0].allocations[0].usedConfirmedUnitMeasure).toBe(false);
   });
 
   it("distinguishes missing, insufficient, incompatible and expired", () => {

@@ -80,7 +80,7 @@ export function getRecipeServingOptions(recipe: RecipeTemplate, inventory: Recip
     const allocations = match.ingredientMatches.flatMap((ingredientMatch) => ingredientMatch.allocations);
     const nutrition = estimateRecipeNutrition(allocations, match.recipe.servings);
     const canLog = nutrition.isComplete && Boolean(nutrition.total) && Boolean(nutrition.perServing);
-    options.push({ servings, canCookNow, nutrition, canLog, urgentItemCount: match.urgentItemCount, nearestExpirationDate: match.nearestExpirationDate, usedConfirmedUnitMeasure: allocations.some((allocation) => allocation.usedConfirmedUnitMeasure) });
+    options.push({ servings, canCookNow, nutrition, canLog, urgentItemCount: match.urgentItemCount, nearestExpirationDate: match.nearestExpirationDate, usedConfirmedUnitMeasure: nutrition.usedConfirmedUnitMeasure });
   }
 
   return options;

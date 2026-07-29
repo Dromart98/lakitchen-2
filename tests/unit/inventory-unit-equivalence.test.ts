@@ -25,6 +25,8 @@ function row(overrides: Record<string, unknown> = {}) {
 describe("inventory confirmed unit measure selection", () => {
   it("selects one sanitized, confirmed user unit grouped by owner and identity", () => {
     expect(selectInventoryUnitMeasures([row()], USER, [FOOD]).get(FOOD)).toEqual({
+      id: "00000000-0000-4000-8000-000000000003",
+      updatedAt: "2026-07-29T12:00:00.000Z",
       canonicalQuantity: 58,
       canonicalUnit: "g",
     });

@@ -39,6 +39,7 @@ function buildIncompleteNutritionEstimate(missingNutritionItemCount: number): Re
     perServing: null,
     isComplete: false,
     missingNutritionItemCount,
+    usedConfirmedUnitMeasure: false,
   };
 }
 

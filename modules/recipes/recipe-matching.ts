@@ -1,5 +1,5 @@
 import { getInventoryExpirationDayDifference } from "@/modules/inventory/inventory-expiration";
-import type { InventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
+import { calculateConsumedInventoryNutritionWithMetadata, type InventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
 import type { InventoryConfirmedUnitMeasure } from "@/modules/inventory/inventory-unit-equivalence";
 import {
   areFoodQuantityUnitsCompatible,
@@ -250,7 +250,7 @@ function matchIngredient(ingredient: RecipeIngredient, stock: StockCopy[], today
       availableQuantity += usedQuantity;
       item.remainingOriginalQuantity -= original.quantity;
       used.push(item);
-      allocations.push({
+      const allocation: RecipeIngredientAllocation = {
         inventoryItemId: item.id,
         inventoryItemName: item.name,
         usedQuantity,
@@ -264,7 +264,19 @@ function matchIngredient(ingredient: RecipeIngredient, stock: StockCopy[], today
         proteinG: item.protein_g ?? null,
         carbsG: item.carbs_g ?? null,
         fatG: item.fat_g ?? null,
+      };
+      const nutrition = calculateConsumedInventoryNutritionWithMetadata({
+        consumed_quantity: allocation.usedQuantity,
+        unit: allocation.usedUnit,
+        nutrition_basis: allocation.nutritionBasis,
+        calories: allocation.calories,
+        protein_g: allocation.proteinG,
+        carbs_g: allocation.carbsG,
+        fat_g: allocation.fatG,
+        confirmedUnitMeasure: allocation.confirmedUnitMeasure,
       });
+      allocation.usedConfirmedUnitMeasure ||= nutrition?.usedConfirmedUnitMeasure === true;
+      allocations.push(allocation);
     }
   }
 

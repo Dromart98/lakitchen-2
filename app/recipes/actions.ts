@@ -116,6 +116,7 @@ function getSafeRecipeRpcError(error: { code?: string; message: string }): strin
   if (error.message === "Quantity exceeds available stock") return "insufficient-stock";
   if (error.message === "Incomplete inventory nutrition") return "incomplete-nutrition";
   if (error.message === "Incompatible inventory nutrition unit") return "incompatible-nutrition-unit";
+  if (error.message === "equivalence_conflict") return "equivalence-conflict";
 
   return "consume-failed";
 }
