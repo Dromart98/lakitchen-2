@@ -67,6 +67,12 @@ import {
   type CreateSavedAiRecipeCookedBatchErrorCode,
   type CreateSavedAiRecipeCookedBatchResult,
 } from "@/modules/recipes/saved-ai-recipe-batch-creation";
+import {
+  buildConsumeCookedBatchRpcPayload,
+  mapConsumeCookedBatchRpcError,
+  parseConsumeCookedBatchInput,
+  type ConsumeCookedBatchResult,
+} from "@/modules/recipes/cooked-batch-consumption";
 
 const RECIPES_PATH = "/recipes";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -681,6 +687,31 @@ export async function createSavedAiRecipeCookedBatchAction(input: unknown): Prom
 
   revalidatePath(RECIPES_PATH);
   revalidatePath("/inventory");
+  return { status: "success" };
+}
+
+/** Atomically records one explicit portion of an existing cooked batch. */
+export async function consumeCookedBatchAndLogMealAction(input: unknown): Promise<ConsumeCookedBatchResult> {
+  const request = parseConsumeCookedBatchInput(input);
+  if (!request) return { status: "error", code: "invalid-input" };
+
+  const supabase = await createClient();
+  try {
+    await requireAuthenticatedUser(supabase, "cooked batch consumption");
+  } catch {
+    return { status: "error", code: "unauthenticated" };
+  }
+
+  const { error } = await (supabase as unknown as CookSavedAiRecipeSupabaseClient).rpc(
+    "consume_cooked_batch_and_log_meal",
+    buildConsumeCookedBatchRpcPayload(request),
+  ) as { data: unknown; error: { message: string } | null };
+  if (error) return { status: "error", code: mapConsumeCookedBatchRpcError(error) };
+
+  revalidatePath(RECIPES_PATH);
+  revalidatePath("/dashboard");
+  revalidatePath("/meal-history");
+  revalidatePath("/weekly-summary");
   return { status: "success" };
 }
 
