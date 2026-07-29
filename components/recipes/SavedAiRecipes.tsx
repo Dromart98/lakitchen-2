@@ -2,6 +2,7 @@ import { deleteSavedAiRecipeAction } from "@/app/recipes/actions";
 import { SavedAiRecipeCookForm } from "@/components/recipes/SavedAiRecipeCookForm";
 import { CookingYieldPreview } from "@/components/recipes/CookingYieldPreview";
 import type { SavedRecipeCookingYieldNutrition } from "@/modules/recipes/saved-ai-recipe-cooking-yield";
+import type { SavedRecipeCookingYieldMeasurement } from "@/modules/recipes/saved-ai-recipe-cooking-yield-measurement";
 import type { SavedAiRecipe } from "@/modules/recipes/saved-ai-recipes";
 
 function formatQuantity(quantity: number): string {
@@ -15,6 +16,7 @@ function formatSavedDate(value: string): string {
 export type SavedAiRecipeView = SavedAiRecipe & {
   usesConfirmedUnitMeasure: boolean;
   cookingYieldNutrition: SavedRecipeCookingYieldNutrition;
+  cookingYieldMeasurement: SavedRecipeCookingYieldMeasurement | null;
 };
 
 export function SavedAiRecipes({ recipes }: { recipes: SavedAiRecipeView[] }) {
@@ -43,7 +45,7 @@ export function SavedAiRecipes({ recipes }: { recipes: SavedAiRecipeView[] }) {
             <summary>Preparación</summary>
             <ol>{recipe.steps.map((step) => <li key={step}>{step}</li>)}</ol>
           </details>
-          <CookingYieldPreview recipeId={recipe.id} nutrition={recipe.cookingYieldNutrition} />
+          <CookingYieldPreview recipeId={recipe.id} nutrition={recipe.cookingYieldNutrition} initialMeasurement={recipe.cookingYieldMeasurement} />
           <div className="saved-recipe__actions">
             <SavedAiRecipeCookForm recipeId={recipe.id} />
             <form className="saved-recipe__delete" action={deleteSavedAiRecipeAction}>
