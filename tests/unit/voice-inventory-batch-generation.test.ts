@@ -17,7 +17,7 @@ import { VOICE_INVENTORY_BATCH_MAX_ITEMS } from "@/modules/inventory/voice-inven
 const readyItem = {
   name: "Pollo", quantity: 1, unit: "kg", location: "freezer", category: "protein",
   food_state: "raw", nutrition_basis: "per_100g", calories: 120, protein_g: 22,
-  carbs_g: 0, fat_g: 3, package_count: null, package_size: null, package_size_unit: null, total_size: null, total_size_unit: null, confidence: "high", nutrition_assumptions: "Valores típicos por 100 g.", issues: [],
+  carbs_g: 0, fat_g: 3, package_count: null, package_measure_kind: null, package_size: null, package_size_unit: null, total_size: null, total_size_unit: null, confidence: "high", nutrition_assumptions: "Valores típicos por 100 g.", issues: [],
 };
 const completed = (value: unknown) => new Response(JSON.stringify(value), { status: 200 });
 
@@ -44,6 +44,9 @@ describe("voice inventory batch provider", () => {
     expect(body.input[0].content).toContain("pasta fresca");
     expect(body.input[0].content).toContain("No supongas que arroz, pasta seca o legumbres secas están cocinados");
     expect(body.input[0].content).toContain("No uses metadatos de envase para alimentos naturalmente contables como manzanas o huevos");
+    expect(body.input[0].content).toContain("package_measure_kind=can para lata");
+    expect(body.input[0].content).toContain("package_measure_kind=package para paquete, bolsa, caja, botella o bote");
+    expect(body.input[0].content).toContain("No infieras el tipo de envase por el alimento");
   });
   it("applies the shared validator's calibrated confidence to the draft", async () => {
     const result = await generateVoiceInventoryBatch("un kilo de pollo", {
@@ -134,7 +137,7 @@ describe("voice inventory batch provider", () => {
     const volume = (name: string, quantity: number, unit: "l") => ({ ...readyItem, name, quantity, unit, location: "pantry", category: "condiment", food_state: "not_applicable", nutrition_basis: "per_100ml", calories: 20, protein_g: 0, carbs_g: 1, fat_g: 0 });
     const spice = (name: string) => ({ ...readyItem, name, quantity: null, unit: null, location: "pantry", category: "condiment", food_state: "not_applicable", nutrition_basis: null, calories: null, protein_g: null, carbs_g: null, fat_g: null, confidence: "low", nutrition_assumptions: "Falta indicar la cantidad.", issues: ["quantity-missing", "unit-missing", "nutrition-incomplete"] });
     const tortillas = { ...readyItem, name: "Tortillas de trigo integral", quantity: 6, unit: "ud", location: "pantry", category: "carbohydrate", food_state: "processed", nutrition_basis: "per_unit", calories: 120, protein_g: 4, carbs_g: 20, fat_g: 3 };
-    const tuna = { ...readyItem, name: "Atún", quantity: 3, unit: "ud", location: "pantry", category: "protein", food_state: "processed", package_count: 3, package_size: 143, package_size_unit: "g", nutrition_basis: "per_100g", calories: 116, protein_g: 26, carbs_g: 0, fat_g: 1 };
+    const tuna = { ...readyItem, name: "Atún", quantity: 3, unit: "ud", location: "pantry", category: "protein", food_state: "processed", package_count: 3, package_measure_kind: "can" as const, package_size: 143, package_size_unit: "g", nutrition_basis: "per_100g", calories: 116, protein_g: 26, carbs_g: 0, fat_g: 1 };
     const providerItems = [tortillas, tuna, mass("Arroz", 0.5, "kg"), mass("Pasta de lenteja roja", 250, "g"), volume("Aceite", 1, "l"), volume("Vinagre de manzana", 0.5, "l"), ...["Perejil", "Comino", "Canela", "Ajo molido", "Sal"].map(spice)];
     const result = await generateVoiceInventoryBatch("Seis tortillas de trigo integral en la despensa, 3 latas de atún de 143 g en la despensa, medio kilo de arroz en la despensa, doscientos cincuenta gramos de pasta de lenteja roja en la despensa, 1 litro de aceite en la despensa, medio litro de vinagre de manzana en la despensa, perejil en la despensa, comino en la despensa, canela en la despensa, ajo molido en la despensa y sal en la despensa.", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: providerItems }) }) });
     expect(result).toMatchObject({ status: "needs-clarification" });
@@ -186,7 +189,7 @@ describe("voice inventory batch provider", () => {
   });
 
   it("recovers invalid package metadata and individual enums", async () => {
-    const invalidPackage = { ...readyItem, name: "Atún", quantity: 3, unit: "ud", package_count: 3, package_size: -143, package_size_unit: "g", nutrition_basis: "per_100g" };
+    const invalidPackage = { ...readyItem, name: "Atún", quantity: 3, unit: "ud", package_count: 3, package_measure_kind: "can" as const, package_size: -143, package_size_unit: "g", nutrition_basis: "per_100g" };
     const invalidEnums = { ...readyItem, name: "Arroz", unit: "saco", location: "armario", category: "cereal", food_state: "dry" };
     const result = await generateVoiceInventoryBatch("pollo, atún, arroz y aceite", { apiKey: "test-key", fetchImpl: async () => completed({ status: "completed", output_text: JSON.stringify({ items: [readyItem, invalidPackage, invalidEnums, { ...readyItem, name: "Aceite", unit: "l", nutrition_basis: "per_100ml" }] }) }) });
     expect(result).toMatchObject({ status: "needs-clarification" });

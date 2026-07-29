@@ -167,10 +167,11 @@ Evitar que variaciones como “pollo”, “pechuga de pollo” y “pollo fresc
 ### 1.4 Conversión fiable de unidades — En progreso
 
 - **1.4A — núcleo exacto — Implementada/cerrada:** fuente común para conversiones dimensionales exactas entre `g`/`kg`, `ml`/`l` y `ud`.
-- **1.4B — equivalencias estimadas y revisables — En progreso.**
+- **1.4B — equivalencias estimadas y revisables — Implementada/cerrada.**
   - **1.4B1 — modelo, almacenamiento y resolvedor — Implementada/cerrada.**
-  - **1.4B2 — revisión y corrección visual — En progreso.**
-- **1.4C — adopción transversal de equivalencias — Pendiente.**
+  - **1.4B2 — revisión y corrección visual — Implementada/cerrada.**
+- **1.4C — adopción transversal de equivalencias — En progreso.**
+  - **1.4C1 — observaciones de envases por voz — En progreso.**
 
 Añadir una capa común para:
 

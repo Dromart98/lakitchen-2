@@ -19,6 +19,7 @@ import { resolveInventoryNutritionForUser } from "@/lib/nutrition/catalog-resolv
 import { catalogRequestKey, confirmedCatalogRow, persistConfirmedNutritionBatchWithIdentities } from "@/modules/nutrition/catalog";
 import { parseInventoryNutritionAiInput, type InventoryNutritionAiEstimate, type InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
 import { toVoiceInventoryBatchSaveInput, VoiceInventoryBatchCatalogMetadataSchema } from "@/modules/inventory/voice-inventory-batch-save";
+import { buildObservedPackageEquivalenceProposals } from "@/modules/inventory/voice-inventory-package-equivalences";
 
 type InventoryLocation = "pantry" | "fridge" | "freezer";
 type InventoryUnit = "ud" | "g" | "kg" | "ml" | "l";
@@ -492,7 +493,7 @@ export async function estimateVoiceInventoryBatchAction(text: string) {
 }
 
 export type SaveVoiceInventoryBatchResult =
-  | { status: "success"; outcome: "saved" | "already-saved"; insertedCount: number; message: string }
+  | { status: "success"; outcome: "saved" | "already-saved"; insertedCount: number; rememberedMeasureCount: number; proposalWarning?: string; message: string }
   | { status: "error"; code: "invalid-input" | "invalid-batch-payload" | "submission-conflict" | "save-failed"; message: string };
 
 export async function saveVoiceInventoryBatchAction(submissionId: string, items: unknown, catalogMetadata: unknown): Promise<SaveVoiceInventoryBatchResult> {
@@ -527,6 +528,30 @@ export async function saveVoiceInventoryBatchAction(submissionId: string, items:
   }
   const result = data?.[0];
   if (!result || !["saved", "already-saved"].includes(result.status) || !Number.isInteger(result.inserted_count)) return { status: "error", code: "save-failed", message: "No se pudieron añadir los productos. Inténtalo de nuevo." };
+  let rememberedMeasureCount = 0;
+  let proposalFailures = 0;
+  if (alignedCatalogMetadata) {
+    const proposals = buildObservedPackageEquivalenceProposals(itemsWithIdentities, alignedCatalogMetadata);
+    for (const proposal of proposals) {
+      const { error: proposalError } = await (supabase as any).rpc("save_food_quantity_equivalence_proposal", {
+        p_food_catalog_item_id: proposal.foodCatalogItemId,
+        p_measure_kind: proposal.measureKind,
+        p_variant_key: proposal.variantKey,
+        p_display_label: proposal.displayLabel,
+        p_canonical_quantity: proposal.canonicalQuantity,
+        p_canonical_unit: proposal.canonicalUnit,
+        p_source: "observed-package",
+      }) as { error: { message?: string } | null };
+      if (proposalError) {
+        proposalFailures += 1;
+        console.warn("Supabase could not remember an observed package measure:", proposalError.message ?? "Unknown proposal error.");
+      } else rememberedMeasureCount += 1;
+    }
+  }
   revalidatePath(INVENTORY_PATH);
-  return { status: "success", outcome: result.status, insertedCount: result.inserted_count, message: `Se añadieron ${result.inserted_count} productos al inventario.` };
+  revalidatePath("/inventory/equivalences");
+  const proposalWarning = proposalFailures > 0 ? "Los productos se añadieron, pero no se pudo recordar una de las medidas." : undefined;
+  const productMessage = `Se añadieron ${result.inserted_count} productos`;
+  const measureMessage = rememberedMeasureCount > 0 ? ` y se ${rememberedMeasureCount === 1 ? "recordó 1 medida habitual" : `recordaron ${rememberedMeasureCount} medidas habituales`}` : "";
+  return { status: "success", outcome: result.status, insertedCount: result.inserted_count, rememberedMeasureCount, proposalWarning, message: proposalWarning ?? `${productMessage}${measureMessage}.` };
 }
