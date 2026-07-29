@@ -1,5 +1,7 @@
 import { deleteSavedAiRecipeAction } from "@/app/recipes/actions";
 import { SavedAiRecipeCookForm } from "@/components/recipes/SavedAiRecipeCookForm";
+import { CookingYieldPreview } from "@/components/recipes/CookingYieldPreview";
+import type { SavedRecipeCookingYieldNutrition } from "@/modules/recipes/saved-ai-recipe-cooking-yield";
 import type { SavedAiRecipe } from "@/modules/recipes/saved-ai-recipes";
 
 function formatQuantity(quantity: number): string {
@@ -10,7 +12,10 @@ function formatSavedDate(value: string): string {
   return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
-export type SavedAiRecipeView = SavedAiRecipe & { usesConfirmedUnitMeasure: boolean };
+export type SavedAiRecipeView = SavedAiRecipe & {
+  usesConfirmedUnitMeasure: boolean;
+  cookingYieldNutrition: SavedRecipeCookingYieldNutrition;
+};
 
 export function SavedAiRecipes({ recipes }: { recipes: SavedAiRecipeView[] }) {
   return (
@@ -38,6 +43,7 @@ export function SavedAiRecipes({ recipes }: { recipes: SavedAiRecipeView[] }) {
             <summary>Preparación</summary>
             <ol>{recipe.steps.map((step) => <li key={step}>{step}</li>)}</ol>
           </details>
+          <CookingYieldPreview recipeId={recipe.id} nutrition={recipe.cookingYieldNutrition} />
           <div className="saved-recipe__actions">
             <SavedAiRecipeCookForm recipeId={recipe.id} />
             <form className="saved-recipe__delete" action={deleteSavedAiRecipeAction}>

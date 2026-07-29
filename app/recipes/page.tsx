@@ -26,6 +26,7 @@ import { buildRecipeMatchWithServingOptions, filterRecipeMatchesWithServingOptio
 import { toSavedAiRecipe, type SavedAiRecipe } from "@/modules/recipes/saved-ai-recipes";
 import { buildRecipeAiNutritionAllocations } from "@/modules/recipes/recipe-ai-nutrition";
 import { estimateRecipeNutrition } from "@/modules/recipes/recipe-nutrition";
+import { buildSavedRecipeCookingYieldNutrition } from "@/modules/recipes/saved-ai-recipe-cooking-yield";
 import { buildRecipeCalorieBudget, isRecipeServingWithinCalorieBudget } from "@/modules/recipes/recipe-calorie-budget";
 import { getTodayUtcDate } from "@/modules/meals/meal-date";
 
@@ -198,9 +199,11 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
       steps: recipe.steps,
     };
     const { allocations, missingItemIds } = buildRecipeAiNutritionAllocations(suggestion, aiInventoryById);
+    const nutrition = estimateRecipeNutrition(allocations, recipe.servings);
     return {
       ...recipe,
-      usesConfirmedUnitMeasure: missingItemIds.size === 0 && estimateRecipeNutrition(allocations, recipe.servings).usedConfirmedUnitMeasure,
+      usesConfirmedUnitMeasure: missingItemIds.size === 0 && nutrition.usedConfirmedUnitMeasure,
+      cookingYieldNutrition: buildSavedRecipeCookingYieldNutrition(recipe, aiInventoryById),
     };
   });
   const recipes = (recipeError ? [] : recipeData ?? []).map(toRecipeTemplate).filter((recipe): recipe is RecipeTemplate => Boolean(recipe));
