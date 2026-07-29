@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const sql = readFileSync("supabase/migrations/20260729155804_create_saved_ai_recipe_cooked_batches.sql", "utf8");
+const indexFixSql = readFileSync("supabase/migrations/20260729160115_fix_cooked_batch_source_owner_index.sql", "utf8");
 
 describe("saved AI recipe cooked batch migration", () => {
   it("stores independent batch snapshots without derived portion fields", () => {
@@ -21,6 +22,11 @@ describe("saved AI recipe cooked batch migration", () => {
     expect(sql).toContain("references public.user_saved_ai_recipes(id, user_id)");
     expect(sql).toContain("on delete set null (source_recipe_id)");
     expect(sql).not.toMatch(/references public\.user_saved_ai_recipes\(id, user_id\)\s+on delete cascade/);
+  });
+
+  it("covers the composite source-owner foreign key", () => {
+    expect(indexFixSql).toContain("drop index if exists public.user_saved_ai_recipe_cooked_batches_source_recipe_idx");
+    expect(indexFixSql).toContain("on public.user_saved_ai_recipe_cooked_batches(source_recipe_id, user_id)");
   });
 
   it("constrains finite positive weights, whole servings, nutrition, consumption and timestamps", () => {
