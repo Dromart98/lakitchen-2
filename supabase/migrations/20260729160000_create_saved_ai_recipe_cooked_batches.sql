@@ -39,7 +39,9 @@ create table public.user_saved_ai_recipe_cooked_batches (
       and consumed_cooked_weight_g <= cooked_weight_g
       and consumed_cooked_weight_g <> 'Infinity'::double precision
       and consumed_cooked_weight_g <> 'NaN'::double precision
-    )
+    ),
+  constraint user_saved_ai_recipe_cooked_batches_timestamps_check
+    check (updated_at >= created_at)
 );
 
 create index user_saved_ai_recipe_cooked_batches_user_created_idx
@@ -49,22 +51,38 @@ create index user_saved_ai_recipe_cooked_batches_source_recipe_idx
   on public.user_saved_ai_recipe_cooked_batches(source_recipe_id)
   where source_recipe_id is not null;
 
-create or replace function public.prevent_cooked_batch_owner_change()
+create or replace function public.prevent_cooked_batch_snapshot_change()
 returns trigger
 language plpgsql
 set search_path = ''
 as $$
 begin
-  if new.user_id is distinct from old.user_id then
-    raise exception using errcode = '42501', message = 'Cooked batch owner cannot be changed';
+  if new.id is distinct from old.id
+    or new.user_id is distinct from old.user_id
+    or new.recipe_title is distinct from old.recipe_title
+    or new.raw_weight_g is distinct from old.raw_weight_g
+    or new.cooked_weight_g is distinct from old.cooked_weight_g
+    or new.servings is distinct from old.servings
+    or new.total_calories is distinct from old.total_calories
+    or new.total_protein_g is distinct from old.total_protein_g
+    or new.total_carbs_g is distinct from old.total_carbs_g
+    or new.total_fat_g is distinct from old.total_fat_g
+    or new.created_at is distinct from old.created_at then
+    raise exception using errcode = '42501', message = 'Cooked batch snapshot cannot be changed';
   end if;
+
+  if new.source_recipe_id is distinct from old.source_recipe_id
+    and not (old.source_recipe_id is not null and new.source_recipe_id is null) then
+    raise exception using errcode = '42501', message = 'Cooked batch source recipe cannot be changed';
+  end if;
+
   return new;
 end;
 $$;
 
-create trigger prevent_user_saved_ai_recipe_cooked_batch_owner_change
-before update of user_id on public.user_saved_ai_recipe_cooked_batches
-for each row execute function public.prevent_cooked_batch_owner_change();
+create trigger prevent_user_saved_ai_recipe_cooked_batch_snapshot_change
+before update on public.user_saved_ai_recipe_cooked_batches
+for each row execute function public.prevent_cooked_batch_snapshot_change();
 
 create trigger set_user_saved_ai_recipe_cooked_batches_updated_at
 before update on public.user_saved_ai_recipe_cooked_batches
@@ -83,6 +101,6 @@ revoke all on table public.user_saved_ai_recipe_cooked_batches from anon;
 revoke all on table public.user_saved_ai_recipe_cooked_batches from authenticated;
 grant select on table public.user_saved_ai_recipe_cooked_batches to authenticated;
 
-revoke execute on function public.prevent_cooked_batch_owner_change() from public;
-revoke execute on function public.prevent_cooked_batch_owner_change() from anon;
-revoke execute on function public.prevent_cooked_batch_owner_change() from authenticated;
+revoke execute on function public.prevent_cooked_batch_snapshot_change() from public;
+revoke execute on function public.prevent_cooked_batch_snapshot_change() from anon;
+revoke execute on function public.prevent_cooked_batch_snapshot_change() from authenticated;
