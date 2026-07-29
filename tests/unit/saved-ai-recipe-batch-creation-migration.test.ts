@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 
 const sql = readFileSync("supabase/migrations/20260806000000_create_saved_ai_recipe_cooked_batch_atomically.sql", "utf8");
 const retrySql = readFileSync("supabase/migrations/20260806001000_fix_cooked_batch_retry_idempotency.sql", "utf8");
+const sourceSql = readFileSync("supabase/migrations/20260806002000_preserve_cooked_batch_source_snapshot.sql", "utf8");
 const action = readFileSync("app/recipes/actions.ts", "utf8");
+const contract = readFileSync("modules/recipes/saved-ai-recipe-batch-creation.ts", "utf8");
 
 describe("atomic saved AI recipe cooked batch migration", () => {
   it("exposes one hardened authenticated-only RPC", () => {
@@ -68,6 +70,23 @@ describe("atomic saved AI recipe cooked batch migration", () => {
     expect(retrySql).toContain("revoke execute on function public.create_saved_ai_recipe_cooked_batch_impl(uuid, uuid, timestamptz, jsonb) from anon");
     expect(retrySql).toContain("revoke execute on function public.create_saved_ai_recipe_cooked_batch_impl(uuid, uuid, timestamptz, jsonb) from authenticated");
     expect(retrySql).toContain("grant execute on function public.create_saved_ai_recipe_cooked_batch(uuid, uuid, timestamptz, jsonb) to authenticated");
+  });
+
+  it("preserves an immutable source identity after the live recipe relation is detached", () => {
+    expect(sourceSql).toContain("rename column source_recipe_id to live_source_recipe_id");
+    expect(sourceSql).toContain("add column source_recipe_id uuid");
+    expect(sourceSql).toContain("new.live_source_recipe_id := new.source_recipe_id");
+    expect(sourceSql).toContain("new.source_recipe_id is distinct from old.source_recipe_id");
+    expect(sourceSql).toContain("old.live_source_recipe_id is not null and new.live_source_recipe_id is null");
+    expect(sourceSql).toContain("creation_fingerprint is null");
+  });
+
+  it("aligns database and public measurement versions to canonical millisecond precision", () => {
+    expect(sourceSql).toContain("alter column updated_at type timestamptz(3)");
+    expect(sourceSql).toContain("alter column source_measurement_updated_at type timestamptz(3)");
+    expect(sourceSql).toContain("date_trunc('milliseconds', updated_at)");
+    expect(contract).toContain("MEASUREMENT_VERSION_PATTERN");
+    expect(contract).toContain("parsed.toISOString() === value");
   });
 
   it("inserts the batch and then fully deletes or partially reduces inventory in the same function", () => {
