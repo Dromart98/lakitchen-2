@@ -21,10 +21,16 @@ export function toVoiceInventoryBatchSaveInput(submissionId: string, items: unkn
 export const VoiceInventoryBatchCatalogMetadataSchema = z.array(z.object({
   name: z.string().trim().min(1).max(120),
   food_state: z.enum(["raw", "cooked", "processed", "not_applicable", "unknown"]),
+  package_measure_kind: z.enum(["can", "package"]).nullable(),
+  package_count: finite.positive().nullable(),
+  package_size: finite.positive().nullable(),
+  package_size_unit: z.enum(["g", "kg", "ml", "l"]).nullable(),
+  total_size: finite.positive().nullable(),
+  total_size_unit: z.enum(["g", "kg", "ml", "l"]).nullable(),
 }).strict()).min(1).max(30);
 
 export function buildVoiceInventoryBatchCatalogMetadata(items: VoiceInventoryDraftItem[]) {
-  return VoiceInventoryBatchCatalogMetadataSchema.safeParse(items.map((item) => ({ name: item.name, food_state: item.food_state })));
+  return VoiceInventoryBatchCatalogMetadataSchema.safeParse(items.map((item) => ({ name: item.name, food_state: item.food_state, package_measure_kind: item.package_measure_kind, package_count: item.package_count, package_size: item.package_size, package_size_unit: item.package_size_unit, total_size: item.total_size, total_size_unit: item.total_size_unit })));
 }
 
 /** Maps editable drafts to the only ten columns accepted by the batch RPC. */

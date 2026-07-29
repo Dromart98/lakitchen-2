@@ -7,9 +7,10 @@ export const VOICE_INVENTORY_BATCH_MAX_LENGTH = 4000;
 export const VOICE_INVENTORY_BATCH_MAX_ITEMS = 30;
 export const VOICE_INVENTORY_BATCH_UNITS = ["g", "kg", "ml", "l", "ud"] as const;
 export const VOICE_INVENTORY_BATCH_LOCATIONS = ["pantry", "fridge", "freezer"] as const;
+export const VOICE_INVENTORY_PACKAGE_MEASURE_KINDS = ["can", "package"] as const;
 export const VOICE_INVENTORY_BATCH_ISSUES = [
   "quantity-missing", "unit-missing", "location-unconfirmed",
-  "package-size-missing", "nutrition-incomplete", "nutrition-basis-mismatch",
+  "package-size-missing", "package-kind-missing", "nutrition-incomplete", "nutrition-basis-mismatch",
   "low-confidence", "ambiguous-product",
 ] as const;
 export type VoiceInventoryDraftIssue = (typeof VOICE_INVENTORY_BATCH_ISSUES)[number];
@@ -28,6 +29,7 @@ export const VoiceInventoryDraftItemSchema = z.object({
   confidence: z.enum(["high", "medium", "low"]),
   nutrition_assumptions: z.string().max(500),
   package_count: finiteNonNegative.nullable(),
+  package_measure_kind: z.enum(VOICE_INVENTORY_PACKAGE_MEASURE_KINDS).nullable(),
   package_size: finiteNonNegative.nullable(),
   package_size_unit: z.enum(PACKAGE_SIZE_UNITS).nullable(),
   total_size: finiteNonNegative.nullable(),
@@ -85,6 +87,7 @@ export function recoverVoiceInventoryDraftItem(value: unknown): z.infer<typeof V
    confidence: enumValue(raw.confidence, ["high", "medium", "low"] as const) ?? "low",
    nutrition_assumptions: typeof raw.nutrition_assumptions === "string" && raw.nutrition_assumptions.length <= 500 ? raw.nutrition_assumptions : "Completa los datos pendientes.",
    package_count: nonNegativeNumber(raw.package_count),
+   package_measure_kind: enumValue(raw.package_measure_kind, VOICE_INVENTORY_PACKAGE_MEASURE_KINDS),
    package_size: nonNegativeNumber(raw.package_size),
    package_size_unit: enumValue(raw.package_size_unit, PACKAGE_SIZE_UNITS),
    total_size: nonNegativeNumber(raw.total_size),
@@ -130,6 +133,8 @@ export function normalizeVoiceInventoryDraftItem(item: z.infer<typeof VoiceInven
  for (const [issue, needed] of derived) { if (needed) issues.add(issue); else issues.delete(issue); }
  if (item.package_count !== null && (!resolved || (sourceBasis && !converted))) issues.add("package-size-missing");
  else if (resolved) issues.delete("package-size-missing");
+ if (item.package_count !== null && item.package_measure_kind === null) issues.add("package-kind-missing");
+ else issues.delete("package-kind-missing");
  return { ...normalizedItem, issues: [...issues] };
 }
 export function normalizeEditedVoiceInventoryDraftItem(item: VoiceInventoryDraftItem, field: keyof VoiceInventoryDraftItem, value: unknown): VoiceInventoryDraftItem {
@@ -141,6 +146,6 @@ export function normalizeEditedVoiceInventoryDraftItem(item: VoiceInventoryDraft
  return { ...normalizeVoiceInventoryDraftItem(next), client_id: item.client_id };
 }
 export function withDraftClientIds(items: z.infer<typeof VoiceInventoryDraftItemSchema>[]) { return items.map((item, index) => ({ ...normalizeVoiceInventoryDraftItem(item), client_id: `voice-draft-${Date.now().toString(36)}-${index}` })); }
-const structuralIssues: VoiceInventoryDraftIssue[] = ["quantity-missing", "unit-missing", "location-unconfirmed", "package-size-missing", "nutrition-incomplete", "nutrition-basis-mismatch", "ambiguous-product"];
+const structuralIssues: VoiceInventoryDraftIssue[] = ["quantity-missing", "unit-missing", "location-unconfirmed", "package-size-missing", "package-kind-missing", "nutrition-incomplete", "nutrition-basis-mismatch", "ambiguous-product"];
 export function getVoiceInventoryDraftReadiness(item: VoiceInventoryDraftItem) { const normalized = normalizeVoiceInventoryDraftItem(item); const structuralReady = normalized.name.trim().length > 0 && !normalized.issues.some((issue) => structuralIssues.includes(issue)); const requiresReview = normalized.issues.some((issue) => !structuralIssues.includes(issue)); return { structuralReady, requiresReview, reviewReady: !requiresReview || Boolean(item.review_acknowledged), saveReady: structuralReady && (!requiresReview || Boolean(item.review_acknowledged)) }; }
 export function getVoiceInventoryDraftStatus(item: VoiceInventoryDraftItem) { const readiness = getVoiceInventoryDraftReadiness(item); return !readiness.structuralReady ? "Incompleto" : !readiness.reviewReady ? "Necesita revisión" : "Listo"; }

@@ -66,7 +66,7 @@ function catalogClient(initialRows: NutritionCatalogRow[]) {
 const voiceItem = (name: string) => ({ client_id: name, name, quantity: 1, unit: "kg" as const, location: "freezer" as const,
   category: "protein" as const, food_state: "raw" as const, nutrition_basis: "per_100g" as const,
   calories: 999, protein_g: 1, carbs_g: 2, fat_g: 3, confidence: "medium" as const, nutrition_assumptions: "Estimación revisable.",
-  package_count: null, package_size: null, package_size_unit: null, total_size: null, total_size_unit: null, issues: [] });
+  package_count: null, package_measure_kind: null, package_size: null, package_size_unit: null, total_size: null, total_size_unit: null, issues: [] });
 
 describe("catalog-first integrations", () => {
   it("returns a manual catalog hit without USDA or OpenAI calls", async () => {

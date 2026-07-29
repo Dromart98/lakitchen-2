@@ -17,6 +17,7 @@ const pendingItem = {
   confidence: "low",
   nutrition_assumptions: "Nutrición pendiente.",
   package_count: null,
+  package_measure_kind: null,
   package_size: null,
   package_size_unit: null,
   total_size: null,
