@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const sql = readFileSync("supabase/migrations/20260729160000_create_saved_ai_recipe_cooked_batches.sql", "utf8");
+const sql = readFileSync("supabase/migrations/20260729155804_create_saved_ai_recipe_cooked_batches.sql", "utf8");
 
 describe("saved AI recipe cooked batch migration", () => {
   it("stores independent batch snapshots without derived portion fields", () => {
