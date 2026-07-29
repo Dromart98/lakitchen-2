@@ -11,15 +11,21 @@ describe("atomic cooked batch consumption migration", () => {
     expect(sql).toContain("enable row level security");
     expect(sql).toContain("force row level security");
     expect(sql).toContain("for select to authenticated");
-    expect(sql).toContain("revoke all on table public.user_saved_ai_recipe_cooked_batch_consumptions from authenticated");
-    expect(sql).toContain("grant select on table public.user_saved_ai_recipe_cooked_batch_consumptions to authenticated");
+    expect(sql).toContain("revoke all on table public.user_saved_ai_recipe_cooked_batch_consumptions\n  from authenticated");
+    expect(sql).toContain("grant select on table public.user_saved_ai_recipe_cooked_batch_consumptions\n  to authenticated");
     expect(sql).not.toMatch(/consumptions[\s\S]*for (insert|update|delete) to authenticated/);
   });
 
-  it("links the event to same-owner batch and meal with deletion restricted", () => {
+  it("links same-owner rows without blocking complete account deletion", () => {
     expect(sql).toContain("unique (id, user_id)");
-    expect(sql).toMatch(/foreign key \(batch_id, user_id\)[\s\S]*on delete restrict/);
-    expect(sql).toMatch(/foreign key \(meal_log_id, user_id\)[\s\S]*on delete restrict/);
+    expect(sql).toMatch(/foreign key \(batch_id, user_id\)[\s\S]*on delete no action deferrable initially deferred/);
+    expect(sql).toMatch(/foreign key \(meal_log_id, user_id\)[\s\S]*on delete no action deferrable initially deferred/);
+    expect(sql).not.toContain("on delete restrict");
+  });
+
+  it("keeps existing exact meal macro storage unchanged", () => {
+    expect(sql).toContain("alter table public.daily_meal_logs\n  add constraint daily_meal_logs_id_user_key unique (id, user_id)");
+    expect(sql).not.toMatch(/alter column (calories|protein_g|carbs_g|fat_g) type double precision/);
   });
 
   it("hardens the authenticated-only definer RPC and its trigger", () => {
@@ -29,7 +35,7 @@ describe("atomic cooked batch consumption migration", () => {
     expect(sql).toContain("from public");
     expect(sql).toContain("from anon");
     expect(sql).toContain("to authenticated");
-    expect(sql).toContain("revoke execute on function public.set_cooked_batch_monotonic_version() from authenticated");
+    expect(sql).toMatch(/revoke execute on function public\.set_cooked_batch_monotonic_version\(\)[\s\S]*from authenticated/);
   });
 
   it("checks idempotency before mutable state and rejects incompatible reuse", () => {
@@ -40,7 +46,7 @@ describe("atomic cooked batch consumption migration", () => {
     expect(sql).toContain("pg_catalog.pg_advisory_xact_lock");
     expect(sql).toContain("v_existing.idempotency_fingerprint <> v_fingerprint");
     expect(sql).toContain("message = 'idempotency_conflict'");
-    expect(sql).toContain("return query select v_existing.consumed_cooked_weight_g");
+    expect(sql).toMatch(/return query[\s\S]*v_existing\.consumed_cooked_weight_g/);
   });
 
   it("locks the owned batch, enforces its version and exactly one unit", () => {
@@ -53,7 +59,7 @@ describe("atomic cooked batch consumption migration", () => {
 
   it("uses the same fraction equations and IEEE-754 tolerance as TypeScript", () => {
     expect(sql).toContain("2.220446049250313e-16::double precision");
-    expect(sql).toContain("* greatest(1::double precision");
+    expect(sql).toMatch(/\* greatest\([\s\S]*1::double precision/);
     expect(sql).toContain("* 8");
     expect(portion).toContain("Number.EPSILON * scale * FLOATING_POINT_TOLERANCE_MULTIPLIER");
     expect(sql).toContain("v_weight := v_batch.cooked_weight_g * (v_requested / v_batch.servings)");
@@ -66,14 +72,15 @@ describe("atomic cooked batch consumption migration", () => {
     expect(sql.match(/insert into public\.daily_meal_logs/g)).toHaveLength(1);
     expect(sql.match(/insert into public\.user_saved_ai_recipe_cooked_batch_consumptions/g)).toHaveLength(1);
     expect(sql.match(/update public\.user_saved_ai_recipe_cooked_batches as batch/g)).toHaveLength(1);
+    expect(sql).toContain("get diagnostics v_affected = row_count");
     expect(sql).not.toContain("daily_meal_log_items");
     expect(sql).not.toContain("inventory_items");
     expect(sql).not.toContain("target_calories");
   });
 
-  it("persists unrounded macros, UTC consumption date, and monotonic millisecond versions", () => {
-    expect(sql).toContain("alter column calories type double precision");
+  it("persists unrounded macros, UTC date, and safe monotonic versions", () => {
     expect(sql).toContain("(pg_catalog.now() at time zone 'utc')::date");
+    expect(sql).toContain("alter column created_at type timestamptz(3)");
     expect(sql).toContain("alter column updated_at type timestamptz(3)");
     expect(sql).toContain("old.updated_at + interval '1 millisecond'");
   });
