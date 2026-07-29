@@ -123,6 +123,7 @@ describe("mapRecipeAiCookRpcError", () => {
     expect(mapRecipeAiCookRpcError({ message: "Quantity exceeds available stock" })).toBe("insufficient-stock");
     expect(mapRecipeAiCookRpcError({ message: "Incomplete inventory nutrition" })).toBe("incomplete-nutrition");
     expect(mapRecipeAiCookRpcError({ message: "Incompatible inventory nutrition unit" })).toBe("incompatible-unit");
+    expect(mapRecipeAiCookRpcError({ message: "equivalence_conflict" })).toBe("equivalence-conflict");
     expect(mapRecipeAiCookRpcError({ message: "Other" })).toBe("consume-failed");
   });
 });

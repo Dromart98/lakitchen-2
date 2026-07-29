@@ -1,4 +1,6 @@
 import type { InventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
+import { calculateConsumedInventoryNutritionWithMetadata } from "@/modules/inventory/inventory-nutrition";
+import type { InventoryConfirmedUnitMeasure } from "@/modules/inventory/inventory-unit-equivalence";
 import type { RecipeIngredientAllocation } from "@/modules/recipes/recipe-matching";
 import { estimateRecipeNutrition, type RecipeNutritionEstimate } from "@/modules/recipes/recipe-nutrition";
 import type { RecipeAiSuggestion } from "@/modules/recipes/recipe-ai-generation";
@@ -16,6 +18,8 @@ export type RecipeAiNutritionInventoryItem = {
   protein_g?: number | null;
   carbs_g?: number | null;
   fat_g?: number | null;
+  food_catalog_item_id?: string | null;
+  confirmedUnitMeasure?: InventoryConfirmedUnitMeasure | null;
 };
 
 export type RecipeAiSuggestionWithNutrition = RecipeAiSuggestion & {
@@ -54,7 +58,7 @@ export function buildRecipeAiNutritionAllocations(
     const inventoryItem = inventoryById.get(ingredient.inventory_item_id);
     const converted = convertRecipeAiQuantityToBase(ingredient.quantity, ingredient.unit);
 
-    if (!inventoryItem || !converted) {
+    if (!inventoryItem || !converted || ingredient.name !== inventoryItem.name || ingredient.unit !== inventoryItem.unit) {
       missingItemIds.add(ingredient.inventory_item_id);
       continue;
     }
@@ -64,12 +68,26 @@ export function buildRecipeAiNutritionAllocations(
       inventoryItemName: inventoryItem.name,
       usedQuantity: converted.quantity,
       usedUnit: converted.unit,
+      originalQuantity: ingredient.quantity,
+      originalUnit: inventoryItem.unit,
+      confirmedUnitMeasure: inventoryItem.confirmedUnitMeasure ?? null,
       nutritionBasis: inventoryItem.nutrition_basis ?? null,
       calories: inventoryItem.calories ?? null,
       proteinG: inventoryItem.protein_g ?? null,
       carbsG: inventoryItem.carbs_g ?? null,
       fatG: inventoryItem.fat_g ?? null,
     });
+    const allocation = allocations.at(-1)!;
+    allocation.usedConfirmedUnitMeasure = calculateConsumedInventoryNutritionWithMetadata({
+      consumed_quantity: allocation.usedQuantity,
+      unit: allocation.usedUnit,
+      nutrition_basis: allocation.nutritionBasis,
+      calories: allocation.calories,
+      protein_g: allocation.proteinG,
+      carbs_g: allocation.carbsG,
+      fat_g: allocation.fatG,
+      confirmedUnitMeasure: allocation.confirmedUnitMeasure,
+    })?.usedConfirmedUnitMeasure === true;
   }
 
   return { allocations, missingItemIds };

@@ -14,6 +14,7 @@ export type RecipeAiCookErrorCode =
   | "incompatible-unit"
   | "too-many-items"
   | "calorie-budget-exceeded"
+  | "equivalence-conflict"
   | "consume-failed"
   | "unexpected-error";
 
@@ -96,6 +97,8 @@ export type RecipeAiCookInventoryItem = {
   protein_g?: number | null;
   carbs_g?: number | null;
   fat_g?: number | null;
+  food_catalog_item_id?: string | null;
+  confirmedUnitMeasure?: import("@/modules/inventory/inventory-unit-equivalence").InventoryConfirmedUnitMeasure | null;
 };
 
 export function validateRecipeAiCookInventory(
@@ -127,6 +130,7 @@ export function mapRecipeConsumptionError(result: Extract<RecipeConsumptionResul
 }
 
 export function mapRecipeAiCookRpcError(error: { message?: string } | null | undefined): RecipeAiCookErrorCode {
+  if (error?.message === "equivalence_conflict") return "equivalence-conflict";
   if (error?.message === "Inventory item not found") return "recipe-stale";
   if (error?.message === "Quantity exceeds available stock") return "insufficient-stock";
   if (error?.message === "Incomplete inventory nutrition") return "incomplete-nutrition";

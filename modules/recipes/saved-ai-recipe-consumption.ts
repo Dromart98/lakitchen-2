@@ -23,6 +23,7 @@ export type SavedAiRecipeCookErrorCode =
   | "too-many-items"
   | "calorie-budget-exceeded"
   | "consumption-conflict"
+  | "equivalence-conflict"
   | "unexpected-error";
 
 export type SavedAiRecipeCookResult =
@@ -128,6 +129,7 @@ export function buildSavedAiRecipeCookPlan(
 }
 
 export function mapSavedAiRecipeCookRpcError(error: { message?: string } | null | undefined): SavedAiRecipeCookErrorCode {
+  if (error?.message === "equivalence_conflict") return "equivalence-conflict";
   if (error?.message === "Inventory item not found") return "recipe-stale";
   if (error?.message === "Quantity exceeds available stock") return "insufficient-stock";
   if (error?.message === "Incomplete inventory nutrition") return "nutrition-unavailable";

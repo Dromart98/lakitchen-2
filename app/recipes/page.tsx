@@ -3,6 +3,7 @@ import Link from "next/link";
 import { cookRecipeAndLogMealAction } from "@/app/recipes/actions";
 import { RecipeAiGenerator } from "@/components/recipes/RecipeAiGenerator";
 import { SavedAiRecipes } from "@/components/recipes/SavedAiRecipes";
+import type { SavedAiRecipeView } from "@/components/recipes/SavedAiRecipes";
 import { AppShell } from "@/components/layout/AppShell";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -23,6 +24,8 @@ import {
 import type { RecipeNutritionEstimate } from "@/modules/recipes/recipe-nutrition";
 import { buildRecipeMatchWithServingOptions, filterRecipeMatchesWithServingOptions, getMaxUrgentItemCountForCookableServings } from "@/modules/recipes/recipe-servings";
 import { toSavedAiRecipe, type SavedAiRecipe } from "@/modules/recipes/saved-ai-recipes";
+import { buildRecipeAiNutritionAllocations } from "@/modules/recipes/recipe-ai-nutrition";
+import { estimateRecipeNutrition } from "@/modules/recipes/recipe-nutrition";
 import { buildRecipeCalorieBudget, isRecipeServingWithinCalorieBudget } from "@/modules/recipes/recipe-calorie-budget";
 import { getTodayUtcDate } from "@/modules/meals/meal-date";
 
@@ -184,6 +187,22 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
   }, []);
 
   const inventoryItems: RecipeInventoryItem[] = inventoryError ? [] : attachRecipeInventoryUnitMeasures(inventoryData ?? [], unitMeasures);
+  const aiInventoryById = new Map(inventoryItems.map((item) => [item.id, item]));
+  const savedRecipeViews: SavedAiRecipeView[] = savedRecipes.map((recipe) => {
+    const suggestion = {
+      title: recipe.title,
+      description: recipe.description,
+      estimated_minutes: recipe.estimated_minutes,
+      servings: recipe.servings,
+      ingredients: recipe.ingredients.map(({ inventory_item_id, name, quantity, unit }) => ({ inventory_item_id, name, quantity, unit })),
+      steps: recipe.steps,
+    };
+    const { allocations, missingItemIds } = buildRecipeAiNutritionAllocations(suggestion, aiInventoryById);
+    return {
+      ...recipe,
+      usesConfirmedUnitMeasure: missingItemIds.size === 0 && estimateRecipeNutrition(allocations, recipe.servings).usedConfirmedUnitMeasure,
+    };
+  });
   const recipes = (recipeError ? [] : recipeData ?? []).map(toRecipeTemplate).filter((recipe): recipe is RecipeTemplate => Boolean(recipe));
   const recipeMatchesWithServingOptions = sortRecipeMatches(matchRecipesToInventory(recipes, inventoryItems, todayKey))
     .map((match) => buildRecipeMatchWithServingOptions(match, inventoryItems, todayKey));
@@ -210,7 +229,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
 
         <RecipeAiGenerator />
 
-        <SavedAiRecipes recipes={savedRecipes} />
+        <SavedAiRecipes recipes={savedRecipeViews} />
 
         <section className="recipes-section recipes-catalog" aria-labelledby="recipes-catalog-title">
           <div className="recipes-section__heading">

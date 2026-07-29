@@ -7,6 +7,7 @@ import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { generateRecipesWithOpenAi } from "@/lib/openai/recipe-generation";
 import { buildRecipeAiNutritionAllocations } from "@/modules/recipes/recipe-ai-nutrition";
+import { loadAndAttachRecipeAiUnitMeasures, type RecipeAiUnitMeasureClient } from "@/modules/recipes/recipe-ai-unit-measures.server";
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
 import { selectInventoryUnitMeasures } from "@/modules/inventory/inventory-unit-equivalence";
 import { isMealType } from "@/modules/meals/meal-types";
@@ -262,7 +263,7 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
   const recipeClient = supabase as unknown as RecipeAiSupabaseClient;
   const { data, error } = await recipeClient
     .from("inventory_items")
-    .select("id, name, quantity, unit, category, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g")
+    .select("id, name, quantity, unit, category, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g, food_catalog_item_id")
     .eq("user_id", user.id)
     .gt("quantity", 0)
     .order("expires_at", { ascending: true, nullsFirst: false })
@@ -275,7 +276,8 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
   }
 
   const todayKey = getCurrentInventoryExpirationDateKey();
-  const inventoryItems = filterUsableRecipeAiInventoryItems(data ?? [], todayKey);
+  const usableInventoryItems = filterUsableRecipeAiInventoryItems(data ?? [], todayKey);
+  const inventoryItems = await loadAndAttachRecipeAiUnitMeasures(recipeClient as unknown as RecipeAiUnitMeasureClient, user.id, usableInventoryItems, "AI recipe generation");
   if (inventoryItems.length === 0) return { status: "error", code: "empty-inventory" };
   if (inventoryItems.length < RECIPE_AI_MIN_INVENTORY_ITEMS) return { status: "error", code: "insufficient-inventory" };
 
@@ -357,7 +359,7 @@ export async function saveGeneratedRecipeAction(input: unknown): Promise<SaveGen
   const recipeClient = supabase as unknown as SaveGeneratedRecipeSupabaseClient;
   const { data, error } = await recipeClient
     .from("inventory_items")
-    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g")
+    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g, food_catalog_item_id")
     .eq("user_id", user.id)
     .in("id", inventoryItemIds)
     .gt("quantity", 0) as { data: SavedAiRecipeInventoryItem[] | null; error: { message: string } | null };
@@ -367,11 +369,12 @@ export async function saveGeneratedRecipeAction(input: unknown): Promise<SaveGen
     return { status: "error", code: "unexpected-error" };
   }
 
-  const validationError = validateSavedAiRecipeInventory(request.recipe, data ?? [], getCurrentInventoryExpirationDateKey());
+  const inventoryItems = await loadAndAttachRecipeAiUnitMeasures(recipeClient as unknown as RecipeAiUnitMeasureClient, user.id, data ?? [], "AI recipe saving");
+  const validationError = validateSavedAiRecipeInventory(request.recipe, inventoryItems, getCurrentInventoryExpirationDateKey());
   if (validationError) return { status: "error", code: validationError };
 
   const budget = await loadRecipeCalorieBudget(recipeClient as unknown as RecipeBudgetClient, user.id);
-  const nutritionInventory = data ?? [];
+  const nutritionInventory = inventoryItems;
   const nutrition = validateAndAdjustAiRecipeCalories(request.recipe, nutritionInventory, budget);
   if (budget && nutrition.nutrition.isComplete && nutrition.calorieValidation.status === "not-viable") return { status: "error", code: "calorie-budget-exceeded" };
 
@@ -492,7 +495,7 @@ export async function cookSavedAiRecipeAndLogMealAction(input: unknown): Promise
 
   const { data: inventoryData, error: inventoryError } = await recipeClient
     .from("inventory_items")
-    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g")
+    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g, food_catalog_item_id")
     .eq("user_id", user.id)
     .in("id", inventoryItemIds) as { data: SavedAiRecipeCookInventoryItem[] | null; error: { message: string } | null };
 
@@ -501,7 +504,7 @@ export async function cookSavedAiRecipeAndLogMealAction(input: unknown): Promise
     return { status: "error", code: "unexpected-error" };
   }
 
-  const inventoryItems = inventoryData ?? [];
+  const inventoryItems = await loadAndAttachRecipeAiUnitMeasures(recipeClient as unknown as RecipeAiUnitMeasureClient, user.id, inventoryData ?? [], "saved AI recipe consumption");
   const validationError = validateSavedAiRecipeCookInventory(recipe, inventoryItems, getCurrentInventoryExpirationDateKey());
   if (validationError) return { status: "error", code: validationError };
 
@@ -564,7 +567,7 @@ export async function cookGeneratedRecipeAndLogMealAction(input: unknown): Promi
   const recipeClient = supabase as unknown as RecipeAiCookSupabaseClient;
   const { data, error } = await recipeClient
     .from("inventory_items")
-    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g")
+    .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g, food_catalog_item_id")
     .eq("user_id", user.id)
     .in("id", inventoryItemIds)
     .gt("quantity", 0) as { data: RecipeAiCookInventoryItem[] | null; error: { message: string } | null };
@@ -574,7 +577,7 @@ export async function cookGeneratedRecipeAndLogMealAction(input: unknown): Promi
     return { status: "error", code: "unexpected-error" };
   }
 
-  const inventoryItems = data ?? [];
+  const inventoryItems = await loadAndAttachRecipeAiUnitMeasures(recipeClient as unknown as RecipeAiUnitMeasureClient, user.id, data ?? [], "AI recipe consumption");
   const validationError = validateRecipeAiCookInventory(request.recipe, inventoryItems, getCurrentInventoryExpirationDateKey());
   if (validationError) return { status: "error", code: validationError };
 

@@ -42,6 +42,8 @@ export type RecipeAiInventoryItem = {
   protein_g?: number | null;
   carbs_g?: number | null;
   fat_g?: number | null;
+  food_catalog_item_id?: string | null;
+  confirmedUnitMeasure?: import("@/modules/inventory/inventory-unit-equivalence").InventoryConfirmedUnitMeasure | null;
 };
 
 export type RecipeAiIngredient = {
