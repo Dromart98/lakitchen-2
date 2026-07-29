@@ -1,6 +1,6 @@
 # Roadmap estratégico de Lakitchenapp
 
-Última actualización: 27 de julio de 2026.
+Última actualización: 29 de julio de 2026.
 
 ## Principios de producto
 
@@ -164,19 +164,19 @@ Crear una entidad central de alimento, por ejemplo `food_catalog_items`, utiliza
 
 Evitar que variaciones como “pollo”, “pechuga de pollo” y “pollo fresco” se conviertan en alimentos nutricionalmente distintos sin necesidad.
 
-### 1.4 Conversión fiable de unidades — En progreso
+### 1.4 Conversión fiable de unidades — Implementada/cerrada
 
 - **1.4A — núcleo exacto — Implementada/cerrada:** fuente común para conversiones dimensionales exactas entre `g`/`kg`, `ml`/`l` y `ud`.
 - **1.4B — equivalencias estimadas y revisables — Implementada/cerrada.**
   - **1.4B1 — modelo, almacenamiento y resolvedor — Implementada/cerrada.**
   - **1.4B2 — revisión y corrección visual — Implementada/cerrada.**
-- **1.4C — adopción transversal de equivalencias — En progreso.**
+- **1.4C — adopción transversal de equivalencias — Implementada/cerrada.**
   - **1.4C1 — observaciones de envases por voz — Implementada/cerrada.**
   - **1.4C2 — reutilización confirmada por voz — Implementada/cerrada.**
   - **1.4C3 — medidas obtenidas por código de barras — Implementada/cerrada.**
   - **1.4C4 — consumo unitario y registro de macros — Implementada/cerrada.**
   - **1.4C5 — recetas del catálogo — Implementada/cerrada.**
-  - **1.4C6 — recetas IA temporales y guardadas — En progreso.**
+  - **1.4C6 — recetas IA temporales y guardadas — Implementada/cerrada.**
 
 Añadir una capa común para:
 
