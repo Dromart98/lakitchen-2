@@ -28,6 +28,7 @@ export type CookingYieldResult = Readonly<{
 }>;
 
 const NUTRIENT_KEYS = ["calories", "proteinG", "carbsG", "fatG"] as const;
+const FLOATING_POINT_TOLERANCE_MULTIPLIER = 8;
 
 function requirePositiveFinite(value: number, name: string): void {
   if (!Number.isFinite(value) || value <= 0) {
@@ -70,6 +71,11 @@ function addNutrition(
   });
 }
 
+function areEquivalentWeights(left: number, right: number): boolean {
+  const scale = Math.max(1, Math.abs(left), Math.abs(right));
+  return Math.abs(left - right) <= Number.EPSILON * scale * FLOATING_POINT_TOLERANCE_MULTIPLIER;
+}
+
 /**
  * Redistributes already-resolved nutrition using observed cooking weights.
  * Missing water change or incorporated oil remain unresolved (`null`); this
@@ -79,8 +85,8 @@ export function calculateCookingYield(input: CookingYieldInput): CookingYieldRes
   requirePositiveFinite(input.rawWeightG, "rawWeightG");
   requirePositiveFinite(input.cookedWeightG, "cookedWeightG");
   requirePositiveFinite(input.servings, "servings");
-  if (!Number.isInteger(input.servings)) {
-    throw new RangeError("servings must be an integer");
+  if (!Number.isSafeInteger(input.servings)) {
+    throw new RangeError("servings must be a safe integer");
   }
   requireNutritionTotals(input.resolvedNutritionTotal, "resolvedNutritionTotal");
 
@@ -98,7 +104,7 @@ export function calculateCookingYield(input: CookingYieldInput): CookingYieldRes
 
   if (input.netWaterChangeG !== undefined) {
     const expectedCookedWeight = input.rawWeightG + input.netWaterChangeG + (oil?.weightG ?? 0);
-    if (expectedCookedWeight !== input.cookedWeightG) {
+    if (!areEquivalentWeights(expectedCookedWeight, input.cookedWeightG)) {
       throw new RangeError("cookedWeightG is inconsistent with the explicit water and oil changes");
     }
   }
