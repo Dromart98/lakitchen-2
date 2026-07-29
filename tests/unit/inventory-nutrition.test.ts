@@ -109,6 +109,67 @@ describe("complete inventory nutrition values", () => {
 });
 
 describe("available inventory nutrition totals", () => {
+  it.each([
+    ["per_100g", 2, "ud", 58, "g", 1.16],
+    ["per_100ml", 0.5, "ud", 250, "ml", 1.25],
+    ["per_unit", 116, "g", 58, "g", 2],
+    ["per_unit", 0.116, "kg", 58, "g", 2],
+    ["per_unit", 500, "ml", 250, "ml", 2],
+    ["per_unit", 0.5, "l", 250, "ml", 2],
+  ] as const)("uses a confirmed unit measure for %s with %s %s", (basis, consumed, unit, canonicalQuantity, canonicalUnit, factor) => {
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: basis,
+      consumed_quantity: consumed,
+      unit,
+      calories: 100,
+      protein_g: 10,
+      carbs_g: 5,
+      fat_g: 2,
+      confirmedUnitMeasure: { canonicalQuantity, canonicalUnit },
+    })).toEqual({
+      calories: 100 * factor,
+      protein_g: 10 * factor,
+      carbs_g: 5 * factor,
+      fat_g: 2 * factor,
+    });
+  });
+
+  it("rejects a confirmed measure with the wrong dimension", () => {
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100g",
+      consumed_quantity: 2,
+      unit: "ud",
+      calories: 100,
+      protein_g: 10,
+      carbs_g: 5,
+      fat_g: 2,
+      confirmedUnitMeasure: { canonicalQuantity: 250, canonicalUnit: "ml" },
+    })).toBeNull();
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_unit",
+      consumed_quantity: 116,
+      unit: "g",
+      calories: 100,
+      protein_g: 10,
+      carbs_g: 5,
+      fat_g: 2,
+      confirmedUnitMeasure: { canonicalQuantity: Number.NaN, canonicalUnit: "g" },
+    })).toBeNull();
+  });
+
+  it("accepts the sole compatible mass and volume measures", () => {
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100g", consumed_quantity: 2, unit: "ud",
+      calories: 100, protein_g: 10, carbs_g: 5, fat_g: 2,
+      confirmedUnitMeasure: { canonicalQuantity: 58, canonicalUnit: "g" },
+    })?.calories).toBeCloseTo(116);
+    expect(calculateConsumedInventoryNutrition({
+      nutrition_basis: "per_100ml", consumed_quantity: 0.5, unit: "ud",
+      calories: 100, protein_g: 10, carbs_g: 5, fat_g: 2,
+      confirmedUnitMeasure: { canonicalQuantity: 250, canonicalUnit: "ml" },
+    })?.calories).toBe(125);
+  });
+
   it("uses factor 2.5 for 250 g with values per 100 g", () => {
     expect(calculateAvailableInventoryNutrition({
       nutrition_basis: "per_100g",

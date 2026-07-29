@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 
 import { consumeInventoryItemAction, consumeInventoryItemAndLogMealAction } from "@/app/inventory/actions";
 import {
@@ -21,6 +22,10 @@ type InventoryConsumeFormProps = {
   protein_g: number | null;
   carbs_g: number | null;
   fat_g: number | null;
+  confirmedUnitMeasure?: {
+    canonicalQuantity: number;
+    canonicalUnit: "g" | "ml";
+  } | null;
 };
 
 function formatOptionalPreviewValue(value: number | null, suffix: string) {
@@ -52,6 +57,7 @@ export function InventoryConsumeForm({
   protein_g,
   carbs_g,
   fat_g,
+  confirmedUnitMeasure,
 }: InventoryConsumeFormProps) {
   const [consumedQuantity, setConsumedQuantity] = useState("");
   const parsedQuantity = Number(consumedQuantity);
@@ -68,6 +74,7 @@ export function InventoryConsumeForm({
     protein_g,
     carbs_g,
     fat_g,
+    confirmedUnitMeasure,
   }) !== null;
   const canLogMeal = hasCompleteNutrition && canCalculateWithUnit;
 
@@ -82,10 +89,22 @@ export function InventoryConsumeForm({
       protein_g,
       carbs_g,
       fat_g,
+      confirmedUnitMeasure,
     });
 
     return totals ? getPreviewParts(totals) : [];
-  }, [calories, carbs_g, exceedsStock, fat_g, isPositiveFiniteQuantity, nutrition_basis, parsedQuantity, protein_g, unit]);
+  }, [calories, carbs_g, confirmedUnitMeasure, exceedsStock, fat_g, isPositiveFiniteQuantity, nutrition_basis, parsedQuantity, protein_g, unit]);
+
+  const exactCalculationAvailable = hasNutrition && calculateConsumedInventoryNutrition({
+    nutrition_basis,
+    consumed_quantity: 1,
+    unit,
+    calories,
+    protein_g,
+    carbs_g,
+    fat_g,
+  }) !== null;
+  const usesConfirmedMeasure = canCalculateWithUnit && !exactCalculationAvailable && confirmedUnitMeasure;
 
   return (
     <div className="meal-log-form">
@@ -112,8 +131,17 @@ export function InventoryConsumeForm({
             {previewParts.join(" · ")}
           </p>
         ) : null}
+        {usesConfirmedMeasure ? (
+          <p className="muted">
+            Se ha usado tu medida habitual: 1 unidad = {confirmedUnitMeasure.canonicalQuantity}{" "}
+            {confirmedUnitMeasure.canonicalUnit}.
+          </p>
+        ) : null}
         {hasNutrition && !canCalculateWithUnit && !exceedsStock ? (
-          <p className="muted">No se puede calcular la información nutricional de este consumo con la unidad actual.</p>
+          <p className="muted">
+            Revisa las medidas habituales de este alimento. {" "}
+            <Link href="/inventory/equivalences">Ir a medidas habituales</Link>
+          </p>
         ) : null}
         <button className="button" type="submit">Confirmar consumo</button>
       </form>

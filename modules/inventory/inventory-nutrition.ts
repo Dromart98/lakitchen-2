@@ -21,6 +21,10 @@ type InventoryConsumedNutritionInput = InventoryNutritionValues & {
   nutrition_basis: InventoryNutritionBasis | null;
   consumed_quantity: number;
   unit: string;
+  confirmedUnitMeasure?: {
+    canonicalQuantity: number;
+    canonicalUnit: "g" | "ml";
+  } | null;
 };
 
 export type InventoryAvailableNutritionTotals = InventoryNutritionValues;
@@ -68,6 +72,7 @@ function getAvailableNutritionFactor(
   nutritionBasis: InventoryNutritionBasis | null,
   quantity: number,
   unit: string,
+  confirmedUnitMeasure?: InventoryConsumedNutritionInput["confirmedUnitMeasure"],
 ) {
   if (!nutritionBasis || !isFoodQuantityUnit(unit)) {
     return null;
@@ -75,15 +80,35 @@ function getAvailableNutritionFactor(
 
   if (nutritionBasis === "per_100g") {
     const grams = convertFoodQuantity(quantity, unit, "g");
-    return grams === null ? null : grams / 100;
+    if (grams !== null) return grams / 100;
+    return unit === "ud"
+      && confirmedUnitMeasure?.canonicalUnit === "g"
+      && Number.isFinite(confirmedUnitMeasure.canonicalQuantity)
+      && confirmedUnitMeasure.canonicalQuantity > 0
+      ? quantity * confirmedUnitMeasure.canonicalQuantity / 100
+      : null;
   }
 
   if (nutritionBasis === "per_100ml") {
     const milliliters = convertFoodQuantity(quantity, unit, "ml");
-    return milliliters === null ? null : milliliters / 100;
+    if (milliliters !== null) return milliliters / 100;
+    return unit === "ud"
+      && confirmedUnitMeasure?.canonicalUnit === "ml"
+      && Number.isFinite(confirmedUnitMeasure.canonicalQuantity)
+      && confirmedUnitMeasure.canonicalQuantity > 0
+      ? quantity * confirmedUnitMeasure.canonicalQuantity / 100
+      : null;
   }
 
-  return convertFoodQuantity(quantity, unit, "ud");
+  const units = convertFoodQuantity(quantity, unit, "ud");
+  if (units !== null) return units;
+  if (
+    !confirmedUnitMeasure
+    || !Number.isFinite(confirmedUnitMeasure.canonicalQuantity)
+    || confirmedUnitMeasure.canonicalQuantity <= 0
+  ) return null;
+  const canonicalQuantity = convertFoodQuantity(quantity, unit, confirmedUnitMeasure.canonicalUnit);
+  return canonicalQuantity === null ? null : canonicalQuantity / confirmedUnitMeasure.canonicalQuantity;
 }
 
 function multiplyOptionalNutritionValue(value: number | null, factor: number) {
@@ -95,13 +120,19 @@ function calculateInventoryNutritionForQuantity(
     nutrition_basis: InventoryNutritionBasis | null;
     quantity: number;
     unit: string;
+    confirmedUnitMeasure?: InventoryConsumedNutritionInput["confirmedUnitMeasure"];
   },
 ): InventoryAvailableNutritionTotals | null {
   const values = [input.calories, input.protein_g, input.carbs_g, input.fat_g];
 
   if (!hasInventoryNutritionValues(values)) return null;
 
-  const factor = getAvailableNutritionFactor(input.nutrition_basis, input.quantity, input.unit);
+  const factor = getAvailableNutritionFactor(
+    input.nutrition_basis,
+    input.quantity,
+    input.unit,
+    input.confirmedUnitMeasure,
+  );
 
   if (factor === null) return null;
 
@@ -130,6 +161,7 @@ export function calculateConsumedInventoryNutrition(
     protein_g: input.protein_g,
     carbs_g: input.carbs_g,
     fat_g: input.fat_g,
+    confirmedUnitMeasure: input.confirmedUnitMeasure,
   });
 }
 
