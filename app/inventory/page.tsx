@@ -114,6 +114,8 @@ const inventorySuccessMessages: Record<string, string> = {
   "item-created": "Producto añadido al inventario correctamente.",
   "item-created-barcode-memory-failed":
     "Producto añadido al inventario correctamente, pero no se pudo recordar el código.",
+  "item-created-barcode-measure-failed":
+    "Producto y código guardados, pero no se pudo recordar la medida habitual.",
   "item-updated": "Producto actualizado correctamente.",
   "item-deleted": "Producto eliminado correctamente.",
   "item-consumed": "Cantidad descontada correctamente.",
