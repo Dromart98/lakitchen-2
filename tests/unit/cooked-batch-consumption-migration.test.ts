@@ -38,6 +38,14 @@ describe("atomic cooked batch consumption migration", () => {
     expect(sql).toMatch(/revoke execute on function public\.set_cooked_batch_monotonic_version\(\)[\s\S]*from authenticated/);
   });
 
+  it("rejects null or non-finite direct RPC versions and canonicalizes fingerprints", () => {
+    expect(sql).toContain("or not pg_catalog.isfinite(p_expected_batch_updated_at)");
+    expect(sql).toContain("or p_meal_type is null");
+    expect(sql).toContain("pg_catalog.extract(epoch from p_expected_batch_updated_at)::text");
+    expect(sql).toContain("pg_catalog.encode(pg_catalog.float8send(v_requested), 'hex')");
+    expect(sql).not.toContain("p_expected_batch_updated_at::text");
+  });
+
   it("checks idempotency before mutable state and rejects incompatible reuse", () => {
     const existing = sql.indexOf("where request_id = p_request_id");
     const batch = sql.indexOf("where id = p_batch_id and user_id = v_user_id");
