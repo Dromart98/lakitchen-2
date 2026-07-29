@@ -70,6 +70,20 @@ describe("cooking yield", () => {
     expect(result.incorporatedOil).toBeNull();
   });
 
+  it("accepts coherent decimal weights within floating-point precision", () => {
+    const result = calculateCookingYield({
+      rawWeightG: 100.1,
+      cookedWeightG: 80,
+      servings: 2,
+      resolvedNutritionTotal: nutrition,
+      netWaterChangeG: -20.2,
+      incorporatedOil: { weightG: 0.1 },
+    });
+
+    expect(result.cookedWeightG).toBe(80);
+    expect(result.netWaterChangeG).toBe(-20.2);
+  });
+
   it.each([
     ["zero raw weight", { rawWeightG: 0 }],
     ["negative cooked weight", { cookedWeightG: -1 }],
@@ -77,6 +91,7 @@ describe("cooking yield", () => {
     ["infinite weight", { cookedWeightG: Number.POSITIVE_INFINITY }],
     ["zero servings", { servings: 0 }],
     ["fractional servings", { servings: 1.5 }],
+    ["unsafe servings", { servings: Number.MAX_SAFE_INTEGER + 1 }],
     ["non-finite water change", { netWaterChangeG: Number.NaN }],
     ["zero explicit oil", { incorporatedOil: { weightG: 0 } }],
     ["negative nutrition", { resolvedNutritionTotal: { ...nutrition, calories: -1 } }],
