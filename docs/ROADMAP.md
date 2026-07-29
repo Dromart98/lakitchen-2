@@ -196,6 +196,7 @@ Toda conversión estimada debe poder corregirse y reutilizarse.
 - **1.5B — previsualización revisable en recetas IA guardadas — Implementada/cerrada:** pesos observados y raciones permiten consultar, sin persistencia, el rendimiento y la nutrición reconstruida desde el inventario actual; los datos incompletos quedan pendientes de revisión.
 - **1.5C — medición confirmada reutilizable — Implementada/cerrada:** cada receta IA guardada admite una medición corregible y eliminable de peso previo, peso cocinado y raciones; al cargarla se recalculan los resultados con la nutrición actual sin persistir valores derivados.
 - **1.5D — porción consumida de un lote confirmado — Implementada/cerrada:** un contrato determinista separa lote, consumo explícito por raciones o gramos cocinados y remanente, conservando la nutrición total sin redondeos intermedios; todavía no se integra en el flujo de cocinar ni registrar comidas.
+- **1.5E — lotes cocinados reales — Implementada/cerrada:** el modelo privado conserva cada cocinado como un snapshot independiente de título, pesos, raciones, nutrición total y gramos consumidos, aunque se elimine la receta de origen; las escrituras quedan reservadas para futuras operaciones atómicas.
 
 Modelar correctamente:
 
