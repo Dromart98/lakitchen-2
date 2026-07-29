@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { selectInventoryUnitMeasures } from "@/modules/inventory/inventory-unit-equivalence";
+import { selectInventoryUnitMeasures, toInventoryUnitMeasureValue } from "@/modules/inventory/inventory-unit-equivalence";
 
 const USER = "00000000-0000-4000-8000-000000000001";
 const FOOD = "00000000-0000-4000-8000-000000000002";
@@ -23,6 +23,25 @@ function row(overrides: Record<string, unknown> = {}) {
 }
 
 describe("inventory confirmed unit measure selection", () => {
+  it("projects a private snapshot to an immutable two-field client value", () => {
+    const snapshot = {
+      id: "00000000-0000-4000-8000-000000000003",
+      updatedAt: "2026-07-29T12:00:00.000Z",
+      canonicalQuantity: 58,
+      canonicalUnit: "g" as const,
+    };
+    const before = structuredClone(snapshot);
+
+    const value = toInventoryUnitMeasureValue(snapshot);
+
+    expect(value).toEqual({ canonicalQuantity: 58, canonicalUnit: "g" });
+    expect(Object.keys(value)).toEqual(["canonicalQuantity", "canonicalUnit"]);
+    expect(value).not.toHaveProperty("id");
+    expect(value).not.toHaveProperty("updatedAt");
+    expect(snapshot).toEqual(before);
+    expect(value).not.toBe(snapshot);
+  });
+
   it("selects one sanitized, confirmed user unit grouped by owner and identity", () => {
     expect(selectInventoryUnitMeasures([row()], USER, [FOOD]).get(FOOD)).toEqual({
       id: "00000000-0000-4000-8000-000000000003",

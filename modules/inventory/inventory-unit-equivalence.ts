@@ -9,6 +9,20 @@ export type InventoryConfirmedUnitMeasure = Readonly<{
   canonicalUnit: "g" | "ml";
 }>;
 
+export type InventoryUnitMeasureValue = Readonly<{
+  canonicalQuantity: number;
+  canonicalUnit: "g" | "ml";
+}>;
+
+export function toInventoryUnitMeasureValue(
+  measure: InventoryConfirmedUnitMeasure,
+): InventoryUnitMeasureValue {
+  return {
+    canonicalQuantity: measure.canonicalQuantity,
+    canonicalUnit: measure.canonicalUnit,
+  };
+}
+
 type EquivalenceRow = Record<string, unknown>;
 
 export function selectInventoryUnitMeasures(

@@ -35,6 +35,7 @@ import type {
 } from "@/modules/inventory/inventory.types";
 import {
   selectInventoryUnitMeasures,
+  toInventoryUnitMeasureValue,
   type InventoryConfirmedUnitMeasure,
 } from "@/modules/inventory/inventory-unit-equivalence";
 
@@ -500,6 +501,12 @@ export default async function InventoryPage({
                         const hasCompleteNutrition = Boolean(item.nutrition_basis)
                           && hasCompleteInventoryNutritionValues(item);
                         const hasValidItemId = typeof item.id === "string" && item.id.trim().length > 0;
+                        const confirmedMeasureSnapshot = item.food_catalog_item_id
+                          ? unitMeasures.get(item.food_catalog_item_id) ?? null
+                          : null;
+                        const confirmedMeasure = confirmedMeasureSnapshot
+                          ? toInventoryUnitMeasureValue(confirmedMeasureSnapshot)
+                          : null;
                         return (
                           <li className="inventory-product" key={item.id}>
                             <div className="inventory-product__main">
@@ -560,9 +567,7 @@ export default async function InventoryPage({
                                     protein_g={item.protein_g}
                                     carbs_g={item.carbs_g}
                                     fat_g={item.fat_g}
-                                    confirmedUnitMeasure={item.food_catalog_item_id
-                                      ? unitMeasures.get(item.food_catalog_item_id) ?? null
-                                      : null}
+                                    confirmedUnitMeasure={confirmedMeasure}
                                   />
                                 </div>
                               </details>

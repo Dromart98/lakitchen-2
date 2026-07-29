@@ -16,12 +16,21 @@ describe("inventory unit equivalence page contract", () => {
 
   it("keeps inventory usable when the optional equivalence query fails", () => {
     expect(page).toContain("if (equivalenceError)");
-    expect(page).toContain("unitMeasures.get(item.food_catalog_item_id) ?? null");
+    expect(page).toContain("const confirmedMeasureSnapshot = item.food_catalog_item_id");
   });
 
-  it("passes only the minimal measure and provides a review link", () => {
-    expect(form).toContain('canonicalQuantity: number;');
-    expect(form).toContain('canonicalUnit: "g" | "ml";');
+  it("projects the private snapshot before crossing the client boundary", () => {
+    expect(page).toContain("toInventoryUnitMeasureValue(confirmedMeasureSnapshot)");
+    expect(page).toContain("confirmedUnitMeasure={confirmedMeasure}");
+    expect(page).not.toMatch(/confirmedUnitMeasure=\{[^}]*unitMeasures\.get/s);
+    expect(form).toContain("confirmedUnitMeasure?: InventoryUnitMeasureValue | null;");
+    const props = form.slice(form.indexOf("type InventoryConsumeFormProps"), form.indexOf("function formatOptionalPreviewValue"));
+    expect(props).not.toContain("id: string;\n  updatedAt");
+    expect(props).not.toContain("updatedAt");
+  });
+
+  it("keeps only the public measure value and provides a review link", () => {
+    expect(form).toContain('import type { InventoryUnitMeasureValue }');
     expect(form).toContain('href="/inventory/equivalences"');
     expect(form).not.toContain("variant_key");
     expect(form).not.toContain("food_catalog_item_id");
