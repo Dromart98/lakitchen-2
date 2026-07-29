@@ -81,10 +81,13 @@ describe("atomic saved AI recipe cooked batch migration", () => {
     expect(sourceSql).toContain("creation_fingerprint is null");
   });
 
-  it("aligns database and public measurement versions to canonical millisecond precision", () => {
+  it("aligns database and public measurement versions to canonical, monotonic millisecond precision", () => {
     expect(sourceSql).toContain("alter column updated_at type timestamptz(3)");
     expect(sourceSql).toContain("alter column source_measurement_updated_at type timestamptz(3)");
     expect(sourceSql).toContain("date_trunc('milliseconds', updated_at)");
+    expect(sourceSql).toContain("set_saved_ai_recipe_cooking_yield_version");
+    expect(sourceSql).toContain("old.updated_at + interval '1 millisecond'");
+    expect(sourceSql).toContain("before update on public.user_saved_ai_recipe_cooking_yields");
     expect(contract).toContain("MEASUREMENT_VERSION_PATTERN");
     expect(contract).toContain("parsed.toISOString() === value");
   });
