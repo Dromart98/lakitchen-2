@@ -1,3 +1,11 @@
+alter table public.user_saved_ai_recipe_cooking_yields
+  alter column updated_at type timestamptz(3)
+  using date_trunc('milliseconds', updated_at);
+
+alter table public.user_saved_ai_recipe_cooked_batches
+  alter column source_measurement_updated_at type timestamptz(3)
+  using date_trunc('milliseconds', source_measurement_updated_at);
+
 alter table public.user_saved_ai_recipe_cooked_batches
   rename column source_recipe_id to live_source_recipe_id;
 
