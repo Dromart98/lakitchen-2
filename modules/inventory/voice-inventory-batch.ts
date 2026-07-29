@@ -11,7 +11,7 @@ export const VOICE_INVENTORY_PACKAGE_MEASURE_KINDS = ["can", "package"] as const
 export const VOICE_INVENTORY_BATCH_ISSUES = [
   "quantity-missing", "unit-missing", "location-unconfirmed",
   "package-size-missing", "package-kind-missing", "nutrition-incomplete", "nutrition-basis-mismatch",
-  "low-confidence", "ambiguous-product",
+  "low-confidence", "ambiguous-product", "saved-package-measure-applied",
 ] as const;
 export type VoiceInventoryDraftIssue = (typeof VOICE_INVENTORY_BATCH_ISSUES)[number];
 
@@ -40,7 +40,7 @@ export const VoiceInventoryDraftItemSchema = z.object({
   source_carbs_g: finiteNonNegative.nullable().optional(),
   source_fat_g: finiteNonNegative.nullable().optional(),
   manually_edited_nutrition: z.array(z.enum(["calories", "protein_g", "carbs_g", "fat_g"])).max(4).optional(),
-  issues: z.array(z.enum(VOICE_INVENTORY_BATCH_ISSUES)).max(9),
+  issues: z.array(z.enum(VOICE_INVENTORY_BATCH_ISSUES)).max(10),
 }).strict();
 export const VoiceInventoryBatchOutputSchema = z.object({ items: z.array(VoiceInventoryDraftItemSchema).min(1).max(VOICE_INVENTORY_BATCH_MAX_ITEMS) }).strict();
 export const VoiceInventoryBatchRootSchema = z.object({ items: z.array(z.unknown()) });
@@ -139,6 +139,9 @@ export function normalizeVoiceInventoryDraftItem(item: z.infer<typeof VoiceInven
 }
 export function normalizeEditedVoiceInventoryDraftItem(item: VoiceInventoryDraftItem, field: keyof VoiceInventoryDraftItem, value: unknown): VoiceInventoryDraftItem {
  const next = { ...item, [field]: value, review_acknowledged: field === "review_acknowledged" ? Boolean(value) : false };
+ if (["package_measure_kind", "package_count", "package_size", "package_size_unit", "total_size", "total_size_unit"].includes(field)) {
+   next.issues = next.issues.filter((issue) => issue !== "saved-package-measure-applied");
+ }
  if (["calories", "protein_g", "carbs_g", "fat_g"].includes(field)) {
    next.manually_edited_nutrition = [...new Set([...(item.manually_edited_nutrition ?? []), field as "calories" | "protein_g" | "carbs_g" | "fat_g"])];
  }
