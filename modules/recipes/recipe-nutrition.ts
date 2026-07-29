@@ -1,11 +1,11 @@
 import type { RecipeIngredientAllocation } from "@/modules/recipes/recipe-matching";
 import { calculateConsumedInventoryNutritionWithMetadata } from "@/modules/inventory/inventory-nutrition";
 
-type NutritionTotals = {
-  calories: number;
-  proteinG: number;
-  carbsG: number;
-  fatG: number;
+export type NutritionTotals = {
+  readonly calories: number;
+  readonly proteinG: number;
+  readonly carbsG: number;
+  readonly fatG: number;
 };
 
 export type RecipeNutritionEstimate = {
