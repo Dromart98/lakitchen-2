@@ -104,12 +104,12 @@ test("MEALS-LIFECYCLE: crear, editar, persistir, propagar y eliminar", async ({ 
 
 test("MEALS-DATE-BOUNDARIES: rechaza fechas futuras en historial y resumen semanal", async ({ page }) => {
   await page.goto("/meal-history?date=2999-01-01");
-  await expect(page.getByRole("alert")).toContainText("Selecciona una fecha válida que no sea futura.");
+  await expect(page.getByText("Selecciona una fecha válida que no sea futura.", { exact: true })).toBeVisible();
   await expect(page.locator("#history-date")).not.toHaveValue("2999-01-01");
   await expect(page.getByText("Día siguiente · No disponible")).toBeVisible();
 
   await page.goto("/weekly-summary?week=2999-01-01");
-  await expect(page.getByRole("alert")).toContainText("Selecciona una semana válida que no sea futura.");
+  await expect(page.getByText("Selecciona una semana válida que no sea futura.", { exact: true })).toBeVisible();
   await expect(page.locator("#weekly-summary-week")).not.toHaveValue("2999-01-01");
   await expect(page.getByText("Semana siguiente · No disponible")).toBeVisible();
 });
