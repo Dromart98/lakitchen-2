@@ -154,9 +154,9 @@ test("MACROS-INVENTORY: descuento exacto, macros y persistencia", async ({ page 
   await expect(page.getByRole("status")).toContainText("Comida registrada y productos descontados correctamente.");
 
   const meal = page.locator(".macros-today-meal", { hasText: mealName });
-  await expect(meal).toContainText("250 kcal · P 25 g · C 37.5 g · G 10 g");
+  await expect(meal).toContainText("250 kcal · P 25 g · C 37,5 g · G 10 g");
   await page.reload();
-  await expect(page.locator(".macros-today-meal", { hasText: mealName })).toContainText("250 kcal · P 25 g · C 37.5 g · G 10 g");
+  await expect(page.locator(".macros-today-meal", { hasText: mealName })).toContainText("250 kcal · P 25 g · C 37,5 g · G 10 g");
   await page.goto(`/inventory?query=${encodeURIComponent(productName)}`);
   await expect(page.locator(".inventory-product", { hasText: productName })).toContainText("375 g");
   await page.reload();
