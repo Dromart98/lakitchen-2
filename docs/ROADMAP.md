@@ -1,6 +1,6 @@
 # Roadmap estratégico de Lakitchenapp
 
-Última actualización: 29 de julio de 2026.
+Última actualización: 1 de agosto de 2026.
 
 ## Principios de producto
 
@@ -32,7 +32,7 @@ Estado ya cerrado:
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
 - **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
 
-Siguiente tarea: **Fase 1.3A — núcleo de identidad única + catálogo nutricional**.
+Siguiente tarea: **cerrar la matriz de validación funcional y corregir los defectos reproducibles encontrados antes de iniciar la Fase 2**.
 
 Orden de implementación acordado:
 
