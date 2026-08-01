@@ -20,7 +20,8 @@ const admin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-const { SUPABASE_SERVICE_ROLE_KEY: _serviceRoleKey, ...playwrightBaseEnv } = process.env;
+const playwrightBaseEnv = { ...process.env };
+delete playwrightBaseEnv.SUPABASE_SERVICE_ROLE_KEY;
 let failed = false;
 
 for (const suite of suites) {
