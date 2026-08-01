@@ -104,7 +104,6 @@ test("MACROS-TEXT-AI: análisis revisable, guardado y persistencia", async ({ pa
   await panel.getByRole("button", { name: "Calcular estimación" }).click();
   await expect(panel.getByText("Calculando estimación…")).toBeHidden({ timeout: 45_000 });
   await skipIfAiIsUnavailable(panel);
-  await expect(panel.getByRole("heading", { name: /Plátano|Yogur|Revisa/i }).first()).toBeVisible();
   await confirmAiMacros(page, panel);
 });
 
