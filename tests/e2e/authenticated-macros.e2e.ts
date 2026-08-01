@@ -9,7 +9,7 @@ test("the isolated E2E account can access macros", async ({ page }) => {
 
   await page.goto("/login");
   await page.getByLabel("Email").fill(email!);
-  await page.getByLabel("Contraseña", { exact: true }).fill(password!);
+  await page.locator('input[name="password"]').fill(password!);
 
   await Promise.all([
     page.waitForURL("**/dashboard"),
