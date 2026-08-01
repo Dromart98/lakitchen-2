@@ -37,6 +37,7 @@ Las estimaciones asistidas requieren revisión humana antes de guardar. Por ejem
 - Registro de comidas manual, por texto asistido, foto asistida o ingredientes del inventario, con calorías y proteínas, carbohidratos y grasas.
 - Perfil nutricional y objetivos diarios; vistas de progreso, historial y resumen semanal.
 - Generación, revisión y guardado de recetas y de planes diarios; los planes señalan productos que necesitan revisión antes de poder utilizarlos.
+- Las recetas asistidas guardadas pueden cocinarse y conservarse como lotes; después se registra únicamente la porción consumida, por raciones o gramos cocinados.
 - Lista de la compra y transferencia de artículos al inventario.
 - Preferencia de tema claro, oscuro o del sistema guardada en el navegador.
 - La aplicación no debe exponer nombres internos de proveedores, modelos, bases de datos ni fuentes nutricionales. Los mensajes visibles deben explicar el efecto para la persona en lenguaje cotidiano.

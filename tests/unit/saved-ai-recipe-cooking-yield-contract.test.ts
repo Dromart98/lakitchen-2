@@ -44,7 +44,8 @@ describe("saved AI recipe cooking yield RSC contract", () => {
 
   it("reuses the deterministic calculator and does not project private metadata", () => {
     expect(preview).toContain("calculateCookingYield({");
-    expect(page).toContain('.select("recipe_id, raw_weight_g, cooked_weight_g, servings")');
+    expect(page).toContain('.select("recipe_id, raw_weight_g, cooked_weight_g, servings, updated_at")');
+    expect(page).toContain("createSavedAiRecipeCookedBatchUiAction.bind(null, recipe.id");
     expect(page).not.toContain("user_id: user.id, cookingYieldNutrition");
     expect(preview).not.toMatch(/action=|fetch\(|supabase|router\.refresh|revalidate/i);
   });

@@ -4709,6 +4709,33 @@ h3 {
   margin-top: auto;
 }
 
+.cooked-batches__grid,
+.cooked-batch-form {
+  display: grid;
+  gap: 14px;
+}
+
+.cooked-batch-card {
+  display: grid;
+  gap: 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--card-soft);
+  padding: 18px;
+}
+
+.cooked-batch-card h3 { margin: 0 0 8px; }
+.cooked-batch-card__summary { display: grid; gap: 10px; margin: 0; }
+.cooked-batch-card__summary div { display: grid; gap: 3px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+.cooked-batch-card__summary dt { color: var(--muted); font-weight: 750; }
+.cooked-batch-card__summary dd { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
+.cooked-batch-form label { display: grid; gap: 7px; font-weight: 750; }
+.cooked-batch-form input:not([type="checkbox"]), .cooked-batch-form select { width: 100%; min-height: 48px; }
+.cooked-batch-form__confirmation { grid-template-columns: 24px 1fr; align-items: start; line-height: 1.5; }
+.cooked-batch-form__confirmation input { width: 22px; height: 22px; margin-top: 1px; }
+.cooked-batch-card__preview { border-radius: 14px; background: var(--brand-soft); padding: 14px; }
+.cooked-batch-card__preview p { margin: 6px 0 0; line-height: 1.5; }
+
 .cooking-yield-preview__body {
   display: grid;
   gap: 14px;

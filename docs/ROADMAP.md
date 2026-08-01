@@ -190,7 +190,7 @@ Añadir una capa común para:
 
 Toda conversión estimada debe poder corregirse y reutilizarse.
 
-### 1.5 Rendimiento de cocinado — En progreso
+### 1.5 Rendimiento de cocinado — Implementada/cerrada
 
 - **1.5A — núcleo determinista de rendimiento — Implementada/cerrada:** validación y cálculo común de pesos observados, cambio neto de agua y aceite explícitos, rendimiento, peso por ración y redistribución de nutrición total.
 - **1.5B — previsualización revisable en recetas IA guardadas — Implementada/cerrada:** pesos observados y raciones permiten consultar, sin persistencia, el rendimiento y la nutrición reconstruida desde el inventario actual; los datos incompletos quedan pendientes de revisión.
@@ -199,6 +199,7 @@ Toda conversión estimada debe poder corregirse y reutilizarse.
 - **1.5E — lotes cocinados reales — Implementada/cerrada:** el modelo privado conserva cada cocinado como un snapshot independiente de título, pesos, raciones, nutrición total y gramos consumidos, aunque se elimine la receta de origen; las escrituras quedan reservadas para futuras operaciones atómicas.
 - **1.5F — creación atómica e idempotente del lote — Implementada/cerrada:** una operación autenticada valida la receta y la medición confirmada, bloquea y descuenta sus ingredientes, calcula la nutrición desde el inventario dentro de la transacción y crea una sola vez el lote con consumo inicial cero, sin registrar una comida ni aplicar presupuesto calórico.
 - **1.5G — consumo atómico de porciones cocinadas — Implementada/cerrada:** una operación independiente consume exactamente gramos o raciones de un lote, conserva su snapshot nutricional y registra una sola comida de forma transaccional e idempotente, sin volver a tocar el inventario.
+- **1.5H — integración mobile-first de lotes cocinados — Implementada/cerrada:** las recetas IA guardadas con medición y nutrición confirmadas se cocinan como lotes; la interfaz muestra su remanente y permite registrar después porciones por raciones o gramos cocinados.
 
 Modelar correctamente:
 

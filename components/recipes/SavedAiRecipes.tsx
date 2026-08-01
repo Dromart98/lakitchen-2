@@ -1,5 +1,5 @@
 import { deleteSavedAiRecipeAction } from "@/app/recipes/actions";
-import { SavedAiRecipeCookForm } from "@/components/recipes/SavedAiRecipeCookForm";
+import { SavedAiRecipeBatchForm } from "@/components/recipes/SavedAiRecipeBatchForm";
 import { CookingYieldPreview } from "@/components/recipes/CookingYieldPreview";
 import type { SavedRecipeCookingYieldNutrition } from "@/modules/recipes/saved-ai-recipe-cooking-yield";
 import type { SavedRecipeCookingYieldMeasurement } from "@/modules/recipes/saved-ai-recipe-cooking-yield-measurement";
@@ -17,6 +17,7 @@ export type SavedAiRecipeView = SavedAiRecipe & {
   usesConfirmedUnitMeasure: boolean;
   cookingYieldNutrition: SavedRecipeCookingYieldNutrition;
   cookingYieldMeasurement: SavedRecipeCookingYieldMeasurement | null;
+  createBatch: ((input: { requestId: string }) => Promise<import("@/modules/recipes/saved-ai-recipe-batch-creation").CreateSavedAiRecipeCookedBatchResult>) | null;
 };
 
 export function SavedAiRecipes({ recipes }: { recipes: SavedAiRecipeView[] }) {
@@ -47,7 +48,7 @@ export function SavedAiRecipes({ recipes }: { recipes: SavedAiRecipeView[] }) {
           </details>
           <CookingYieldPreview recipeId={recipe.id} nutrition={recipe.cookingYieldNutrition} initialMeasurement={recipe.cookingYieldMeasurement} />
           <div className="saved-recipe__actions">
-            <SavedAiRecipeCookForm recipeId={recipe.id} />
+            {recipe.createBatch ? <SavedAiRecipeBatchForm action={recipe.createBatch} /> : recipe.cookingYieldMeasurement === null ? <p className="cooking-yield-preview__notice">Confirma el peso previo, el peso cocinado y las raciones para poder guardar un lote.</p> : <p className="cooking-yield-preview__notice">Revisa la nutrición de {recipe.cookingYieldNutrition.status === "incomplete" ? recipe.cookingYieldNutrition.itemsToReview : 1} producto{recipe.cookingYieldNutrition.status === "incomplete" && recipe.cookingYieldNutrition.itemsToReview === 1 ? "" : "s"} antes de guardar un lote.</p>}
             <form className="saved-recipe__delete" action={deleteSavedAiRecipeAction}>
               <input type="hidden" name="recipe_id" value={recipe.id} />
               <button type="submit">Eliminar receta</button>
