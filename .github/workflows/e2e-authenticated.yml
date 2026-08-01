@@ -1,0 +1,114 @@
+name: Authenticated E2E
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  authenticated-macros-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      E2E_BASE_URL: https://lakitchen-2.vercel.app
+      SUPABASE_URL: https://biektlygqlvxpovolyyz.supabase.co
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Check required E2E secret
+        shell: bash
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [[ -z "$SUPABASE_SERVICE_ROLE_KEY" ]]; then
+            echo "Missing required GitHub Actions secret: SUPABASE_SERVICE_ROLE_KEY" >&2
+            exit 1
+          fi
+
+      - name: Check external connectivity
+        shell: bash
+        run: |
+          curl --silent --show-error --location --output /dev/null \
+            --connect-timeout 15 --max-time 30 https://lakitchen-2.vercel.app
+          curl --silent --show-error --location --output /dev/null \
+            --connect-timeout 15 --max-time 30 https://biektlygqlvxpovolyyz.supabase.co
+
+      - name: Create isolated E2E user
+        shell: bash
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node <<'NODE'
+          const { appendFileSync } = require("node:fs");
+          const { randomBytes, randomUUID } = require("node:crypto");
+          const { createClient } = require("@supabase/supabase-js");
+
+          (async () => {
+            const email = `lakitchen-e2e-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}-${randomUUID()}@example.invalid`;
+            const password = randomBytes(32).toString("base64url");
+            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+              auth: { autoRefreshToken: false, persistSession: false },
+            });
+
+            process.stdout.write(`::add-mask::${password}\n`);
+            const { data, error } = await supabase.auth.admin.createUser({
+              email,
+              password,
+              email_confirm: true,
+            });
+            if (error) throw error;
+
+            appendFileSync(process.env.GITHUB_ENV, `E2E_EMAIL=${email}\nE2E_PASSWORD=${password}\nE2E_USER_ID=${data.user.id}\n`);
+          })().catch((error) => {
+            console.error(error.message);
+            process.exitCode = 1;
+          });
+          NODE
+
+      - name: Run authenticated macros smoke test
+        run: npx playwright test tests/e2e/authenticated-macros.e2e.ts
+
+      - name: Delete isolated E2E user
+        if: always()
+        shell: bash
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [[ -z "${E2E_USER_ID:-}" ]]; then
+            echo "No E2E user was created; cleanup is not required."
+            exit 0
+          fi
+          node <<'NODE'
+          const { createClient } = require("@supabase/supabase-js");
+
+          (async () => {
+            const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+              auth: { autoRefreshToken: false, persistSession: false },
+            });
+            const { error } = await supabase.auth.admin.deleteUser(process.env.E2E_USER_ID);
+            if (error) throw error;
+          })().catch((error) => {
+            console.error(error.message);
+            process.exitCode = 1;
+          });
+          NODE
+
+      - name: Remove temporary E2E artifacts
+        if: always()
+        shell: bash
+        run: rm -rf test-results playwright-report
