@@ -7,7 +7,7 @@ export default defineConfig({
   fullyParallel: false,
   retries: 0,
   workers: 1,
-  reporter: "line",
+  reporter: [["line"], ["./tests/e2e/macros-status-reporter.ts"]],
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "https://lakitchen-2.vercel.app",
     trace: "off",
