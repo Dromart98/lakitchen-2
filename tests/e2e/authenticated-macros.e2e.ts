@@ -46,11 +46,24 @@ async function addInventoryItem(
 }
 
 async function skipIfAiIsUnavailable(panel: Locator) {
-  const alert = panel.getByRole("alert");
+  const alert = panel.getByRole("alert").first();
   if (await alert.isVisible().catch(() => false)) {
     const message = (await alert.textContent()) ?? "";
     test.skip(blockedAiMessages.test(message), `BLOCKED: servicio de análisis no disponible: ${message}`);
   }
+}
+
+async function expectPhotoReview(panel: Locator) {
+  const heading = panel.getByRole("heading", { name: "Revisa los ingredientes detectados" });
+  if (await heading.isVisible().catch(() => false)) return;
+
+  const alert = panel.getByRole("alert").first();
+  if (await alert.isVisible().catch(() => false)) {
+    const message = ((await alert.textContent()) ?? "").trim();
+    throw new Error(`El análisis de foto no produjo una revisión confirmable. Estado visible: ${message || "alerta vacía"}`);
+  }
+
+  await expect(heading).toBeVisible();
 }
 
 async function confirmAiMacros(page: Page, panel: Locator) {
@@ -112,7 +125,7 @@ test("MACROS-PHOTO-AI: fixture, análisis revisable, guardado y persistencia", a
     await panel.getByRole("button", { name: "Analizar fotografía" }).click();
     await expect(panel.getByText("Analizando comida…")).toBeHidden({ timeout: 45_000 });
     await skipIfAiIsUnavailable(panel);
-    await expect(panel.getByRole("heading", { name: "Revisa los ingredientes detectados" })).toBeVisible();
+    await expectPhotoReview(panel);
     await confirmAiMacros(page, panel);
   } finally {
     await rm(fixtureDirectory, { recursive: true, force: true });
@@ -138,7 +151,7 @@ test("MACROS-INVENTORY: descuento exacto, macros y persistencia", async ({ page 
   await panel.getByLabel("Nombre de la comida").fill(mealName);
   await panel.getByLabel("Tipo de comida").selectOption("other");
   await panel.getByRole("button", { name: "Registrar comida y descontar inventario" }).click();
-  await expect(page.getByRole("status")).toContainText("Comida registrada y cantidades descontadas correctamente");
+  await expect(page.getByRole("status")).toContainText("Comida registrada y productos descontados correctamente.");
 
   const meal = page.locator(".macros-today-meal", { hasText: mealName });
   await expect(meal).toContainText("250 kcal · P 25 g · C 37.5 g · G 10 g");
@@ -154,7 +167,8 @@ test("MACROS-INCOMPLETE-NUTRITION: no inventa nutrientes y exige revisión", asy
   const productName = `E2E incompleto ${Date.now()}`;
   await addInventoryItem(page, { name: productName, quantity: "300", nutrition: { calories: "123" } });
   const product = page.locator(".inventory-product", { hasText: productName });
-  await expect(product).toContainText("Nutrición pendiente");
+  await expect(product).toContainText("Completar macros");
+  await expect(product).toContainText("123 kcal");
   await product.getByText("Gestionar").click();
   await product.getByText("Descontar cantidad").click();
   await product.getByLabel("Cantidad consumida").fill("100");
@@ -175,7 +189,7 @@ test("MACROS-LIGHT-THEME: elementos principales y preferencia persistente", asyn
   await expect(page.getByRole("heading", { name: "Tu alimentación de hoy" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Añadir comida" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Comidas registradas hoy" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Objetivos diarios" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Objetivos diarios", exact: true })).toBeVisible();
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect(page.evaluate(() => localStorage.getItem("lakitchen.theme.preference"))).resolves.toBe("light");
