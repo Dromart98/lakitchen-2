@@ -80,7 +80,7 @@ jobs:
           });
           NODE
 
-      - name: Run authenticated macros smoke test
+      - name: Run authenticated macros production validation
         run: npx playwright test tests/e2e/authenticated-macros.e2e.ts
 
       - name: Delete isolated E2E user
