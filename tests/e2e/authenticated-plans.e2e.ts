@@ -124,7 +124,7 @@ test("PLANS-LIFECYCLE: perfil, generación, guardado sin consumo y cocinado de u
   let firstMeal = savedPlan.locator(".saved-plan-meal").first();
   const mealTitle = ((await firstMeal.locator("h4").textContent()) ?? "").trim();
   expect(mealTitle).not.toBe("");
-  const ingredients = (await firstMeal.locator("li").allTextContents()).map(parseIngredient);
+  const ingredients = (await firstMeal.locator("ul > li").allTextContents()).map(parseIngredient);
   expect(ingredients.length).toBeGreaterThanOrEqual(1);
   for (const ingredient of ingredients) {
     expect(items.map((item) => item.name)).toContain(ingredient.name);
