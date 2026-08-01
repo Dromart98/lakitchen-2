@@ -183,7 +183,10 @@ test("MACROS-INCOMPLETE-NUTRITION: no inventa nutrientes y exige revisión", asy
 
 test("MACROS-LIGHT-THEME: elementos principales y preferencia persistente", async ({ page }) => {
   await page.goto("/settings");
+  await page.getByLabel("Oscuro").check();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.getByLabel("Claro").check();
+  await expect(page.evaluate(() => localStorage.getItem("lakitchen.theme.preference"))).resolves.toBe("light");
   await page.goto("/macros");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect(page.getByRole("heading", { name: "Tu alimentación de hoy" })).toBeVisible();
