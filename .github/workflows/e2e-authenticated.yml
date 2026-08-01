@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 jobs:
-  authenticated-macros-smoke:
+  authenticated-production-validation:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -80,8 +80,8 @@ jobs:
           });
           NODE
 
-      - name: Run authenticated macros production validation
-        run: npx playwright test tests/e2e/authenticated-macros.e2e.ts
+      - name: Run authenticated production validation
+        run: npx playwright test tests/e2e/authenticated-macros.e2e.ts tests/e2e/authenticated-meals.e2e.ts
 
       - name: Delete isolated E2E user
         if: always()

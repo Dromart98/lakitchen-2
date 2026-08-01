@@ -2,7 +2,7 @@ import type { FullResult, Reporter, TestCase, TestResult } from "@playwright/tes
 
 const results: string[] = [];
 
-export default class MacrosStatusReporter implements Reporter {
+export default class AuthenticatedStatusReporter implements Reporter {
   onTestEnd(test: TestCase, result: TestResult) {
     const status = result.status === "skipped" ? "BLOCKED" : result.status === test.expectedStatus ? "PASS" : "FAIL";
     results.push(`| ${test.title} | ${status} |`);
@@ -12,6 +12,6 @@ export default class MacrosStatusReporter implements Reporter {
   async onEnd(_result: FullResult) {
     if (!process.env.GITHUB_STEP_SUMMARY) return;
     const { appendFile } = await import("node:fs/promises");
-    await appendFile(process.env.GITHUB_STEP_SUMMARY, `\n### Macros E2E\n\n| Caso | Resultado |\n| --- | --- |\n${results.join("\n")}\n`);
+    await appendFile(process.env.GITHUB_STEP_SUMMARY, `\n### Authenticated E2E\n\n| Caso | Resultado |\n| --- | --- |\n${results.join("\n")}\n`);
   }
 }
