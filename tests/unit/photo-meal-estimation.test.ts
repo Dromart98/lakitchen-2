@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { PHOTO_MEAL_AI_MODEL_DEFAULT, PHOTO_MEAL_SYSTEM_PROMPT, estimatePhotoMealWithOpenAi } from "@/lib/openai/photo-meal-estimation";
+import {
+  PHOTO_MEAL_AI_MODEL_DEFAULT,
+  PHOTO_MEAL_SYSTEM_PROMPT,
+  estimatePhotoMealWithOpenAi,
+  normalizePhotoMealProviderOutput,
+} from "@/lib/openai/photo-meal-estimation";
 import { validateTextMealProviderOutput } from "@/modules/meals/text-meal-ai";
 
 const chicken = { normalized_name: "Pechuga de pollo".toLowerCase(), display_name: "Pechuga de pollo", name: "Pechuga de pollo", confidence: "medium" as const, quantity: 180, unit: "g", preparation: "cocinado", calories: 297, protein_g: 55.8, carbs_g: 0, fat_g: 6.5 };
@@ -31,6 +36,11 @@ describe("photo meal prompt", () => {
     expect(PHOTO_MEAL_SYSTEM_PROMPT).toContain("cantidad explícita y razonable del usuario prevalece");
     expect(PHOTO_MEAL_SYSTEM_PROMPT).toContain("no añadas por defecto aceite, mantequilla, salsas");
     expect(PHOTO_MEAL_SYSTEM_PROMPT).toContain("g, ml, unidad");
+  });
+
+  it("states the status-dependent null contract that the flat provider schema cannot express", () => {
+    expect(PHOTO_MEAL_SYSTEM_PROMPT).toContain("Si status es success, message debe ser null");
+    expect(PHOTO_MEAL_SYSTEM_PROMPT).toContain("Si status es needs-clarification, suggested_name, ingredients, assumptions y confidence deben ser null");
   });
 });
 
@@ -71,9 +81,19 @@ describe("photo meal OpenAI provider", () => {
     ] });
   });
 
-  it("accepts clarification only as a valid structured outcome and rejects invalid provider responses", async () => {
+  it("discards only fields that are irrelevant for the provider-selected status", async () => {
+    const successWithProviderMessage = { ...success, message: "Estimación orientativa lista" };
+    expect(normalizePhotoMealProviderOutput(successWithProviderMessage)).toEqual({ ...successWithProviderMessage, message: null });
+    expect(await estimatePhotoMealWithOpenAi("data:image/jpeg;base64,/9j/", "", { apiKey: "key", fetchImpl: async () => completed(successWithProviderMessage) })).toMatchObject({ status: "success", suggested_name: "Pollo con arroz" });
+
+    const clarificationWithIrrelevantPayload = { ...clarification, suggested_name: "Ignorar", ingredients: [chicken], assumptions: ["Ignorar"], confidence: "low" };
+    expect(normalizePhotoMealProviderOutput(clarificationWithIrrelevantPayload)).toEqual({ ...clarificationWithIrrelevantPayload, suggested_name: null, ingredients: null, assumptions: null, confidence: null });
+    expect(await estimatePhotoMealWithOpenAi("data:image/jpeg;base64,/9j/", "", { apiKey: "key", fetchImpl: async () => completed(clarificationWithIrrelevantPayload) })).toEqual({ status: "needs-clarification", message: clarification.message });
+  });
+
+  it("accepts clarification only as a valid structured outcome and rejects invalid relevant provider responses", async () => {
     expect(await estimatePhotoMealWithOpenAi("data:image/jpeg;base64,/9j/", "", { apiKey: "key", fetchImpl: async () => completed(clarification) })).toEqual({ status: "needs-clarification", message: clarification.message });
-    const invalids = [response(408, {}), response(500, {}), response(200, { status: "incomplete" }), response(200, { status: "completed", output: [{ content: [{ type: "refusal" }] }] }), response(200, { status: "completed" }), response(200, { status: "completed", output_text: "not json" }), completed({ ...success, message: "bad" }), completed({ ...clarification, ingredients: [chicken] })];
+    const invalids = [response(408, {}), response(500, {}), response(200, { status: "incomplete" }), response(200, { status: "completed", output: [{ content: [{ type: "refusal" }] }] }), response(200, { status: "completed" }), response(200, { status: "completed", output_text: "not json" }), completed({ ...success, ingredients: [{ ...chicken, protein_g: -1 }] }), completed({ ...clarification, message: null })];
     for (const item of invalids) expect((await estimatePhotoMealWithOpenAi("data:image/jpeg;base64,/9j/", "", { apiKey: "key", fetchImpl: async () => item })).status).toBe("error");
   });
 });
