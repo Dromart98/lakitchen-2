@@ -690,6 +690,22 @@ export async function createSavedAiRecipeCookedBatchAction(input: unknown): Prom
   return { status: "success" };
 }
 
+/** UI boundary: recipe ownership and measurement version are bound by the server component. */
+export async function createSavedAiRecipeCookedBatchUiAction(
+  recipeId: string,
+  measurementUpdatedAt: string,
+  input: unknown,
+): Promise<CreateSavedAiRecipeCookedBatchResult> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { status: "error", code: "invalid-input" };
+  const value = input as Record<string, unknown>;
+  if (Object.keys(value).length !== 1 || typeof value.requestId !== "string") return { status: "error", code: "invalid-input" };
+  return createSavedAiRecipeCookedBatchAction({
+    recipe_id: recipeId,
+    request_id: value.requestId,
+    expected_measurement_updated_at: measurementUpdatedAt,
+  });
+}
+
 /** Atomically records one explicit portion of an existing cooked batch. */
 export async function consumeCookedBatchAndLogMealAction(input: unknown): Promise<ConsumeCookedBatchResult> {
   const request = parseConsumeCookedBatchInput(input);
@@ -713,6 +729,31 @@ export async function consumeCookedBatchAndLogMealAction(input: unknown): Promis
   revalidatePath("/meal-history");
   revalidatePath("/weekly-summary");
   return { status: "success" };
+}
+
+/** UI boundary: batch ownership and optimistic-lock version never cross into client data. */
+export async function consumeCookedBatchUiAction(
+  batchId: string,
+  batchUpdatedAt: string,
+  input: unknown,
+): Promise<ConsumeCookedBatchResult> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { status: "error", code: "invalid-input" };
+  const value = input as Record<string, unknown>;
+  const allowed = ["requestId", "mode", "quantity", "mealType"];
+  if (Object.keys(value).length !== allowed.length || Object.keys(value).some((key) => !allowed.includes(key))) {
+    return { status: "error", code: "invalid-input" };
+  }
+  const base = {
+    request_id: value.requestId,
+    batch_id: batchId,
+    meal_type: value.mealType,
+    expected_batch_updated_at: batchUpdatedAt,
+  };
+  return consumeCookedBatchAndLogMealAction(value.mode === "servings"
+    ? { ...base, servings_consumed: value.quantity }
+    : value.mode === "grams"
+      ? { ...base, cooked_weight_consumed_g: value.quantity }
+      : { ...base, invalid_mode: value.mode });
 }
 
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { cookRecipeAndLogMealAction } from "@/app/recipes/actions";
+import { cookRecipeAndLogMealAction, createSavedAiRecipeCookedBatchUiAction, consumeCookedBatchUiAction } from "@/app/recipes/actions";
+import { CookedBatches, type PublicCookedBatch } from "@/components/recipes/CookedBatches";
 import { RecipeAiGenerator } from "@/components/recipes/RecipeAiGenerator";
 import { SavedAiRecipes } from "@/components/recipes/SavedAiRecipes";
 import type { SavedAiRecipeView } from "@/components/recipes/SavedAiRecipes";
@@ -30,6 +31,7 @@ import { buildSavedRecipeCookingYieldNutrition } from "@/modules/recipes/saved-a
 import { toSavedRecipeCookingYieldMeasurement } from "@/modules/recipes/saved-ai-recipe-cooking-yield-measurement";
 import { buildRecipeCalorieBudget, isRecipeServingWithinCalorieBudget } from "@/modules/recipes/recipe-calorie-budget";
 import { getTodayUtcDate } from "@/modules/meals/meal-date";
+import { parseSavedAiRecipeCookedBatchRow } from "@/modules/recipes/saved-ai-recipe-cooked-batch";
 
 export const dynamic = "force-dynamic";
 
@@ -134,6 +136,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
     { data: inventoryData, error: inventoryError },
     { data: savedRecipeData, error: savedRecipeError },
     { data: cookingYieldData, error: cookingYieldError },
+    { data: cookedBatchData, error: cookedBatchError },
     { data: recipeData, error: recipeError },
   ] = await Promise.all([
     (supabase as unknown as RecipesPageBudgetClient).from("user_nutrition_profiles").select("target_calories").eq("user_id", user.id).maybeSingle() as Promise<{ data: { target_calories: number | null } | null; error: { message: string } | null }>,
@@ -150,8 +153,13 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
       .order("created_at", { ascending: false }) as Promise<{ data: unknown[] | null; error: { message: string } | null }>,
     (supabase as any)
       .from("user_saved_ai_recipe_cooking_yields")
-      .select("recipe_id, raw_weight_g, cooked_weight_g, servings")
+      .select("recipe_id, raw_weight_g, cooked_weight_g, servings, updated_at")
       .eq("user_id", user.id) as Promise<{ data: unknown[] | null; error: { message: string } | null }>,
+    (supabase as any)
+      .from("user_saved_ai_recipe_cooked_batches")
+      .select("id, recipe_title, raw_weight_g, cooked_weight_g, servings, total_calories, total_protein_g, total_carbs_g, total_fat_g, consumed_cooked_weight_g, created_at, updated_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false }) as Promise<{ data: unknown[] | null; error: { message: string } | null }>,
     (supabase as any)
       .from("recipe_templates")
       .select("id, slug, title, description, prep_minutes, servings, instructions, recipe_ingredients(id, recipe_id, display_name, match_terms, required_quantity, required_unit, is_required, sort_order)")
@@ -172,6 +180,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
     console.warn("Supabase could not load saved AI recipes:", savedRecipeError.message);
   }
   if (cookingYieldError) console.warn("Supabase could not load saved recipe cooking yields:", cookingYieldError.message);
+  if (cookedBatchError) console.warn("Supabase could not load cooked batches:", cookedBatchError.message);
 
   const identityIds = [...new Set((inventoryData ?? []).map((row) => typeof row.food_catalog_item_id === "string" ? row.food_catalog_item_id : "").filter(Boolean))];
   let unitMeasures = new Map();
@@ -206,6 +215,11 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
     const measurement = toSavedRecipeCookingYieldMeasurement(row);
     return typeof recipeId === "string" && measurement ? [[recipeId, measurement] as const] : [];
   }));
+  const cookingYieldVersionByRecipeId = new Map((cookingYieldError ? [] : cookingYieldData ?? []).flatMap((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return [];
+    const value = row as Record<string, unknown>;
+    return typeof value.recipe_id === "string" && typeof value.updated_at === "string" ? [[value.recipe_id, value.updated_at] as const] : [];
+  }));
   const savedRecipeViews: SavedAiRecipeView[] = savedRecipes.map((recipe) => {
     const suggestion = {
       title: recipe.title,
@@ -217,13 +231,33 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
     };
     const { allocations, missingItemIds } = buildRecipeAiNutritionAllocations(suggestion, aiInventoryById);
     const nutrition = estimateRecipeNutrition(allocations, recipe.servings);
+    const cookingYieldNutrition = buildSavedRecipeCookingYieldNutrition(recipe, aiInventoryById);
+    const measurementVersion = cookingYieldVersionByRecipeId.get(recipe.id);
     return {
       ...recipe,
       usesConfirmedUnitMeasure: missingItemIds.size === 0 && nutrition.usedConfirmedUnitMeasure,
-      cookingYieldNutrition: buildSavedRecipeCookingYieldNutrition(recipe, aiInventoryById),
+      cookingYieldNutrition,
       cookingYieldMeasurement: cookingYieldByRecipeId.get(recipe.id) ?? null,
+      createBatch: measurementVersion && cookingYieldNutrition.status === "complete"
+        ? createSavedAiRecipeCookedBatchUiAction.bind(null, recipe.id, new Date(measurementVersion).toISOString())
+        : null,
     };
   });
+  const cookedBatches = (cookedBatchError ? [] : cookedBatchData ?? []).reduce<PublicCookedBatch[]>((items, row) => {
+    const snapshot = parseSavedAiRecipeCookedBatchRow(row);
+    if (!snapshot) {
+      console.warn("Supabase returned an invalid cooked batch row.");
+      return items;
+    }
+    const value = row as Record<string, unknown>;
+    if (typeof value.id !== "string") {
+      console.warn("Supabase returned a cooked batch without its server key.");
+      return items;
+    }
+    const { updatedAt, ...publicSnapshot } = snapshot;
+    items.push({ snapshot: publicSnapshot, consume: consumeCookedBatchUiAction.bind(null, value.id, new Date(updatedAt).toISOString()) });
+    return items;
+  }, []);
   const recipes = (recipeError ? [] : recipeData ?? []).map(toRecipeTemplate).filter((recipe): recipe is RecipeTemplate => Boolean(recipe));
   const recipeMatchesWithServingOptions = sortRecipeMatches(matchRecipesToInventory(recipes, inventoryItems, todayKey))
     .map((match) => buildRecipeMatchWithServingOptions(match, inventoryItems, todayKey));
@@ -251,6 +285,8 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
         <RecipeAiGenerator />
 
         <SavedAiRecipes recipes={savedRecipeViews} />
+
+        <CookedBatches batches={cookedBatches} />
 
         <section className="recipes-section recipes-catalog" aria-labelledby="recipes-catalog-title">
           <div className="recipes-section__heading">
