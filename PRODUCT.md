@@ -40,6 +40,7 @@ Las estimaciones asistidas requieren revisión humana antes de guardar. Por ejem
 - Las recetas asistidas guardadas pueden cocinarse y conservarse como lotes; después se registra únicamente la porción consumida, por raciones o gramos cocinados.
 - Lista de la compra y transferencia de artículos al inventario.
 - Preferencia de tema claro, oscuro o del sistema guardada en el navegador.
+- Eliminación definitiva de la cuenta y de sus datos personales desde Ajustes, con confirmación explícita.
 - La aplicación no debe exponer nombres internos de proveedores, modelos, bases de datos ni fuentes nutricionales. Los mensajes visibles deben explicar el efecto para la persona en lenguaje cotidiano.
 - No se debe asumir conocimiento de términos técnicos. Cuando la nutrición, una unidad o la disponibilidad impidan una acción, el producto debe mostrar qué revisar y el siguiente paso comprensible.
 
