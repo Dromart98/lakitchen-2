@@ -30,7 +30,7 @@ test("AUTH-LIFECYCLE: protección, login, logout y eliminación definitiva de cu
 
   await fillLogin(page, `${password!}incorrecta`);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
-  await expect(page.getByRole("alert")).toContainText("No se pudo completar la autenticación");
+  await expect(page.locator(".auth-form__message--error")).toContainText("No se pudo completar la autenticación");
   await expect(page).toHaveURL(/\/login$/);
 
   await fillLogin(page, password!);
@@ -60,6 +60,6 @@ test("AUTH-LIFECYCLE: protección, login, logout y eliminación definitiva de cu
 
   await fillLogin(page, password!);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
-  await expect(page.getByRole("alert")).toContainText("No se pudo completar la autenticación");
+  await expect(page.locator(".auth-form__message--error")).toContainText("No se pudo completar la autenticación");
   await expect(page).toHaveURL(/\/login\?accountDeleted=true$/);
 });
