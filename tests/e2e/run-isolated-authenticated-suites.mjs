@@ -24,6 +24,40 @@ const playwrightBaseEnv = { ...process.env };
 delete playwrightBaseEnv.SUPABASE_SERVICE_ROLE_KEY;
 let failed = false;
 
+function getUtcDateOffset(days) {
+  return new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+async function buildSuiteSeedEnv(suite, userId) {
+  const filename = suite.split(/[\\/]/).pop();
+  if (filename !== "authenticated-meal-history.e2e.ts") return {};
+
+  const seed = {
+    name: `E2E historial ${randomUUID()}`,
+    meal_type: "lunch",
+    calories: 420,
+    protein_g: 32,
+    carbs_g: 48,
+    fat_g: 11,
+    consumed_on: getUtcDateOffset(-1),
+  };
+
+  const { error } = await admin.from("daily_meal_logs").insert({
+    user_id: userId,
+    ...seed,
+  });
+  if (error) throw new Error(`Meal history seed failed: ${error.message}`);
+
+  return {
+    E2E_HISTORY_SEED_DATE: seed.consumed_on,
+    E2E_HISTORY_SEED_NAME: seed.name,
+    E2E_HISTORY_SEED_CALORIES: String(seed.calories),
+    E2E_HISTORY_SEED_PROTEIN: String(seed.protein_g),
+    E2E_HISTORY_SEED_CARBS: String(seed.carbs_g),
+    E2E_HISTORY_SEED_FAT: String(seed.fat_g),
+  };
+}
+
 for (const suite of suites) {
   let userId = null;
   let suiteFailed = false;
@@ -39,6 +73,7 @@ for (const suite of suites) {
     });
     if (error || !data.user) throw error ?? new Error("Temporary E2E user was not created.");
     userId = data.user.id;
+    const suiteSeedEnv = await buildSuiteSeedEnv(suite, userId);
 
     console.log(`\n=== Running isolated suite: ${suite} ===`);
     const result = spawnSync(
@@ -48,6 +83,7 @@ for (const suite of suites) {
         stdio: "inherit",
         env: {
           ...playwrightBaseEnv,
+          ...suiteSeedEnv,
           E2E_EMAIL: email,
           E2E_PASSWORD: password,
           E2E_USER_ID: userId,
