@@ -1,6 +1,6 @@
 # Roadmap estratégico de Lakitchenapp
 
-Última actualización: 1 de agosto de 2026.
+Última actualización: 2 de agosto de 2026.
 
 ## Principios de producto
 
@@ -11,19 +11,13 @@
 - Mantener ocultos los proveedores internos de datos nutricionales en la interfaz.
 - Consolidar primero una versión estable antes de pagos, grupos o funciones avanzadas.
 
-## Fase actual — Validación funcional y corrección de defectos
+## Estado de validación funcional — Cerrado
 
-Prioridad: crítica.
+Prioridad: cerrada el 2 de agosto de 2026.
 
-Objetivo: terminar la matriz manual de validación de Inventario, Macros, comidas, recetas, planes, historial, lista de compra, ajustes y autenticación.
+La matriz funcional ejecutable de Inventario, Macros, comidas, recetas, planes, historial, lista de compra, ajustes y autenticación está cerrada. El workflow `Authenticated E2E` validó en producción **13/13 casos PASS** sobre `main`, incluyendo persistencia tras recarga, consumos y descuentos, operaciones de recetas y planes, transferencia de compras, temas, protección de rutas, login/logout y eliminación definitiva de cuenta con verificación administrativa de cascada de datos.
 
-Incluye:
-
-- Corregir defectos reproducibles encontrados durante la validación.
-- Confirmar persistencia después de recargar.
-- Confirmar operaciones atómicas e idempotentes.
-- Validar cámara, código de barras, voz, formularios y estados vacíos.
-- No añadir módulos grandes hasta cerrar esta fase.
+La validación física de voz, cámara y código de barras sigue pendiente como comprobación manual en dispositivo/navegador real. No se considera fallo de la matriz ejecutable ni se marca como PASS hasta realizar esa validación física.
 
 ### Mejoras confirmadas durante la validación de Inventario y Macros
 
@@ -32,7 +26,7 @@ Estado ya cerrado:
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
 - **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
 
-Siguiente tarea: **cerrar la matriz de validación funcional y corregir los defectos reproducibles encontrados antes de iniciar la Fase 2**.
+Siguiente tarea: **iniciar la Fase 2 por 2.1 — Caché y reutilización**, auditando primero qué resultados ya se reutilizan y dónde siguen existiendo llamadas repetidas evitables.
 
 Orden de implementación acordado:
 
@@ -217,6 +211,8 @@ No permitir que la IA calcule libremente estos valores cuando puedan obtenerse d
 
 Prioridad: alta.
 
+**Estado: en curso.** Primera tarea: **2.1 Caché y reutilización**.
+
 ### 2.1 Caché y reutilización
 
 - Reutilizar resultados nutricionales ya resueltos.
@@ -396,12 +392,12 @@ Después de validar el uso real:
 
 ## Orden de ejecución acordado
 
-1. Terminar la validación funcional actual.
-2. Ejecutar los tres bloques de mejoras confirmadas de Inventario y Macros en el orden documentado.
-3. Corregir los demás defectos encontrados durante la validación.
-4. Implementar la capa nutricional centralizada.
-5. Añadir catálogo interno, unidades y estados de preparación.
-6. Reforzar observabilidad, caché, costes e idempotencia.
+1. **Cerrado:** Terminar la validación funcional actual.
+2. **Cerrado:** Ejecutar los tres bloques de mejoras confirmadas de Inventario y Macros en el orden documentado.
+3. **Cerrado:** Corregir los demás defectos encontrados durante la validación.
+4. **Cerrado:** Implementar la capa nutricional centralizada.
+5. **Cerrado:** Añadir catálogo interno, unidades y estados de preparación.
+6. **Actual:** Reforzar observabilidad, caché, costes e idempotencia.
 7. Añadir pruebas E2E críticas y accesibilidad.
 8. Limpiar dependencias y actualizar documentación.
 9. Simplificar la UX completa.
