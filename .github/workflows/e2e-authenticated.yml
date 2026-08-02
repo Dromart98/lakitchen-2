@@ -59,6 +59,7 @@ jobs:
           tests/e2e/authenticated-plans.e2e.ts
           tests/e2e/authenticated-meal-history.e2e.ts
           tests/e2e/authenticated-shopping-list.e2e.ts
+          tests/e2e/authenticated-settings.e2e.ts
 
       - name: Remove temporary E2E artifacts
         if: always()
