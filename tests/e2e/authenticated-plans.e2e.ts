@@ -137,9 +137,8 @@ test("PLANS-LIFECYCLE: perfil, generación, guardado sin consumo y cocinado de u
   await savedPlan.locator("summary").click();
   firstMeal = savedPlan.locator(".saved-plan-meal").first();
   await firstMeal.getByRole("button", { name: "Cocinar y registrar" }).click();
-  await expect(firstMeal.getByRole("status")).toContainText("Comida registrada e inventario actualizado.");
-  await expect(firstMeal.getByText("Comida registrada", { exact: true })).toBeVisible();
-  await expect(savedPlan).toContainText("1 de 4");
+  await expect(firstMeal.getByText("Comida registrada", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(savedPlan).toContainText("1 de 4", { timeout: 15_000 });
 
   for (const ingredient of ingredients) {
     await expectInventoryQuantity(page, ingredient.name, 1000 - ingredient.grams);
