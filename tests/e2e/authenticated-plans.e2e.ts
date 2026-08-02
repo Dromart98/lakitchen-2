@@ -46,7 +46,12 @@ async function addInventoryItem(
   await page.locator("#inventory-protein-g").fill(item.protein);
   await page.locator("#inventory-carbs-g").fill(item.carbs);
   await page.locator("#inventory-fat-g").fill(item.fat);
+  const saveResponsePromise = page.waitForResponse(
+    (response) => response.request().method() === "POST" && new URL(response.url()).pathname === "/inventory",
+  );
   await page.getByRole("button", { name: "Guardar producto" }).click();
+  const saveResponse = await saveResponsePromise;
+  expect(saveResponse.ok()).toBeTruthy();
   await page.goto(`/inventory?query=${encodeURIComponent(item.name)}`);
   await expect(page.locator(".inventory-product", { hasText: item.name })).toBeVisible();
 }
