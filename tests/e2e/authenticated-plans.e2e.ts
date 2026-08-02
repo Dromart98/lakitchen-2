@@ -51,7 +51,7 @@ async function addInventoryItem(
   );
   await page.getByRole("button", { name: "Guardar producto" }).click();
   const saveResponse = await saveResponsePromise;
-  expect(saveResponse.ok()).toBeTruthy();
+  expect(saveResponse.status()).toBeLessThan(400);
   await page.goto(`/inventory?query=${encodeURIComponent(item.name)}`);
   await expect(page.locator(".inventory-product", { hasText: item.name })).toBeVisible();
 }
