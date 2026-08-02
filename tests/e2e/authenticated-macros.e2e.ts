@@ -42,7 +42,8 @@ async function addInventoryItem(
     if (item.nutrition.fat !== undefined) await page.locator("#inventory-fat-g").fill(item.nutrition.fat);
   }
   await page.getByRole("button", { name: "Guardar producto" }).click();
-  await expect(page.getByRole("status")).toContainText("Producto añadido al inventario correctamente");
+  await page.goto(`/inventory?query=${encodeURIComponent(item.name)}`);
+  await expect(page.locator(".inventory-product", { hasText: item.name })).toBeVisible();
 }
 
 async function skipIfAiIsUnavailable(panel: Locator) {
