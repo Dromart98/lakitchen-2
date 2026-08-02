@@ -28,9 +28,9 @@ test("SHOPPING-LIST-LIFECYCLE: crear, editar, comprar, transferir y eliminar", a
   await page.goto("/shopping-list");
   await expect(page.getByRole("heading", { name: "Tu lista de la compra está vacía" })).toBeVisible();
 
-  await page.getByLabel("Nombre", { exact: true }).fill("Arroz");
-  await page.getByLabel("Cantidad", { exact: true }).fill("750");
-  await page.getByLabel("Unidad", { exact: true }).selectOption("g");
+  await page.locator("#shopping-list-name").fill("Arroz");
+  await page.locator("#shopping-list-quantity").fill("750");
+  await page.locator("#shopping-list-unit").selectOption("g");
   await Promise.all([
     page.waitForURL(/\/shopping-list\?shoppingListSuccess=item-created$/),
     page.getByRole("button", { name: "Añadir a la lista" }).click(),
@@ -91,9 +91,9 @@ test("SHOPPING-LIST-LIFECYCLE: crear, editar, comprar, transferir y eliminar", a
   await expect(inventoryItem).toContainText("1.5 kg");
 
   await page.goto("/shopping-list");
-  await page.getByLabel("Nombre", { exact: true }).fill("Producto para eliminar");
-  await page.getByLabel("Cantidad", { exact: true }).fill("2");
-  await page.getByLabel("Unidad", { exact: true }).selectOption("ud");
+  await page.locator("#shopping-list-name").fill("Producto para eliminar");
+  await page.locator("#shopping-list-quantity").fill("2");
+  await page.locator("#shopping-list-unit").selectOption("ud");
   await Promise.all([
     page.waitForURL(/\/shopping-list\?shoppingListSuccess=item-created$/),
     page.getByRole("button", { name: "Añadir a la lista" }).click(),
