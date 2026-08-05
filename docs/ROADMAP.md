@@ -1,6 +1,6 @@
 # Roadmap estratégico de Lakitchenapp
 
-Última actualización: 2 de agosto de 2026.
+Última actualización: 5 de agosto de 2026.
 
 ## Principios de producto
 
@@ -334,11 +334,204 @@ Revisar:
 
 Principio: no añadir más métodos de entrada hasta que los existentes sean fáciles de entender.
 
-## Fase 5 — Datos, recuperación y conexión débil
+## Fase 5 — Evolución funcional priorizada de alimentación e IA
+
+Prioridad: alta después de cerrar las Fases 2, 3 y 4.
+
+Objetivo: mejorar la utilidad diaria de LaKitchen aprovechando su catálogo nutricional, inventario, recetas, planes y lotes cocinados. Estas funciones no deben convertir la IA en fuente libre de datos nutricionales: la IA interpreta, clasifica o propone; los valores verificables se resuelven con datos guardados, etiqueta, catálogo y fuentes nutricionales existentes.
+
+Reglas comunes:
+
+- Mantener todos los resultados asistidos revisables antes de persistir cambios ambiguos.
+- Reutilizar `food_catalog_items`, equivalencias confirmadas y correcciones previas antes de llamar a modelos externos.
+- No permitir que un modelo invente macros cuando exista una coincidencia nutricional verificable.
+- Mantener Structured Outputs o contratos equivalentes estrictos en cualquier extracción de IA.
+- Evitar N+1 de IA o de fuentes nutricionales; agrupar y deduplicar resoluciones.
+- Aplicar caché, presupuesto, observabilidad e idempotencia de Fase 2 a cada nueva función.
+- Implementar una función por PR y validar primero el flujo directamente afectado.
+
+### 5.1 Foto IA 2.0 — identificación visual + resolución nutricional determinista
+
+**Estado: pendiente. Prioridad: máxima.**
+
+- Separar claramente detección visual de alimentos y cálculo nutricional.
+- Usar la imagen para identificar componentes, estado de preparación y cantidades aproximadas; después resolver cada alimento contra el catálogo nutricional de LaKitchen.
+- Calcular kcal y macros desde las entidades nutricionales resueltas, no desde cifras libres generadas por el modelo.
+- Permitir corregir alimento, cantidad y unidad antes de guardar.
+- Si una foto coincide con una receta o lote cocinado del usuario, ofrecer reutilizar ese origen en vez de volver a estimar toda la nutrición.
+- Conservar el comportamiento actual de revisión humana y no descontar inventario sin confirmación explícita.
+
+Criterio de cierre:
+
+- conjunto de pruebas con platos simples y mixtos;
+- identificación y matching validados por componente;
+- cálculo nutricional reproducible desde el catálogo;
+- ausencia de macros inventados cuando exista dato verificable;
+- E2E del flujo foto → revisión → guardado → persistencia.
+
+### 5.2 Importación de recetas desde web y redes
+
+**Estado: pendiente. Prioridad: máxima.**
+
+- Aceptar enlaces compatibles de páginas web y, cuando el contenido accesible lo permita, Instagram, TikTok y YouTube.
+- Extraer título, raciones, ingredientes, cantidades, pasos y tiempos mediante un contrato estructurado y revisable.
+- Resolver ingredientes contra el catálogo de LaKitchen sin inventar nutrición.
+- Comparar la receta con el inventario real y señalar qué existe, qué falta y qué productos conviene gastar antes.
+- Permitir enviar únicamente los faltantes a la lista de compra.
+- Permitir guardar la receta y usar el flujo existente de medición, cocinado y lotes.
+- Degradar con claridad cuando una plataforma no permita acceder al contenido necesario; no depender de scraping frágil como único camino.
+
+Criterio de cierre:
+
+- importación validada desde al menos una web estructurada y cada fuente social técnicamente soportada;
+- ingredientes editables y correctamente resueltos;
+- faltantes calculados contra inventario;
+- guardado y posterior cocinado mediante el flujo existente sin duplicar recetas ni consumos.
+
+### 5.3 Escáner de etiquetas nutricionales
+
+**Estado: pendiente. Prioridad: muy alta.**
+
+- Permitir fotografiar frontal, tabla nutricional y datos de cantidad de un producto.
+- Extraer nombre, marca cuando sea útil, peso o volumen neto, número de unidades/raciones y nutrición por 100 g, 100 ml o unidad.
+- Distinguir de forma determinista valores por 100 g/ml frente a valores por ración.
+- Validar unidades, decimales, peso total y coherencia energética de macros antes de aceptar el resultado.
+- Calcular peso por unidad cuando pueda derivarse del envase.
+- Guardar la corrección confirmada en el catálogo privado para reutilizarla sin volver a usar IA.
+- Priorizar código de barras/Open Food Facts cuando ya exista un producto fiable y usar la etiqueta para completar o corregir datos.
+
+Criterio de cierre:
+
+- pruebas con etiquetas españolas/europeas y formatos distintos;
+- rechazo o revisión de tablas ambiguas;
+- persistencia y reutilización del producto confirmado;
+- no repetir análisis de IA para la misma etiqueta confirmada salvo invalidación relevante.
+
+### 5.4 Asistente contextual de LaKitchen
+
+**Estado: pendiente. Prioridad: muy alta.**
+
+- Crear un asistente orientado a acciones de cocina, no un chatbot nutricional generalista.
+- Responder usando contexto autorizado del inventario, caducidades, lotes cocinados, comidas del día, macros restantes, recetas y planes.
+- Admitir preguntas prácticas como “¿qué puedo cenar?”, “¿qué debería gastar antes?” o “quiero algo de menos de 600 kcal”.
+- Priorizar propuestas realizables con lo que ya existe en casa.
+- Convertir recomendaciones en acciones explícitas: ver receta, añadir al plan, registrar, usar lote o buscar otra opción.
+- No diagnosticar, tratar ni sustituir consejo médico o nutrición clínica.
+
+Criterio de cierre:
+
+- respuestas fundamentadas únicamente en datos accesibles del usuario y catálogo;
+- ninguna acción destructiva o de persistencia sin confirmación;
+- pruebas de autorización/RLS para impedir cruces entre usuarios;
+- casos E2E de consulta → propuesta → acción seleccionada.
+
+### 5.5 Sustituciones inteligentes basadas en inventario
+
+**Estado: pendiente. Prioridad: alta.**
+
+- Detectar ingredientes faltantes en recetas y planes.
+- Proponer primero sustitutos que realmente estén disponibles en el inventario del usuario.
+- Considerar equivalencia culinaria, cantidad disponible, caducidad y efecto nutricional.
+- Recalcular cantidades y macros con el catálogo después de aceptar una sustitución.
+- No modificar automáticamente una receta guardada sin confirmación.
+- Reutilizar sustituciones confirmadas cuando el contexto culinario sea compatible.
+
+Criterio de cierre:
+
+- sustitutos disponibles y cantidades comprobadas;
+- recalculado nutricional determinista;
+- receta original conservada hasta confirmación;
+- pruebas de faltante, sustitución aceptada, rechazada y sin alternativa válida.
+
+### 5.6 Peso real opcional para mejorar Foto IA
+
+**Estado: pendiente. Prioridad: alta. Dependencia: 5.1.**
+
+- Añadir a Foto IA 2.0 una opción sencilla para introducir el peso real del plato o de la porción cuando el usuario lo conozca.
+- Usar ese peso como restricción para distribuir cantidades entre los alimentos detectados, sin asumir que la visión puede deducir una escala absoluta fiable.
+- Si el alimento procede de un lote cocinado conocido, priorizar el peso real y la nutrición del lote frente a una nueva estimación visual.
+- Mantener el peso editable durante la revisión.
+
+Criterio de cierre:
+
+- el total de cantidades no puede contradecir el peso aportado fuera de tolerancias explícitas;
+- comparación de precisión con y sin peso real en el benchmark de Foto IA;
+- ninguna duplicación de lógica nutricional respecto a 5.1.
+
+### 5.7 Comidas habituales y repetición sin IA
+
+**Estado: pendiente. Prioridad: alta.**
+
+- Permitir repetir una comida anterior con una acción corta.
+- Permitir guardar combinaciones frecuentes como comida habitual.
+- Reutilizar identidad de alimentos, cantidades, unidades y nutrición confirmadas sin nueva llamada de IA.
+- Si los datos nutricionales base han cambiado de forma relevante, recalcular desde las entidades actuales manteniendo visible la revisión necesaria.
+- Evitar duplicados por doble clic o reintento mediante idempotencia.
+
+Criterio de cierre:
+
+- repetir comida de historial en un paso revisable;
+- guardar, editar y eliminar una comida habitual;
+- cero llamadas de IA cuando todos los componentes están resueltos y vigentes;
+- persistencia e idempotencia verificadas.
+
+### 5.8 Lista de compra por déficit real
+
+**Estado: pendiente. Prioridad: alta.**
+
+- Auditar primero qué resta entre planes, recetas e inventario ya existe para no duplicarla.
+- Calcular necesidad total de recetas/planes menos cantidad utilizable disponible en inventario.
+- Resolver conversiones mediante la capa común de unidades y equivalencias ya implementada.
+- Añadir a la lista de compra solo la cantidad faltante, no la cantidad completa de la receta.
+- Mantener separadas reservas o consumos futuros si se incorpora ese concepto; no descontar inventario por anticipado.
+- Consolidar faltantes equivalentes bajo una misma identidad de alimento cuando sea seguro.
+
+Criterio de cierre:
+
+- pruebas con gramos, mililitros, unidades y envases;
+- faltantes correctos con inventario parcial y suficiente;
+- no duplicación de artículos equivalentes;
+- transferencia posterior a inventario conserva identidad y cantidades.
+
+### 5.9 Reequilibrado automático del resto del día
+
+**Estado: pendiente. Prioridad: media-alta.**
+
+- Permitir recalcular las comidas pendientes cuando el consumo real se desvíe del plan del día.
+- Mantener como restricciones explícitas el objetivo energético y los objetivos de macronutrientes definidos por el usuario.
+- Priorizar primero ajuste de raciones de comidas ya planificadas antes de sustituir platos completos.
+- Usar únicamente alimentos/recetas con nutrición resuelta; la IA puede proponer cambios, pero los totales deben calcularse de forma determinista.
+- Mostrar el antes y después y exigir confirmación antes de modificar el plan.
+
+Criterio de cierre:
+
+- escenarios de exceso y defecto calórico;
+- conservación de límites y objetivos configurados;
+- ningún cambio silencioso en planes guardados;
+- recalculado reproducible y persistencia correcta tras confirmar.
+
+### 5.10 Objetivos variables por día con objetivo semanal
+
+**Estado: pendiente. Prioridad: media. Dependencia: perfil nutricional y planificación estables.**
+
+- Permitir distribuir un objetivo semanal de energía entre días con cantidades distintas.
+- Mantener visible el total semanal y comprobar que la distribución diaria conserve ese presupuesto dentro de la tolerancia de redondeo.
+- Permitir ajustes manuales por día y plantillas simples como días laborables/fin de semana.
+- Integrar los objetivos diarios resultantes con planes, progreso y reequilibrado de 5.9.
+- No alterar automáticamente objetivos clínicos ni inferir necesidades médicas.
+
+Criterio de cierre:
+
+- suma semanal determinista;
+- edición de un día actualiza de forma clara el saldo semanal;
+- planes y progreso consumen el objetivo correcto para cada fecha;
+- pruebas de zona horaria, cambio de semana y redondeos.
+
+## Fase 6 — Datos, recuperación y conexión débil
 
 Prioridad: media.
 
-### 5.1 Exportación y eliminación
+### 6.1 Exportación y eliminación
 
 Permitir:
 
@@ -349,13 +542,13 @@ Permitir:
 - eliminar cuenta y datos;
 - recuperar eliminaciones importantes cuando sea viable.
 
-### 5.2 Copias de seguridad
+### 6.2 Copias de seguridad
 
 - Definir política de backups.
 - Verificar restauraciones reales.
 - Documentar recuperación ante errores de usuario o despliegue.
 
-### 5.3 Funcionamiento con conexión débil
+### 6.3 Funcionamiento con conexión débil
 
 Primera etapa:
 
@@ -366,7 +559,7 @@ Primera etapa:
 
 La cola offline completa y sincronización bidireccional quedan para una fase posterior.
 
-## Fase 6 — Arquitectura familiar y SaaS
+## Fase 7 — Arquitectura familiar y SaaS
 
 Prioridad: futura.
 
@@ -401,8 +594,12 @@ Después de validar el uso real:
 7. Añadir pruebas E2E críticas y accesibilidad.
 8. Limpiar dependencias y actualizar documentación.
 9. Simplificar la UX completa.
-10. Añadir exportación, backups y soporte para conexión débil.
-11. Preparar hogares, planes y pagos solo cuando la versión estable lo justifique.
+10. Implementar en orden 5.1–5.3: Foto IA 2.0, importación de recetas y escáner de etiquetas.
+11. Implementar 5.4–5.6: asistente contextual, sustituciones y peso real opcional en Foto IA.
+12. Implementar 5.7–5.8: comidas habituales y lista de compra por déficit real.
+13. Implementar 5.9–5.10: reequilibrado del día y objetivos variables manteniendo presupuesto semanal.
+14. Añadir exportación, backups y soporte para conexión débil.
+15. Preparar hogares, planes y pagos solo cuando la versión estable lo justifique.
 
 ## Fuera de alcance por ahora
 
@@ -413,6 +610,8 @@ Después de validar el uso real:
 - nutrición clínica;
 - diagnóstico médico;
 - automatizaciones familiares avanzadas;
-- sincronización offline completa.
+- sincronización offline completa;
+- score nutricional simplificado tipo puntuación global;
+- mascota, rachas y retos como núcleo del producto.
 
 Estas funciones solo se reconsiderarán después de estabilizar precisión nutricional, fiabilidad y experiencia de uso.
