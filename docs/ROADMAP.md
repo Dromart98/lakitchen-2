@@ -231,20 +231,102 @@ Controlar:
 - funciones disponibles por plan futuro;
 - errores por modelo.
 
-### 2.3 Observabilidad
+### 2.3 Logs estructurados y correlación
 
-Registrar de forma segura:
+**Estado: pendiente. Prioridad: máxima dentro de la Fase 2.**
 
-- función y página afectadas;
-- tipo de error;
-- API o modelo implicado;
-- duración;
-- reintentos;
-- éxito o abandono del flujo.
+- Sustituir logs ad hoc de producción por una capa común de logging estructurado, preferentemente JSON.
+- Incluir como mínimo timestamp, nivel, componente, evento, ruta o acción, versión de despliegue y un `request_id`/`correlation_id` estable por petición.
+- Asociar el usuario solo mediante un identificador interno seguro cuando sea imprescindible para diagnosticar, sin registrar correo, contenido de comidas, imágenes, tokens, claves ni otros datos sensibles.
+- Propagar el identificador de correlación a llamadas a Supabase, OpenAI y fuentes nutricionales cuando sea técnicamente viable.
+- Separar logs de desarrollo de logs de producción y aplicar retención limitada.
 
-No guardar contenido privado, imágenes o datos sensibles salvo necesidad explícita.
+Criterio de cierre:
 
-### 2.4 Idempotencia y operaciones atómicas
+- un error de producción puede seguirse de extremo a extremo mediante un identificador de correlación;
+- las pruebas verifican que secretos, imágenes y contenido privado no aparecen en logs;
+- la estructura y severidades están documentadas y se usan en los flujos críticos.
+
+### 2.4 Monitoreo de errores y alertas
+
+**Estado: pendiente. Prioridad: máxima.**
+
+- Incorporar monitorización centralizada de excepciones y fallos no controlados en cliente y servidor, con stack trace, versión de release, ruta/componente y correlación con los logs estructurados.
+- Agrupar errores equivalentes y registrar frecuencia, primera/última aparición y regresiones por versión.
+- Sanear automáticamente PII, secretos, payloads de imágenes y respuestas crudas de proveedores antes de enviar eventos.
+- Configurar alertas únicamente para fallos accionables: errores nuevos de producción, aumentos anómalos y fallos en recorridos críticos.
+- Mantener las pantallas de error seguras existentes; la monitorización no debe exponer detalles técnicos al usuario.
+
+Criterio de cierre:
+
+- una excepción de prueba en producción controlada aparece con release y correlación correctas;
+- no se envían secretos ni contenido privado;
+- existe una alerta comprobada para un fallo crítico simulado.
+
+### 2.5 Rate limiting y protección frente a abuso
+
+**Estado: pendiente. Prioridad: alta.**
+
+- Auditar todas las superficies remotas expuestas y aplicar límites donde el abuso pueda consumir recursos, coste o disponibilidad.
+- Proteger especialmente autenticación, recuperación, registro, búsquedas externas, generación con IA y cualquier endpoint/API público susceptible de automatización.
+- Preferir límites por usuario autenticado y complementar por IP o huella técnica solo cuando sea necesario, evitando bloquear tráfico legítimo compartido.
+- Devolver respuestas `429` seguras con ventanas de reintento cuando corresponda y no filtrar información de cuentas existentes.
+- Mantener separados los límites de abuso de los presupuestos funcionales de IA de 2.2.
+
+Criterio de cierre:
+
+- pruebas automatizadas cubren umbral, recuperación tras ventana y aislamiento entre usuarios;
+- los endpoints críticos no pueden saturarse con una única identidad sin control;
+- no se altera el comportamiento de RPC internos que ya están protegidos por autenticación, RLS e idempotencia salvo necesidad demostrada.
+
+### 2.6 Health checks y readiness
+
+**Estado: pendiente. Prioridad: alta.**
+
+- Añadir un endpoint de salud mínimo que confirme que la aplicación responde sin revelar configuración interna.
+- Separar, si hace falta, `liveness` de `readiness`: la segunda debe comprobar únicamente dependencias críticas necesarias para servir tráfico, como acceso básico a Supabase.
+- No convertir el health check en una llamada costosa a OpenAI, USDA u otros proveedores en cada sondeo; las dependencias externas no críticas se supervisan por métricas y errores.
+- Limitar cualquier diagnóstico detallado a contexto interno/autorizado y nunca devolver secretos, URLs privadas, SQL ni mensajes crudos de proveedores.
+
+Criterio de cierre:
+
+- health check estable, rápido y cubierto por prueba;
+- una dependencia crítica simulada como no disponible produce estado de readiness correcto;
+- el endpoint público no expone datos sensibles.
+
+### 2.7 Plan de rollback de despliegues
+
+**Estado: pendiente. Prioridad: alta.**
+
+- Documentar y probar cómo volver a la última versión estable de Vercel en menos de cinco minutos.
+- Mantener despliegues identificables por SHA/release y conservar la capacidad de promover de nuevo una versión previamente validada.
+- Diseñar migraciones de Supabase con compatibilidad suficiente para que el código anterior pueda recuperarse cuando sea razonable; cualquier migración irreversible debe incluir estrategia explícita de recuperación antes de desplegarse.
+- Usar feature flags únicamente cuando reduzcan de verdad el riesgo de una función nueva; no añadir infraestructura de flags sin una necesidad concreta.
+- Ejecutar periódicamente un simulacro de rollback no destructivo y registrar el resultado.
+
+Criterio de cierre:
+
+- runbook de rollback documentado;
+- simulacro desde una release de prueba completado dentro del objetivo temporal;
+- comprobación posterior confirma aplicación, autenticación y datos operativos funcionales.
+
+### 2.8 Ciclo de vida y rotación de secretos
+
+**Estado: pendiente. Prioridad: media-alta.**
+
+- Mantener inventario de secretos server-side y su propietario técnico: Supabase, OpenAI, USDA y cualquier proveedor futuro.
+- Definir cadencia de revisión/rotación según capacidades y riesgo de cada proveedor en lugar de asumir una única cifra universal.
+- Documentar rotación normal y revocación de emergencia, incluyendo actualización sin tiempo de inactividad cuando el proveedor permita solapamiento de credenciales.
+- Verificar después de cada rotación que la credencial nueva funciona y que la anterior queda revocada.
+- Mantener las garantías actuales: ninguna clave server-only se versiona, se expone al cliente o aparece en logs.
+
+Criterio de cierre:
+
+- procedimiento reproducible por proveedor;
+- recordatorio operativo de revisión definido;
+- simulacro de rotación de al menos una credencial no productiva sin interrupción del servicio.
+
+### 2.9 Idempotencia y operaciones atómicas
 
 Auditar especialmente:
 
@@ -590,7 +672,7 @@ Después de validar el uso real:
 3. **Cerrado:** Corregir los demás defectos encontrados durante la validación.
 4. **Cerrado:** Implementar la capa nutricional centralizada.
 5. **Cerrado:** Añadir catálogo interno, unidades y estados de preparación.
-6. **Actual:** Reforzar observabilidad, caché, costes e idempotencia.
+6. **Actual:** Reforzar caché, observabilidad, rate limiting, health checks, rollback, secretos, costes e idempotencia.
 7. Añadir pruebas E2E críticas y accesibilidad.
 8. Limpiar dependencias y actualizar documentación.
 9. Simplificar la UX completa.
