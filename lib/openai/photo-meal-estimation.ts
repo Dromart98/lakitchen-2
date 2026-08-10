@@ -14,6 +14,19 @@ El texto adicional sirve de contexto útil. Una cantidad explícita y razonable 
 
 Las unidades permitidas son: g, ml, unidad, unidades, loncha, lonchas, cucharadita, cucharaditas, cucharada, cucharadas, taza, tazas, lata, latas, plato y platos. No des consejos médicos, no afirmes exactitud ni que la comida se ha registrado. Si status es success, message debe ser null. Si status es needs-clarification, suggested_name, ingredients, assumptions y confidence deben ser null. Devuelve exclusivamente JSON conforme al esquema.`;
 
+export const PHOTO_MEAL_PROVIDER_CONTRACT = {
+  // Increment when request shaping or output normalization/validation semantics change.
+  processingVersion: 1,
+  endpoint: ENDPOINT,
+  systemPrompt: PHOTO_MEAL_SYSTEM_PROMPT,
+  defaultContext: "Analiza esta fotografía de comida.",
+  imageDetail: "high",
+  responseFormat: { type: "json_schema", name: "photo_meal_estimation", strict: true, schema: TEXT_MEAL_JSON_SCHEMA },
+  store: false,
+  reasoning: { effort: "low" },
+  maxOutputTokens: 2500,
+} as const;
+
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -60,32 +73,29 @@ export async function estimatePhotoMealWithOpenAi(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
   try {
-    const response = await (options.fetchImpl ?? fetch)(ENDPOINT, {
+    const response = await (options.fetchImpl ?? fetch)(PHOTO_MEAL_PROVIDER_CONTRACT.endpoint, {
       method: "POST",
       headers: { Authorization: `Bearer ${options.apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: options.model ?? PHOTO_MEAL_AI_MODEL_DEFAULT,
         input: [
-          { role: "system", content: PHOTO_MEAL_SYSTEM_PROMPT },
+          { role: "system", content: PHOTO_MEAL_PROVIDER_CONTRACT.systemPrompt },
           {
             role: "user",
             content: [
-              { type: "input_text", text: context || "Analiza esta fotografía de comida." },
-              { type: "input_image", image_url: imageDataUrl, detail: "high" },
+              { type: "input_text", text: context || PHOTO_MEAL_PROVIDER_CONTRACT.defaultContext },
+              { type: "input_image", image_url: imageDataUrl, detail: PHOTO_MEAL_PROVIDER_CONTRACT.imageDetail },
             ],
           },
         ],
         text: {
           format: {
-            type: "json_schema",
-            name: "photo_meal_estimation",
-            strict: true,
-            schema: TEXT_MEAL_JSON_SCHEMA,
+            ...PHOTO_MEAL_PROVIDER_CONTRACT.responseFormat,
           },
         },
-        store: false,
-        reasoning: { effort: "low" },
-        max_output_tokens: 2500,
+        store: PHOTO_MEAL_PROVIDER_CONTRACT.store,
+        reasoning: PHOTO_MEAL_PROVIDER_CONTRACT.reasoning,
+        max_output_tokens: PHOTO_MEAL_PROVIDER_CONTRACT.maxOutputTokens,
       }),
       signal: controller.signal,
     });

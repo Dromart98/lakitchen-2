@@ -2,7 +2,10 @@ import { createHash } from "node:crypto";
 
 import { validateCachedTextMealSuccess, type TextMealEstimationResult } from "@/modules/meals/text-meal-ai";
 
-export const TEXT_MEAL_CACHE_CONTRACT_VERSION = "text-meal-v1";
+function fingerprintContract(contract: unknown) {
+  return createHash("sha256").update(JSON.stringify(contract), "utf8").digest("hex");
+}
+
 export const TEXT_MEAL_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 type CachedSuccess = Extract<TextMealEstimationResult, { status: "success" }>;
@@ -25,9 +28,9 @@ export function normalizeTextMealCacheInput(description: string) {
   return description.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("es");
 }
 
-export function createTextMealCacheKey(description: string, model: string, contractVersion = TEXT_MEAL_CACHE_CONTRACT_VERSION) {
+export function createTextMealCacheKey(description: string, model: string, contract: unknown) {
   return createHash("sha256")
-    .update(`${contractVersion}\0${model}\0${normalizeTextMealCacheInput(description)}`, "utf8")
+    .update(`${fingerprintContract(contract)}\0${model}\0${normalizeTextMealCacheInput(description)}`, "utf8")
     .digest("hex");
 }
 
@@ -42,12 +45,12 @@ export async function readTextMealCache(client: TextMealCacheClient, userId: str
   return validateCachedTextMealSuccess(data.result);
 }
 
-export async function writeTextMealCache(client: TextMealCacheClient, userId: string, cacheKey: string, model: string, result: CachedSuccess, now = new Date()) {
+export async function writeTextMealCache(client: TextMealCacheClient, userId: string, cacheKey: string, model: string, contract: unknown, result: CachedSuccess, now = new Date()) {
   await client.from("user_text_meal_analysis_cache").upsert({
     user_id: userId,
     cache_key: cacheKey,
     model,
-    contract_version: TEXT_MEAL_CACHE_CONTRACT_VERSION,
+    contract_version: fingerprintContract(contract),
     result,
     expires_at: new Date(now.getTime() + TEXT_MEAL_CACHE_TTL_MS).toISOString(),
   }, { onConflict: "user_id,cache_key" });

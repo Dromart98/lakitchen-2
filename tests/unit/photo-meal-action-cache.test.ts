@@ -9,9 +9,9 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({})) }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.createAdmin }));
 vi.mock("@/lib/supabase/auth", () => ({ getAuthenticatedUser: mocks.getUser }));
-vi.mock("@/lib/openai/photo-meal-estimation", () => ({ estimatePhotoMealWithOpenAi: mocks.estimate, PHOTO_MEAL_AI_MODEL_DEFAULT: "default-photo-model" }));
+vi.mock("@/lib/openai/photo-meal-estimation", () => ({ estimatePhotoMealWithOpenAi: mocks.estimate, PHOTO_MEAL_AI_MODEL_DEFAULT: "default-photo-model", PHOTO_MEAL_PROVIDER_CONTRACT: { systemPrompt: "photo-contract" } }));
 vi.mock("@/modules/meals/photo-meal-cache", () => ({ createPhotoMealCacheKey: mocks.key, purgeExpiredPhotoMealCache: mocks.purge, readPhotoMealCache: mocks.read, writePhotoMealCache: mocks.write }));
-vi.mock("@/lib/openai/text-meal-estimation", () => ({ estimateTextMealWithOpenAi: vi.fn(), TEXT_MEAL_AI_MODEL_DEFAULT: "text-model" }));
+vi.mock("@/lib/openai/text-meal-estimation", () => ({ estimateTextMealWithOpenAi: vi.fn(), TEXT_MEAL_AI_MODEL_DEFAULT: "text-model", TEXT_MEAL_PROVIDER_CONTRACT: { systemPrompt: "text-contract" } }));
 
 import { estimatePhotoMealAction } from "@/app/macros/actions";
 
@@ -35,9 +35,9 @@ describe("estimatePhotoMealAction cache contract", () => {
 
   it("validates before lookup, then caches a successful miss for the session user", async () => {
     await expect(estimatePhotoMealAction(form())).resolves.toEqual(success);
-    expect(mocks.key).toHaveBeenCalledWith(new Uint8Array([0xff, 0xd8, 0xff, 1]), "Pollo", "default-photo-model");
+    expect(mocks.key).toHaveBeenCalledWith(new Uint8Array([0xff, 0xd8, 0xff, 1]), "Pollo", "default-photo-model", { systemPrompt: "photo-contract" });
     expect(mocks.estimate).toHaveBeenCalledWith(expect.stringMatching(/^data:image\/jpeg;base64,/), "Pollo", { apiKey: "secret", model: "default-photo-model" });
-    expect(mocks.write).toHaveBeenCalledWith(mocks.admin, "user-a", "hash", "default-photo-model", success);
+    expect(mocks.write).toHaveBeenCalledWith(mocks.admin, "user-a", "hash", "default-photo-model", { systemPrompt: "photo-contract" }, success);
     expect(mocks.purge).toHaveBeenCalledWith(mocks.admin);
   });
 

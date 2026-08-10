@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  createPhotoMealCacheKey, normalizePhotoMealCacheContext, PHOTO_MEAL_CACHE_CONTRACT_VERSION,
+  createPhotoMealCacheKey, normalizePhotoMealCacheContext,
   PHOTO_MEAL_CACHE_PURGE_LIMIT, PHOTO_MEAL_CACHE_TTL_MS, purgeExpiredPhotoMealCache,
   readPhotoMealCache, writePhotoMealCache, type PhotoMealCacheClient,
 } from "@/modules/meals/photo-meal-cache";
+import { PHOTO_MEAL_PROVIDER_CONTRACT } from "@/lib/openai/photo-meal-estimation";
 
 const result = {
   status: "success" as const, suggested_name: "Arroz",
@@ -24,16 +25,21 @@ function query(data: { result: unknown } | null = { result }) {
 }
 
 describe("photo meal analysis cache", () => {
-  it("hashes exact JPEG bytes and normalized equivalent context, model, and contract", () => {
+  it("hashes exact JPEG bytes and deterministically invalidates provider contract changes", () => {
     const bytes = new Uint8Array([0xff, 0xd8, 0xff, 1]);
     expect(normalizePhotoMealCacheContext("  POLLO\n asado  ")).toBe("pollo asado");
-    const key = createPhotoMealCacheKey(bytes, "  POLLO\n asado ", "model-a");
-    expect(key).toBe(createPhotoMealCacheKey(bytes, "pollo asado", "model-a"));
+    const key = createPhotoMealCacheKey(bytes, "  POLLO\n asado ", "model-a", PHOTO_MEAL_PROVIDER_CONTRACT);
+    expect(key).toBe(createPhotoMealCacheKey(bytes, "pollo asado", "model-a", PHOTO_MEAL_PROVIDER_CONTRACT));
     expect(key).toMatch(/^[0-9a-f]{64}$/);
-    expect(key).not.toBe(createPhotoMealCacheKey(new Uint8Array([0xff, 0xd8, 0xff, 2]), "pollo asado", "model-a"));
-    expect(key).not.toBe(createPhotoMealCacheKey(bytes, "pollo cocido", "model-a"));
-    expect(key).not.toBe(createPhotoMealCacheKey(bytes, "pollo asado", "model-b"));
-    expect(key).not.toBe(createPhotoMealCacheKey(bytes, "pollo asado", "model-a", "photo-meal-v2"));
+    expect(key).not.toBe(createPhotoMealCacheKey(new Uint8Array([0xff, 0xd8, 0xff, 2]), "pollo asado", "model-a", PHOTO_MEAL_PROVIDER_CONTRACT));
+    expect(key).not.toBe(createPhotoMealCacheKey(bytes, "pollo cocido", "model-a", PHOTO_MEAL_PROVIDER_CONTRACT));
+    expect(key).not.toBe(createPhotoMealCacheKey(bytes, "pollo asado", "model-b", PHOTO_MEAL_PROVIDER_CONTRACT));
+    expect(key).not.toBe(createPhotoMealCacheKey(bytes, "pollo asado", "model-a", { ...PHOTO_MEAL_PROVIDER_CONTRACT, processingVersion: 2 }));
+    expect(key).not.toBe(createPhotoMealCacheKey(bytes, "pollo asado", "model-a", { ...PHOTO_MEAL_PROVIDER_CONTRACT, systemPrompt: `${PHOTO_MEAL_PROVIDER_CONTRACT.systemPrompt} cambio` }));
+    expect(key).not.toBe(createPhotoMealCacheKey(bytes, "pollo asado", "model-a", {
+      ...PHOTO_MEAL_PROVIDER_CONTRACT,
+      responseFormat: { ...PHOTO_MEAL_PROVIDER_CONTRACT.responseFormat, schema: { type: "object", required: ["changed"] } },
+    }));
   });
 
   it("reads a fresh same-user row and rejects a non-success projection", async () => {
@@ -47,13 +53,13 @@ describe("photo meal analysis cache", () => {
   it("persists only a revalidated success projection and no image or context", async () => {
     const cache = query();
     const now = new Date("2026-08-10T00:00:00.000Z");
-    await writePhotoMealCache(cache.client, "user-a", "hash", "model-a", result, now);
+    await writePhotoMealCache(cache.client, "user-a", "hash", "model-a", PHOTO_MEAL_PROVIDER_CONTRACT, result, now);
     expect(cache.builder.upsert).toHaveBeenCalledWith({
-      user_id: "user-a", cache_key: "hash", model: "model-a", contract_version: PHOTO_MEAL_CACHE_CONTRACT_VERSION,
+      user_id: "user-a", cache_key: "hash", model: "model-a", contract_version: expect.stringMatching(/^[0-9a-f]{64}$/),
       result, expires_at: new Date(now.getTime() + PHOTO_MEAL_CACHE_TTL_MS).toISOString(),
     }, { onConflict: "user_id,cache_key" });
     expect(JSON.stringify(cache.builder.upsert.mock.calls[0])).not.toMatch(/base64|image|context|pollo asado/i);
-    await writePhotoMealCache(cache.client, "user-a", "hash", "model-a", { ...result, total: { ...result.total, calories: 999 } });
+    await writePhotoMealCache(cache.client, "user-a", "hash", "model-a", PHOTO_MEAL_PROVIDER_CONTRACT, { ...result, total: { ...result.total, calories: 999 } });
     expect(cache.builder.upsert).toHaveBeenCalledTimes(1);
   });
 
