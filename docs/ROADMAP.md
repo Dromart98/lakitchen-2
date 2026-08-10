@@ -215,6 +215,8 @@ Prioridad: alta.
 
 ### 2.1 Caché y reutilización
 
+**Estado: en curso.** Fase 2.1A completada para Texto IA: los análisis válidos se reutilizan por usuario durante 30 días mediante una huella de la entrada normalizada, el modelo y la versión del contrato/prompt. Los errores y solicitudes de aclaración no se almacenan. Foto IA queda fuera de este alcance.
+
 - Reutilizar resultados nutricionales ya resueltos.
 - Evitar analizar varias veces el mismo alimento, texto o imagen.
 - Invalidar caché solo cuando cambien datos relevantes.

@@ -1,0 +1,62 @@
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  createTextMealCacheKey,
+  normalizeTextMealCacheInput,
+  readTextMealCache,
+  TEXT_MEAL_CACHE_CONTRACT_VERSION,
+  TEXT_MEAL_CACHE_TTL_MS,
+  writeTextMealCache,
+  type TextMealCacheClient,
+} from "@/modules/meals/text-meal-cache";
+
+const result = {
+  status: "success" as const,
+  suggested_name: "Arroz",
+  ingredients: [{ normalized_name: "arroz", display_name: "Arroz", name: "Arroz", quantity: 100, unit: "g", preparation: "cocido", confidence: "medium" as const, calories: 130, protein_g: 2.7, carbs_g: 28, fat_g: 0.3 }],
+  total: { calories: 130, protein_g: 2.7, carbs_g: 28, fat_g: 0.3 },
+  assumptions: [],
+  confidence: "medium" as const,
+};
+
+function query(data: { result: unknown } | null = { result }) {
+  const calls: [string, unknown][] = [];
+  const builder = {
+    select: vi.fn(() => builder), eq: vi.fn((column: string, value: string) => { calls.push([column, value]); return builder; }),
+    gt: vi.fn(() => builder), maybeSingle: vi.fn(async () => ({ data, error: null })),
+    upsert: vi.fn(async () => ({ error: null })),
+  };
+  return { client: { from: vi.fn(() => builder) } as unknown as TextMealCacheClient, builder, calls };
+}
+
+describe("text meal analysis cache", () => {
+  it("normalizes equivalent input without retaining it and invalidates by model or contract", () => {
+    expect(normalizeTextMealCacheInput("  ARROZ\n  Cocido  ")).toBe("arroz cocido");
+    const key = createTextMealCacheKey("  ARROZ\n Cocido ", "model-a");
+    expect(key).toBe(createTextMealCacheKey("arroz cocido", "model-a"));
+    expect(key).toMatch(/^[0-9a-f]{64}$/);
+    expect(key).not.toContain("arroz");
+    expect(key).not.toBe(createTextMealCacheKey("arroz crudo", "model-a"));
+    expect(key).not.toBe(createTextMealCacheKey("arroz cocido", "model-b"));
+    expect(key).not.toBe(createTextMealCacheKey("arroz cocido", "model-a", "text-meal-v2"));
+  });
+
+  it("reads only a current entry owned by the authenticated user and validates its result", async () => {
+    const valid = query();
+    await expect(readTextMealCache(valid.client, "user-a", "cache-key")).resolves.toEqual(result);
+    expect(valid.calls).toEqual([["user_id", "user-a"], ["cache_key", "cache-key"]]);
+    const invalid = query({ result: { status: "needs-clarification", message: "Falta cantidad suficiente" } });
+    await expect(readTextMealCache(invalid.client, "user-a", "cache-key")).resolves.toBeNull();
+  });
+
+  it("persists only the validated success projection and expiry metadata, never the input", async () => {
+    const cache = query();
+    const now = new Date("2026-08-10T00:00:00.000Z");
+    await writeTextMealCache(cache.client, "user-a", "hashed-key", "model-a", result, now);
+    expect(cache.builder.upsert).toHaveBeenCalledWith({
+      user_id: "user-a", cache_key: "hashed-key", model: "model-a", contract_version: TEXT_MEAL_CACHE_CONTRACT_VERSION,
+      result, expires_at: new Date(now.getTime() + TEXT_MEAL_CACHE_TTL_MS).toISOString(),
+    }, { onConflict: "user_id,cache_key" });
+    expect(JSON.stringify(cache.builder.upsert.mock.calls[0])).not.toContain("descripción original");
+  });
+});
