@@ -65,6 +65,13 @@ export async function generateDailyPlanAction(input: unknown): Promise<DailyPlan
     const user = await getAuthenticatedUser(supabase, "daily plan");
     if (!user) return { status: "error", code: "unauthenticated" };
 
+    const model = process.env.OPENAI_DAILY_PLAN_MODEL ?? DAILY_PLAN_AI_MODEL_DEFAULT;
+    const meter = createAiUsageMeter({ userId: user.id, feature: "daily_plan", model });
+    if (!meter.authorizeFeature()) {
+      await meter.finish({ outcome: "error", errorCode: "ai-feature-disabled" });
+      return { status: "error", code: "ai-feature-disabled" };
+    }
+
     const todayKey = getCurrentInventoryExpirationDateKey();
     if (!isAllowedPlanDate(request.data.plan_date, todayKey)) return { status: "error", code: "invalid-input" };
 
@@ -74,8 +81,6 @@ export async function generateDailyPlanAction(input: unknown): Promise<DailyPlan
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return { status: "error", code: "missing-api-key" };
 
-    const model = process.env.OPENAI_DAILY_PLAN_MODEL ?? DAILY_PLAN_AI_MODEL_DEFAULT;
-    const meter = createAiUsageMeter({ userId: user.id, feature: "daily_plan", model });
     const generated = await generateDailyPlanWithOpenAi(request.data, context.target, context.inventoryItems, context.planDateKey, {
       apiKey,
       model,

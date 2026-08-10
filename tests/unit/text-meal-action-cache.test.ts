@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  estimate: vi.fn(), getUser: vi.fn(), read: vi.fn(), write: vi.fn(), purge: vi.fn(), key: vi.fn(() => "hash"), createAdmin: vi.fn(), admin: { from: vi.fn() },
+  estimate: vi.fn(), getUser: vi.fn(), read: vi.fn(), write: vi.fn(), purge: vi.fn(), key: vi.fn(() => "hash"), createAdmin: vi.fn(), admin: { from: vi.fn() }, featureEnabled: true,
 }));
+vi.mock("@/lib/ai/access-policy", () => ({ isAiFeatureEnabled: () => mocks.featureEnabled }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ from: vi.fn(), rpc: vi.fn() })) }));
@@ -25,6 +26,7 @@ describe("estimateTextMealAction cache contract", () => {
     mocks.purge.mockResolvedValue(undefined);
     mocks.createAdmin.mockReturnValue(mocks.admin);
     mocks.estimate.mockResolvedValue(success);
+    mocks.featureEnabled = true;
     process.env.OPENAI_API_KEY = "secret";
     delete process.env.OPENAI_TEXT_MEAL_MODEL;
   });
@@ -37,6 +39,14 @@ describe("estimateTextMealAction cache contract", () => {
     expect(mocks.read).toHaveBeenCalledWith(mocks.admin, "user-a", "hash");
     expect(mocks.estimate).not.toHaveBeenCalled();
     expect(mocks.write).not.toHaveBeenCalled();
+  });
+
+  it("blocks a disabled feature before reading or returning a cache hit", async () => {
+    mocks.featureEnabled = false;
+    mocks.read.mockResolvedValue(success);
+    await expect(estimateTextMealAction({ description: "100 g arroz" })).resolves.toEqual({ status: "error", code: "ai-feature-disabled" });
+    expect(mocks.read).not.toHaveBeenCalled();
+    expect(mocks.estimate).not.toHaveBeenCalled();
   });
 
   it("on a miss calls OpenAI with store-neutral provider options and caches only success", async () => {

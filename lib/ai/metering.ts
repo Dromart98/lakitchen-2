@@ -95,11 +95,16 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
   let accessError: AiAccessErrorCode | null = null;
   let reservation: Promise<boolean> | null = null;
 
-  async function reserveOnce(): Promise<boolean> {
+  function authorizeFeature(): boolean {
     if (!(input.featurePolicy ?? isAiFeatureEnabled)(input.plan ?? "default", input.feature)) {
       accessError = "ai-feature-disabled";
       return false;
     }
+    return true;
+  }
+
+  async function reserveOnce(): Promise<boolean> {
+    if (!authorizeFeature()) return false;
     if (!reservation) reservation = (async () => {
       try {
         const client = input.quotaClient ?? createAdminClient() as unknown as QuotaClient;
@@ -171,7 +176,7 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
     }
   }
 
-  return { fetchImpl, finish, getAccessError: () => accessError };
+  return { authorizeFeature, fetchImpl, finish, getAccessError: () => accessError };
 }
 
 export function classifyAiResult(result: { status: string; code?: string; reason?: "not-found" | "not-configured" | "provider-error" }): { outcome: AiUsageOutcome; errorCode?: string } {

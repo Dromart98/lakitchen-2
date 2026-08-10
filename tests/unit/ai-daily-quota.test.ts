@@ -46,13 +46,31 @@ describe("daily AI request guard", () => {
   });
 
   it("a disabled plan feature neither reserves nor calls the provider", async () => {
+    const rows: Record<string, unknown>[] = [];
     const quotaClient = client(async () => ({ data: true, error: null }));
     const provider = vi.fn();
-    const meter = createAiUsageMeter({ userId: "user-a", feature: "recipe_generation", model: "model", quotaClient, baseFetch: provider, featurePolicy: () => false });
-    await meter.fetchImpl("https://api.openai.com/v1/responses");
+    const meter = createAiUsageMeter({
+      userId: "user-a", feature: "recipe_generation", model: "model", quotaClient, baseFetch: provider,
+      featurePolicy: () => false,
+      client: { from: () => ({ insert: async (row: Record<string, unknown>) => { rows.push(row); return { error: null }; } }) },
+    });
+    expect(meter.authorizeFeature()).toBe(false);
+    await meter.finish({ outcome: "error", errorCode: "ai-feature-disabled" });
     expect(meter.getAccessError()).toBe("ai-feature-disabled");
     expect(quotaClient.rpc).not.toHaveBeenCalled();
     expect(provider).not.toHaveBeenCalled();
+    expect(rows[0]).toMatchObject({ outcome: "error", error_code: "ai-feature-disabled", provider_request_count: 0, total_tokens: 0, estimated_cost_usd_micros: 0 });
+  });
+
+  it("authorizes an enabled feature without reserving until the provider is called", async () => {
+    const quotaClient = client(async () => ({ data: true, error: null }));
+    const provider = vi.fn(async () => Response.json({}));
+    const meter = createAiUsageMeter({ userId: "user-a", feature: "text_meal", model: "model", quotaClient, baseFetch: provider });
+    expect(meter.authorizeFeature()).toBe(true);
+    expect(quotaClient.rpc).not.toHaveBeenCalled();
+    await meter.fetchImpl("https://api.openai.com/v1/responses");
+    expect(quotaClient.rpc).toHaveBeenCalledOnce();
+    expect(provider).toHaveBeenCalledOnce();
   });
 });
 

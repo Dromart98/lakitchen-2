@@ -69,6 +69,10 @@ export async function estimateInventoryNutritionAction(input: InventoryNutrition
 
   const model = process.env.OPENAI_INVENTORY_NUTRITION_MODEL ?? INVENTORY_NUTRITION_AI_MODEL_DEFAULT;
   const meter = createAiUsageMeter({ userId: user.id, feature: "inventory_nutrition", model });
+  if (!meter.authorizeFeature()) {
+    await meter.finish({ outcome: "error", errorCode: "ai-feature-disabled" });
+    return inventoryNutritionAiError("ai-feature-disabled");
+  }
   const result = await resolveInventoryNutritionForUser(supabase, user.id, validatedInput, { fetchImpl: meter.fetchImpl, openAiModel: model });
   await meter.finish({ ...classifyAiResult(result), cacheHit: result.meteringCacheHit });
   const accessError = meter.getAccessError();
@@ -524,11 +528,15 @@ export async function estimateVoiceInventoryBatchAction(text: string) {
   if (!input) return { status: "error" as const, code: "invalid-input" as const, message: "Escribe una lista de hasta 4.000 caracteres." };
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "voice inventory batch estimate");
+  const model = process.env.OPENAI_VOICE_INVENTORY_BATCH_MODEL || "gpt-5.6-terra";
+  const meter = createAiUsageMeter({ userId: user.id, feature: "voice_inventory", model });
+  if (!meter.authorizeFeature()) {
+    await meter.finish({ outcome: "error", errorCode: "ai-feature-disabled" });
+    return { status: "error" as const, code: "ai-feature-disabled" as const, message: "Esta función no está disponible." };
+  }
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { status: "error" as const, code: "not-configured" as const, message: "La estimación con IA no está configurada todavía." };
   const { generateVoiceInventoryBatch } = await import("@/lib/openai/voice-inventory-batch-generation");
-  const model = process.env.OPENAI_VOICE_INVENTORY_BATCH_MODEL || "gpt-5.6-terra";
-  const meter = createAiUsageMeter({ userId: user.id, feature: "voice_inventory", model });
   const generated = await generateVoiceInventoryBatch(input, { apiKey, model, fetchImpl: meter.fetchImpl });
   await meter.finish(classifyAiResult(generated));
   const accessError = meter.getAccessError();
