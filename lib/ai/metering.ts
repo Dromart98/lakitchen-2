@@ -2,6 +2,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const AI_PRICING_VERSION = "2026-08-10";
+// Metering is best-effort and must add only a short, bounded wait after the AI result is ready.
+export const AI_METERING_PERSIST_TIMEOUT_MS = 1_500;
 
 type TokenUsage = {
   inputTokens: number;
@@ -63,6 +65,20 @@ export type AiUsageFeature = "text_meal" | "photo_meal" | "inventory_nutrition" 
 
 type MeteringClient = { from(table: "ai_usage_events"): { insert(row: Record<string, unknown>): PromiseLike<{ error: unknown }> } };
 
+async function waitForMeteringInsert(operation: PromiseLike<{ error: unknown }>) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(operation),
+      new Promise<never>((_resolve, reject) => {
+        timeoutId = setTimeout(() => reject(new Error("metering-insert-timeout")), AI_METERING_PERSIST_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
+}
+
 export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeature; model: string; client?: MeteringClient | null; now?: () => number; baseFetch?: typeof fetch }) {
   const startedAt = (input.now ?? Date.now)();
   const aggregate = emptyUsage();
@@ -93,7 +109,7 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
     let client = input.client;
     try {
       client ??= createAdminClient() as unknown as MeteringClient;
-      await client.from("ai_usage_events").insert({
+      const { error } = await waitForMeteringInsert(client.from("ai_usage_events").insert({
         user_id: input.userId,
         feature: input.feature,
         provider: "openai",
@@ -111,17 +127,18 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
         total_tokens: usage.totalTokens,
         estimated_cost_usd_micros: cacheHit ? 0 : calculateAiCostUsdMicros(input.model, usage),
         pricing_version: AI_PRICING_VERSION,
-      });
-    } catch (error) {
-      console.warn("ai_usage_metering_write_failed", error instanceof Error ? error.message : "unknown");
+      }));
+      if (error) throw new Error("metering-insert-failed");
+    } catch {
+      console.warn("ai_usage_metering_write_failed");
     }
   }
 
   return { fetchImpl, finish };
 }
 
-export function classifyAiResult(result: { status: string; code?: string }): { outcome: AiUsageOutcome; errorCode?: string } {
+export function classifyAiResult(result: { status: string; code?: string; reason?: "not-found" | "not-configured" | "provider-error" }): { outcome: AiUsageOutcome; errorCode?: string } {
   if (result.status === "success" || result.status === "resolved" || result.status === "selected") return { outcome: "success" };
   if (result.status === "needs-clarification") return { outcome: "clarification" };
-  return { outcome: "error", errorCode: result.code ?? "provider-error" };
+  return { outcome: "error", errorCode: result.code ?? result.reason ?? "provider-error" };
 }
