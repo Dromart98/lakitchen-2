@@ -9,9 +9,10 @@ import { estimatePhotoMealWithOpenAi } from "@/lib/openai/photo-meal-estimation"
 import { photoMealContextSchema, validatePhotoMealFile } from "@/modules/meals/photo-meal-ai";
 import { getAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { textMealRequestSchema, type TextMealEstimationResult } from "@/modules/meals/text-meal-ai";
 import { isValidUuid } from "@/modules/meals/meal-validation";
-import { createTextMealCacheKey, readTextMealCache, writeTextMealCache, type TextMealCacheClient } from "@/modules/meals/text-meal-cache";
+import { createTextMealCacheKey, purgeExpiredTextMealCache, readTextMealCache, writeTextMealCache, type TextMealCacheClient } from "@/modules/meals/text-meal-cache";
 
 type AiMealInventoryRpcClient = {
   rpc: (functionName: "consume_ai_meal_inventory_and_log_meal", args: {
@@ -30,7 +31,10 @@ export async function estimateTextMealAction(input: unknown): Promise<TextMealEs
     if (!user) return { status: "error", code: "unauthenticated" };
     const model = process.env.OPENAI_TEXT_MEAL_MODEL ?? TEXT_MEAL_AI_MODEL_DEFAULT;
     const cacheKey = createTextMealCacheKey(request.data.description, model);
-    const cacheClient = supabase as unknown as TextMealCacheClient;
+    // The service-role client is created only after the browser session has
+    // been authenticated; the cache owner always comes from that session.
+    const cacheClient = createAdminClient() as unknown as TextMealCacheClient;
+    await purgeExpiredTextMealCache(cacheClient).catch(() => undefined);
     const cached = await readTextMealCache(cacheClient, user.id, cacheKey).catch(() => null);
     if (cached) return cached;
     const apiKey = process.env.OPENAI_API_KEY;

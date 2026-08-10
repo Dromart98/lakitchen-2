@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  estimate: vi.fn(), getUser: vi.fn(), read: vi.fn(), write: vi.fn(), key: vi.fn(() => "hash"),
+  estimate: vi.fn(), getUser: vi.fn(), read: vi.fn(), write: vi.fn(), purge: vi.fn(), key: vi.fn(() => "hash"), admin: { from: vi.fn() },
 }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ from: vi.fn(), rpc: vi.fn() })) }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => mocks.admin) }));
 vi.mock("@/lib/supabase/auth", () => ({ getAuthenticatedUser: mocks.getUser }));
 vi.mock("@/lib/openai/text-meal-estimation", () => ({ estimateTextMealWithOpenAi: mocks.estimate, TEXT_MEAL_AI_MODEL_DEFAULT: "default-model" }));
-vi.mock("@/modules/meals/text-meal-cache", () => ({ createTextMealCacheKey: mocks.key, readTextMealCache: mocks.read, writeTextMealCache: mocks.write }));
+vi.mock("@/modules/meals/text-meal-cache", () => ({ createTextMealCacheKey: mocks.key, purgeExpiredTextMealCache: mocks.purge, readTextMealCache: mocks.read, writeTextMealCache: mocks.write }));
 vi.mock("@/lib/openai/photo-meal-estimation", () => ({ estimatePhotoMealWithOpenAi: vi.fn() }));
 
 import { estimateTextMealAction } from "@/app/macros/actions";
@@ -21,6 +22,7 @@ describe("estimateTextMealAction cache contract", () => {
     mocks.getUser.mockResolvedValue({ id: "user-a" });
     mocks.read.mockResolvedValue(null);
     mocks.write.mockResolvedValue(undefined);
+    mocks.purge.mockResolvedValue(undefined);
     mocks.estimate.mockResolvedValue(success);
     process.env.OPENAI_API_KEY = "secret";
     delete process.env.OPENAI_TEXT_MEAL_MODEL;
@@ -31,6 +33,7 @@ describe("estimateTextMealAction cache contract", () => {
     delete process.env.OPENAI_API_KEY;
     await expect(estimateTextMealAction({ description: "100 g arroz" })).resolves.toEqual(success);
     expect(mocks.read).toHaveBeenCalledWith(expect.anything(), "user-a", "hash");
+    expect(mocks.read).toHaveBeenCalledWith(mocks.admin, "user-a", "hash");
     expect(mocks.estimate).not.toHaveBeenCalled();
     expect(mocks.write).not.toHaveBeenCalled();
   });
@@ -40,6 +43,7 @@ describe("estimateTextMealAction cache contract", () => {
     expect(mocks.key).toHaveBeenCalledWith("100 g arroz", "default-model");
     expect(mocks.estimate).toHaveBeenCalledWith("100 g arroz", { apiKey: "secret", model: "default-model" });
     expect(mocks.write).toHaveBeenCalledWith(expect.anything(), "user-a", "hash", "default-model", success);
+    expect(mocks.purge).toHaveBeenCalledWith(mocks.admin);
   });
 
   it.each([
@@ -58,5 +62,12 @@ describe("estimateTextMealAction cache contract", () => {
     await expect(estimateTextMealAction({ description: "100 g arroz" })).resolves.toEqual(success);
     expect(mocks.read).toHaveBeenCalledWith(expect.anything(), "user-b", "hash");
     expect(mocks.estimate).toHaveBeenCalledTimes(1);
+  });
+
+  it("never accepts a cache owner from browser input", async () => {
+    await estimateTextMealAction({ description: "100 g arroz", user_id: "forged-user" });
+    expect(mocks.read).not.toHaveBeenCalled();
+    expect(mocks.write).not.toHaveBeenCalled();
+    expect(mocks.estimate).not.toHaveBeenCalled();
   });
 });

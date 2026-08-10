@@ -4,6 +4,8 @@ import {
   createTextMealCacheKey,
   normalizeTextMealCacheInput,
   readTextMealCache,
+  purgeExpiredTextMealCache,
+  TEXT_MEAL_CACHE_PURGE_LIMIT,
   TEXT_MEAL_CACHE_CONTRACT_VERSION,
   TEXT_MEAL_CACHE_TTL_MS,
   writeTextMealCache,
@@ -24,6 +26,8 @@ function query(data: { result: unknown } | null = { result }) {
   const builder = {
     select: vi.fn(() => builder), eq: vi.fn((column: string, value: string) => { calls.push([column, value]); return builder; }),
     gt: vi.fn(() => builder), maybeSingle: vi.fn(async () => ({ data, error: null })),
+    lt: vi.fn(() => builder), order: vi.fn(() => builder), limit: vi.fn(async (): Promise<{ data: { id: string }[]; error: null }> => ({ data: [], error: null })),
+    delete: vi.fn(() => builder), in: vi.fn(async () => ({ error: null })),
     upsert: vi.fn(async () => ({ error: null })),
   };
   return { client: { from: vi.fn(() => builder) } as unknown as TextMealCacheClient, builder, calls };
@@ -58,5 +62,17 @@ describe("text meal analysis cache", () => {
       result, expires_at: new Date(now.getTime() + TEXT_MEAL_CACHE_TTL_MS).toISOString(),
     }, { onConflict: "user_id,cache_key" });
     expect(JSON.stringify(cache.builder.upsert.mock.calls[0])).not.toContain("descripción original");
+  });
+
+  it("purges an oldest-first bounded batch of expired rows", async () => {
+    const cache = query();
+    cache.builder.limit.mockResolvedValue({ data: [{ id: "expired-a" }, { id: "expired-b" }], error: null });
+    const now = new Date("2026-08-10T00:00:00.000Z");
+    await purgeExpiredTextMealCache(cache.client, now);
+    expect(cache.builder.lt).toHaveBeenCalledWith("expires_at", now.toISOString());
+    expect(cache.builder.order).toHaveBeenCalledWith("expires_at", { ascending: true });
+    expect(cache.builder.limit).toHaveBeenCalledWith(TEXT_MEAL_CACHE_PURGE_LIMIT);
+    expect(cache.builder.delete).toHaveBeenCalledOnce();
+    expect(cache.builder.in).toHaveBeenCalledWith("id", ["expired-a", "expired-b"]);
   });
 });

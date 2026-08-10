@@ -107,7 +107,7 @@ describe("account deletion contracts", () => {
       /references\s+auth\.users\s*\(id\)\s+on\s+delete\s+\w+/gi,
     );
 
-    expect(authReferences?.length).toBe(15);
+    expect(authReferences?.length).toBe(16);
     for (const reference of authReferences ?? []) {
       expect(reference.toLowerCase()).toContain("on delete cascade");
     }
@@ -116,6 +116,9 @@ describe("account deletion contracts", () => {
     );
     expect(migrations).toMatch(
       /foreign key \(recipe_id, user_id\)[\s\S]{0,100}references public\.user_saved_ai_recipes\(id, user_id\)[\s\S]{0,40}on delete cascade/i,
+    );
+    expect(migrations).toMatch(
+      /user_text_meal_analysis_cache[\s\S]{0,200}references auth\.users\(id\) on delete cascade/i,
     );
   });
 });
