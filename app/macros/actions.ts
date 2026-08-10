@@ -33,14 +33,21 @@ export async function estimateTextMealAction(input: unknown): Promise<TextMealEs
     const cacheKey = createTextMealCacheKey(request.data.description, model);
     // The service-role client is created only after the browser session has
     // been authenticated; the cache owner always comes from that session.
-    const cacheClient = createAdminClient() as unknown as TextMealCacheClient;
-    await purgeExpiredTextMealCache(cacheClient).catch(() => undefined);
-    const cached = await readTextMealCache(cacheClient, user.id, cacheKey).catch(() => null);
+    let cacheClient: TextMealCacheClient | null = null;
+    try {
+      cacheClient = createAdminClient() as unknown as TextMealCacheClient;
+    } catch {
+      // Cache configuration must never make Text AI unavailable.
+    }
+    if (cacheClient) await purgeExpiredTextMealCache(cacheClient).catch(() => undefined);
+    const cached = cacheClient
+      ? await readTextMealCache(cacheClient, user.id, cacheKey).catch(() => null)
+      : null;
     if (cached) return cached;
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return { status: "error", code: "missing-api-key" };
     const result = await estimateTextMealWithOpenAi(request.data.description, { apiKey, model });
-    if (result.status === "success") {
+    if (result.status === "success" && cacheClient) {
       await writeTextMealCache(cacheClient, user.id, cacheKey, model, result).catch(() => undefined);
     }
     return result;

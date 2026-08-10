@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  estimate: vi.fn(), getUser: vi.fn(), read: vi.fn(), write: vi.fn(), purge: vi.fn(), key: vi.fn(() => "hash"), admin: { from: vi.fn() },
+  estimate: vi.fn(), getUser: vi.fn(), read: vi.fn(), write: vi.fn(), purge: vi.fn(), key: vi.fn(() => "hash"), createAdmin: vi.fn(), admin: { from: vi.fn() },
 }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ from: vi.fn(), rpc: vi.fn() })) }));
-vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => mocks.admin) }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.createAdmin }));
 vi.mock("@/lib/supabase/auth", () => ({ getAuthenticatedUser: mocks.getUser }));
 vi.mock("@/lib/openai/text-meal-estimation", () => ({ estimateTextMealWithOpenAi: mocks.estimate, TEXT_MEAL_AI_MODEL_DEFAULT: "default-model" }));
 vi.mock("@/modules/meals/text-meal-cache", () => ({ createTextMealCacheKey: mocks.key, purgeExpiredTextMealCache: mocks.purge, readTextMealCache: mocks.read, writeTextMealCache: mocks.write }));
@@ -23,6 +23,7 @@ describe("estimateTextMealAction cache contract", () => {
     mocks.read.mockResolvedValue(null);
     mocks.write.mockResolvedValue(undefined);
     mocks.purge.mockResolvedValue(undefined);
+    mocks.createAdmin.mockReturnValue(mocks.admin);
     mocks.estimate.mockResolvedValue(success);
     process.env.OPENAI_API_KEY = "secret";
     delete process.env.OPENAI_TEXT_MEAL_MODEL;
@@ -62,6 +63,15 @@ describe("estimateTextMealAction cache contract", () => {
     await expect(estimateTextMealAction({ description: "100 g arroz" })).resolves.toEqual(success);
     expect(mocks.read).toHaveBeenCalledWith(expect.anything(), "user-b", "hash");
     expect(mocks.estimate).toHaveBeenCalledTimes(1);
+  });
+
+  it("continues with OpenAI when the server-only cache client cannot be created", async () => {
+    mocks.createAdmin.mockImplementation(() => { throw new Error("missing cache configuration"); });
+    await expect(estimateTextMealAction({ description: "100 g arroz" })).resolves.toEqual(success);
+    expect(mocks.estimate).toHaveBeenCalledWith("100 g arroz", { apiKey: "secret", model: "default-model" });
+    expect(mocks.read).not.toHaveBeenCalled();
+    expect(mocks.write).not.toHaveBeenCalled();
+    expect(mocks.purge).not.toHaveBeenCalled();
   });
 
   it("never accepts a cache owner from browser input", async () => {
