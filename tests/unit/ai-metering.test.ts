@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { AI_PRICING_VERSION, calculateAiCostUsdMicros, createAiUsageMeter, extractOpenAiUsage } from "@/lib/ai/metering";
+import { AI_PRICING_VERSION, calculateAiCostUsdMicros, classifyAiResult, createAiUsageMeter, extractOpenAiUsage } from "@/lib/ai/metering";
 
 const usageBody = (input: number, cached: number, output: number, reasoning: number) => ({
   status: "completed",
@@ -55,7 +55,24 @@ describe("private AI usage metering", () => {
       client: { from: () => ({ insert: async () => { throw new Error("database unavailable"); } }) } as never,
     });
     await expect(meter.finish({ outcome: "error", errorCode: "provider-timeout" })).resolves.toBeUndefined();
-    expect(warn).toHaveBeenCalledWith("ai_usage_metering_write_failed", "database unavailable");
+    expect(warn).toHaveBeenCalledWith("ai_usage_metering_write_failed");
     warn.mockRestore();
+  });
+
+  it("detects a resolved insert error without exposing it or rejecting finish", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const meter = createAiUsageMeter({
+      userId: "user-d", feature: "inventory_nutrition", model: "gpt-5.6-terra",
+      client: { from: () => ({ insert: async () => ({ error: { message: "private database detail" } }) }) } as never,
+    });
+    await expect(meter.finish({ outcome: "success" })).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledWith("ai_usage_metering_write_failed");
+    expect(warn).not.toHaveBeenCalledWith(expect.anything(), expect.stringContaining("private"));
+    warn.mockRestore();
+  });
+
+  it("preserves safe nutrition resolution reasons", () => {
+    expect(classifyAiResult({ status: "unresolved", reason: "not-configured" })).toEqual({ outcome: "error", errorCode: "not-configured" });
+    expect(classifyAiResult({ status: "unresolved", reason: "provider-error" })).toEqual({ outcome: "error", errorCode: "provider-error" });
   });
 });
