@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { isMealType } from "@/modules/meals/meal-types";
 import { parseMealBuilderConsumptionLines } from "@/modules/meals/meal-builder";
 import { estimateTextMealWithOpenAi, TEXT_MEAL_AI_MODEL_DEFAULT } from "@/lib/openai/text-meal-estimation";
-import { estimatePhotoMealWithOpenAi } from "@/lib/openai/photo-meal-estimation";
+import { estimatePhotoMealWithOpenAi, PHOTO_MEAL_AI_MODEL_DEFAULT } from "@/lib/openai/photo-meal-estimation";
 import { photoMealContextSchema, validatePhotoMealFile } from "@/modules/meals/photo-meal-ai";
 import { getAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -13,6 +13,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { textMealRequestSchema, type TextMealEstimationResult } from "@/modules/meals/text-meal-ai";
 import { isValidUuid } from "@/modules/meals/meal-validation";
 import { createTextMealCacheKey, purgeExpiredTextMealCache, readTextMealCache, writeTextMealCache, type TextMealCacheClient } from "@/modules/meals/text-meal-cache";
+import { createPhotoMealCacheKey, purgeExpiredPhotoMealCache, readPhotoMealCache, writePhotoMealCache, type PhotoMealCacheClient } from "@/modules/meals/photo-meal-cache";
 
 type AiMealInventoryRpcClient = {
   rpc: (functionName: "consume_ai_meal_inventory_and_log_meal", args: {
@@ -61,13 +62,30 @@ export async function estimatePhotoMealAction(formData: FormData): Promise<TextM
     const supabase = await createClient();
     const user = await getAuthenticatedUser(supabase, "photo meal estimation");
     if (!user) return { status: "error", code: "unauthenticated" };
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return { status: "error", code: "missing-api-key" };
     const validated = await validatePhotoMealFile(formData.get("photo"));
     if (!validated.ok) return { status: "error", code: validated.code };
     const bytes = new Uint8Array(await validated.file.arrayBuffer());
+    const model = process.env.OPENAI_PHOTO_MEAL_MODEL ?? PHOTO_MEAL_AI_MODEL_DEFAULT;
+    const cacheKey = createPhotoMealCacheKey(bytes, context.data.context, model);
+    let cacheClient: PhotoMealCacheClient | null = null;
+    try {
+      cacheClient = createAdminClient() as unknown as PhotoMealCacheClient;
+    } catch {
+      // Cache configuration must never make Photo AI unavailable.
+    }
+    if (cacheClient) await purgeExpiredPhotoMealCache(cacheClient).catch(() => undefined);
+    const cached = cacheClient
+      ? await readPhotoMealCache(cacheClient, user.id, cacheKey).catch(() => null)
+      : null;
+    if (cached) return cached;
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) return { status: "error", code: "missing-api-key" };
     const imageDataUrl = `data:image/jpeg;base64,${Buffer.from(bytes).toString("base64")}`;
-    return estimatePhotoMealWithOpenAi(imageDataUrl, context.data.context, { apiKey, model: process.env.OPENAI_PHOTO_MEAL_MODEL });
+    const result = await estimatePhotoMealWithOpenAi(imageDataUrl, context.data.context, { apiKey, model });
+    if (result.status === "success" && cacheClient) {
+      await writePhotoMealCache(cacheClient, user.id, cacheKey, model, result).catch(() => undefined);
+    }
+    return result;
   } catch { return { status: "error", code: "unexpected-error" }; }
 }
 
