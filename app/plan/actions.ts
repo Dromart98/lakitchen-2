@@ -3,7 +3,8 @@
 import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
-import { generateDailyPlanWithOpenAi } from "@/lib/openai/daily-plan-generation";
+import { DAILY_PLAN_AI_MODEL_DEFAULT, generateDailyPlanWithOpenAi } from "@/lib/openai/daily-plan-generation";
+import { classifyAiResult, createAiUsageMeter } from "@/lib/ai/metering";
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
 import {
   buildDailyPlanTarget,
@@ -73,10 +74,14 @@ export async function generateDailyPlanAction(input: unknown): Promise<DailyPlan
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return { status: "error", code: "missing-api-key" };
 
+    const model = process.env.OPENAI_DAILY_PLAN_MODEL ?? DAILY_PLAN_AI_MODEL_DEFAULT;
+    const meter = createAiUsageMeter({ userId: user.id, feature: "daily_plan", model });
     const generated = await generateDailyPlanWithOpenAi(request.data, context.target, context.inventoryItems, context.planDateKey, {
       apiKey,
-      model: process.env.OPENAI_DAILY_PLAN_MODEL,
+      model,
+      fetchImpl: meter.fetchImpl,
     });
+    await meter.finish(classifyAiResult(generated));
     if (generated.status !== "success") {
       if (context.inventoryItems.length <= 3 && (generated.status === "needs-clarification" || generated.code === "invalid-ai-response")) {
         return { status: "needs-clarification", message: "No se pudo construir un día completo con los productos utilizables actuales. Completa la nutrición de más productos o añade variedad al inventario." };

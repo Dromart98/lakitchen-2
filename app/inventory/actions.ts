@@ -21,6 +21,8 @@ import { parseInventoryNutritionAiInput, type InventoryNutritionAiEstimate, type
 import { toVoiceInventoryBatchSaveInput, VoiceInventoryBatchCatalogMetadataSchema } from "@/modules/inventory/voice-inventory-batch-save";
 import { buildObservedPackageEquivalenceProposals } from "@/modules/inventory/voice-inventory-package-equivalences";
 import { buildBarcodePackageEquivalenceProposal } from "@/modules/inventory/barcode-package-equivalence";
+import { classifyAiResult, createAiUsageMeter } from "@/lib/ai/metering";
+import { INVENTORY_NUTRITION_AI_MODEL_DEFAULT } from "@/modules/inventory/inventory-ai-nutrition";
 
 type InventoryLocation = "pantry" | "fridge" | "freezer";
 type InventoryUnit = "ud" | "g" | "kg" | "ml" | "l";
@@ -62,7 +64,10 @@ export async function estimateInventoryNutritionAction(input: InventoryNutrition
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "inventory nutrition AI estimate");
 
-  const result = await resolveInventoryNutritionForUser(supabase, user.id, validatedInput);
+  const model = process.env.OPENAI_INVENTORY_NUTRITION_MODEL ?? INVENTORY_NUTRITION_AI_MODEL_DEFAULT;
+  const meter = createAiUsageMeter({ userId: user.id, feature: "inventory_nutrition", model });
+  const result = await resolveInventoryNutritionForUser(supabase, user.id, validatedInput, { fetchImpl: meter.fetchImpl, openAiModel: model });
+  await meter.finish({ ...classifyAiResult(result), cacheHit: result.meteringCacheHit });
   if (result.status === "needs-clarification") return result;
   if (result.status !== "resolved") return inventoryNutritionAiError(result.reason === "not-configured" ? "not-configured" : "provider-error");
   return { status: "success", estimate: { nutrition_basis: result.nutritionBasis, calories: result.calories, protein_g: result.proteinG, carbs_g: result.carbsG, fat_g: result.fatG, confidence: "medium", assumptions: result.assumptions, food_catalog_item_id: result.foodCatalogItemId ?? null } };
@@ -517,7 +522,10 @@ export async function estimateVoiceInventoryBatchAction(text: string) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { status: "error" as const, code: "not-configured" as const, message: "La estimación con IA no está configurada todavía." };
   const { generateVoiceInventoryBatch } = await import("@/lib/openai/voice-inventory-batch-generation");
-  const generated = await generateVoiceInventoryBatch(input, { apiKey, model: process.env.OPENAI_VOICE_INVENTORY_BATCH_MODEL || undefined });
+  const model = process.env.OPENAI_VOICE_INVENTORY_BATCH_MODEL || "gpt-5.6-terra";
+  const meter = createAiUsageMeter({ userId: user.id, feature: "voice_inventory", model });
+  const generated = await generateVoiceInventoryBatch(input, { apiKey, model, fetchImpl: meter.fetchImpl });
+  await meter.finish(classifyAiResult(generated));
   if (generated.status === "error") return generated;
   try {
     const { applyNutritionCatalogToVoiceBatch } = await import("@/modules/inventory/voice-inventory-catalog");

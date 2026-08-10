@@ -211,7 +211,7 @@ No permitir que la IA calcule libremente estos valores cuando puedan obtenerse d
 
 Prioridad: alta.
 
-**Estado: en curso.** Siguiente tarea: **2.2 Límites y presupuesto de IA**.
+**Estado: en curso.** Siguiente tarea: **2.2B Presupuestos y límites funcionales diarios**.
 
 ### 2.1 Caché y reutilización
 
@@ -222,6 +222,12 @@ Prioridad: alta.
 - Invalidar caché solo cuando cambien datos relevantes.
 
 ### 2.2 Límites y presupuesto de IA
+
+**Estado: en curso.** **2.2A Medición privada de uso y coste: completada.** **2.2B Presupuestos y límites funcionales diarios: siguiente tarea.**
+
+2.2A mantiene un evento privado por invocación autenticada con función, proveedor, modelo, caché, intentos, latencia, resultado seguro, usage real agregado y coste histórico en micros USD según una versión explícita de precios. Los aciertos de caché no generan llamadas ni coste, los modelos sin tarifa conocida conservan coste desconocido y un fallo de telemetría no bloquea la función.
+
+La auditoría server-side cubre Texto IA, Foto IA, nutrición de Inventario (incluida la selección IA entre candidatos USDA y el fallback nutricional), dictado de Inventario, dictado de Compra, sugerencias de Recetas y Plan diario. La ruta `/api/recipes/generate` queda fuera: usa `recipe-generator.service.ts`, un generador local determinista que no contacta a ningún proveedor y por tanto no produce usage medible. Las consultas deterministas a USDA y Open Food Facts tampoco son llamadas IA.
 
 Controlar:
 
