@@ -5,6 +5,8 @@ import { isAiFeatureEnabled, type AiPlan } from "@/lib/ai/access-policy";
 export const AI_PRICING_VERSION = "2026-08-10";
 // Metering is best-effort and must add only a short, bounded wait after the AI result is ready.
 export const AI_METERING_PERSIST_TIMEOUT_MS = 1_500;
+// Quota storage is a blocking guard, so keep its wait short and fail closed.
+export const AI_QUOTA_RESERVATION_TIMEOUT_MS = 1_500;
 export const AI_DAILY_REQUEST_LIMIT_FALLBACK = 20;
 
 type TokenUsage = {
@@ -88,6 +90,20 @@ async function waitForMeteringInsert(operation: PromiseLike<{ error: unknown }>)
   }
 }
 
+async function waitForQuotaReservation(operation: PromiseLike<{ data: boolean | null; error: unknown }>) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(operation),
+      new Promise<never>((_resolve, reject) => {
+        timeoutId = setTimeout(() => reject(new Error("quota-reservation-timeout")), AI_QUOTA_RESERVATION_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
+}
+
 export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeature; model: string; client?: MeteringClient | null; quotaClient?: QuotaClient | null; plan?: AiPlan; featurePolicy?: typeof isAiFeatureEnabled; dailyLimit?: number; now?: () => number; baseFetch?: typeof fetch }) {
   const startedAt = (input.now ?? Date.now)();
   const aggregate = emptyUsage();
@@ -108,10 +124,10 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
     if (!reservation) reservation = (async () => {
       try {
         const client = input.quotaClient ?? createAdminClient() as unknown as QuotaClient;
-        const { data, error } = await client.rpc("reserve_ai_daily_request", {
+        const { data, error } = await waitForQuotaReservation(client.rpc("reserve_ai_daily_request", {
           p_user_id: input.userId,
           p_limit: input.dailyLimit ?? getAiDailyRequestLimit(),
-        });
+        }));
         if (error) throw new Error("quota-reservation-failed");
         if (data !== true) accessError = "daily-ai-limit";
         return data === true;

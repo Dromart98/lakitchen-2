@@ -10,6 +10,7 @@ import { toVoiceShoppingBatchSaveInput } from "@/modules/shopping/voice-shopping
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { classifyAiResult, createAiUsageMeter } from "@/lib/ai/metering";
+import { INVENTORY_NUTRITION_AI_MODEL_DEFAULT } from "@/modules/inventory/inventory-ai-nutrition";
 import {
   getShoppingListTransferNutritionPlan,
   planShoppingListTransferResolutionUpdate,
@@ -289,7 +290,18 @@ export async function transferShoppingListItemToInventoryAction(formData: FormDa
   if (nutritionPlan.status === "already-complete") {
     shoppingListSuccess = "item-transferred-with-nutrition";
   } else if (nutritionPlan.status === "estimate") {
-    const nutritionResult = await resolveInventoryNutritionForUser(supabase, user.id, nutritionPlan.input);
+    const model = process.env.OPENAI_INVENTORY_NUTRITION_MODEL ?? INVENTORY_NUTRITION_AI_MODEL_DEFAULT;
+    const meter = createAiUsageMeter({ userId: user.id, feature: "inventory_nutrition", model });
+    if (!meter.authorizeFeature()) {
+      await meter.finish({ outcome: "error", errorCode: "ai-feature-disabled" });
+      revalidateShoppingListTransferPaths();
+      redirect(`/shopping-list?shoppingListSuccess=${shoppingListSuccess}`);
+    }
+    const nutritionResult = await resolveInventoryNutritionForUser(supabase, user.id, nutritionPlan.input, {
+      fetchImpl: meter.fetchImpl,
+      openAiModel: model,
+    });
+    await meter.finish({ ...classifyAiResult(nutritionResult), cacheHit: nutritionResult.meteringCacheHit });
 
     if (nutritionResult.status === "resolved") {
       const resolutionUpdate = planShoppingListTransferResolutionUpdate(transferredItem.food_catalog_item_id, nutritionResult);

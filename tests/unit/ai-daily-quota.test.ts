@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
-import { AI_DAILY_REQUEST_LIMIT_FALLBACK, createAiUsageMeter, getAiDailyRequestLimit } from "@/lib/ai/metering";
+import { AI_DAILY_REQUEST_LIMIT_FALLBACK, AI_QUOTA_RESERVATION_TIMEOUT_MS, createAiUsageMeter, getAiDailyRequestLimit } from "@/lib/ai/metering";
 
 const migration = readFileSync("supabase/migrations/20260810170000_create_ai_daily_request_usage.sql", "utf8").toLowerCase();
 
@@ -37,11 +37,36 @@ describe("daily AI request guard", () => {
   });
 
   it("fails closed before the provider when the limit is reached or storage fails", async () => {
-    for (const quotaClient of [client(async () => ({ data: false, error: null })), client(async () => { throw new Error("down"); })]) {
+    const cases = [
+      { quotaClient: client(async () => ({ data: false, error: null })), expected: "daily-ai-limit" },
+      { quotaClient: client(async () => ({ data: null, error: { message: "private" } })), expected: "ai-access-unavailable" },
+      { quotaClient: client(async () => { throw new Error("down"); }), expected: "ai-access-unavailable" },
+    ] as const;
+    for (const { quotaClient, expected } of cases) {
       const provider = vi.fn();
       const meter = createAiUsageMeter({ userId: "user-a", feature: "photo_meal", model: "model", quotaClient, baseFetch: provider });
       expect((await meter.fetchImpl("https://api.openai.com/v1/responses")).status).toBe(429);
       expect(provider).not.toHaveBeenCalled();
+      expect(meter.getAccessError()).toBe(expected);
+    }
+  });
+
+  it("times out a stuck reservation, clears its timer, and reuses the failed promise", async () => {
+    vi.useFakeTimers();
+    try {
+      const quotaClient = client(() => new Promise(() => undefined));
+      const provider = vi.fn();
+      const meter = createAiUsageMeter({ userId: "user-a", feature: "photo_meal", model: "model", quotaClient, baseFetch: provider });
+      const first = meter.fetchImpl("https://api.openai.com/v1/responses");
+      await vi.advanceTimersByTimeAsync(AI_QUOTA_RESERVATION_TIMEOUT_MS);
+      expect((await first).status).toBe(429);
+      expect(meter.getAccessError()).toBe("ai-access-unavailable");
+      expect(vi.getTimerCount()).toBe(0);
+      expect((await meter.fetchImpl("https://api.openai.com/v1/responses")).status).toBe(429);
+      expect(quotaClient.rpc).toHaveBeenCalledOnce();
+      expect(provider).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
     }
   });
 
