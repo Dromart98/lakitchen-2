@@ -16,6 +16,9 @@ const ingredientSchema = z.object({
   calories: z.number().finite().min(0).max(5000), protein_g: z.number().finite().min(0).max(500), carbs_g: z.number().finite().min(0).max(1000), fat_g: z.number().finite().min(0).max(500),
 }).strict();
 const assumptionsSchema = z.array(z.string().trim().min(1).max(300)).max(20);
+const macroTotalsSchema = z.object({
+  calories: z.number().finite().min(0).max(10000), protein_g: z.number().finite().min(0).max(10000), carbs_g: z.number().finite().min(0).max(10000), fat_g: z.number().finite().min(0).max(10000),
+}).strict();
 
 // This is the exact raw response required by the strict Structured Outputs schema.
 export const textMealRawProviderSchema = z.discriminatedUnion("status", [
@@ -37,4 +40,14 @@ export function validateTextMealProviderOutput(value: unknown): TextMealEstimati
   const total = calculateTextMealTotals(parsed.data.ingredients);
   if (!total) return { status: "error", code: "invalid-ai-response" };
   return { status: "success", suggested_name: parsed.data.suggested_name, ingredients: parsed.data.ingredients, total, assumptions: parsed.data.assumptions, confidence: parsed.data.confidence };
+}
+
+export function validateCachedTextMealSuccess(value: unknown): Extract<TextMealEstimationResult, { status: "success" }> | null {
+  const parsed = z.object({
+    status: z.literal("success"), suggested_name: z.string().trim().min(1).max(120), ingredients: z.array(ingredientSchema).min(1).max(20), total: macroTotalsSchema, assumptions: assumptionsSchema, confidence: z.enum(["high", "medium", "low"]),
+  }).strict().safeParse(value);
+  if (!parsed.success) return null;
+  const total = calculateTextMealTotals(parsed.data.ingredients);
+  if (!total || JSON.stringify(total) !== JSON.stringify(parsed.data.total)) return null;
+  return parsed.data;
 }

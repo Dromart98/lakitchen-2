@@ -4,13 +4,15 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isMealType } from "@/modules/meals/meal-types";
 import { parseMealBuilderConsumptionLines } from "@/modules/meals/meal-builder";
-import { estimateTextMealWithOpenAi } from "@/lib/openai/text-meal-estimation";
+import { estimateTextMealWithOpenAi, TEXT_MEAL_AI_MODEL_DEFAULT } from "@/lib/openai/text-meal-estimation";
 import { estimatePhotoMealWithOpenAi } from "@/lib/openai/photo-meal-estimation";
 import { photoMealContextSchema, validatePhotoMealFile } from "@/modules/meals/photo-meal-ai";
 import { getAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { textMealRequestSchema, type TextMealEstimationResult } from "@/modules/meals/text-meal-ai";
 import { isValidUuid } from "@/modules/meals/meal-validation";
+import { createTextMealCacheKey, purgeExpiredTextMealCache, readTextMealCache, writeTextMealCache, type TextMealCacheClient } from "@/modules/meals/text-meal-cache";
 
 type AiMealInventoryRpcClient = {
   rpc: (functionName: "consume_ai_meal_inventory_and_log_meal", args: {
@@ -20,7 +22,37 @@ type AiMealInventoryRpcClient = {
     p_lines: { item_id: string; consumed_quantity: number }[];
   }) => Promise<{ error: { code?: string; message: string } | null }>;
 };
-export async function estimateTextMealAction(input: unknown): Promise<TextMealEstimationResult> { const request = textMealRequestSchema.safeParse(input); if (!request.success) return { status: "error", code: "invalid-input" }; try { const supabase = await createClient(); const user = await getAuthenticatedUser(supabase, "text meal estimation"); if (!user) return { status: "error", code: "unauthenticated" }; const apiKey = process.env.OPENAI_API_KEY; if (!apiKey) return { status: "error", code: "missing-api-key" }; return estimateTextMealWithOpenAi(request.data.description, { apiKey, model: process.env.OPENAI_TEXT_MEAL_MODEL }); } catch { return { status: "error", code: "unexpected-error" }; } }
+export async function estimateTextMealAction(input: unknown): Promise<TextMealEstimationResult> {
+  const request = textMealRequestSchema.safeParse(input);
+  if (!request.success) return { status: "error", code: "invalid-input" };
+  try {
+    const supabase = await createClient();
+    const user = await getAuthenticatedUser(supabase, "text meal estimation");
+    if (!user) return { status: "error", code: "unauthenticated" };
+    const model = process.env.OPENAI_TEXT_MEAL_MODEL ?? TEXT_MEAL_AI_MODEL_DEFAULT;
+    const cacheKey = createTextMealCacheKey(request.data.description, model);
+    // The service-role client is created only after the browser session has
+    // been authenticated; the cache owner always comes from that session.
+    let cacheClient: TextMealCacheClient | null = null;
+    try {
+      cacheClient = createAdminClient() as unknown as TextMealCacheClient;
+    } catch {
+      // Cache configuration must never make Text AI unavailable.
+    }
+    if (cacheClient) await purgeExpiredTextMealCache(cacheClient).catch(() => undefined);
+    const cached = cacheClient
+      ? await readTextMealCache(cacheClient, user.id, cacheKey).catch(() => null)
+      : null;
+    if (cached) return cached;
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) return { status: "error", code: "missing-api-key" };
+    const result = await estimateTextMealWithOpenAi(request.data.description, { apiKey, model });
+    if (result.status === "success" && cacheClient) {
+      await writeTextMealCache(cacheClient, user.id, cacheKey, model, result).catch(() => undefined);
+    }
+    return result;
+  } catch { return { status: "error", code: "unexpected-error" }; }
+}
 
 export async function estimatePhotoMealAction(formData: FormData): Promise<TextMealEstimationResult> {
   const context = photoMealContextSchema.safeParse({ context: formData.get("context") ?? "" });
