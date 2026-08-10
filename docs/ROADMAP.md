@@ -1,6 +1,6 @@
 # Roadmap estratégico de Lakitchenapp
 
-Última actualización: 5 de agosto de 2026.
+Última actualización: 10 de agosto de 2026.
 
 ## Principios de producto
 
@@ -699,3 +699,24 @@ Después de validar el uso real:
 - mascota, rachas y retos como núcleo del producto.
 
 Estas funciones solo se reconsiderarán después de estabilizar precisión nutricional, fiabilidad y experiencia de uso.
+
+## Gate de lanzamiento público — orden obligatorio
+
+**Prioridad: crítica antes de abrir LaKitchen a usuarios externos. Estado: pendiente.**
+
+Este gate no añade funciones de alimentación nuevas. Reordena como criterios de lanzamiento los trabajos técnicos y de producto que ya existen en el roadmap y añade los elementos públicos que faltan. No se debe iniciar una campaña pública ni considerar estable la versión hasta cerrar los puntos aplicables.
+
+1. **Seguridad y privacidad de datos.** Auditar autenticación, RLS, Server Actions/RPC, permisos, endpoints, variables de entorno, secretos y headers de seguridad. Verificar que fotos, comidas, objetivos, inventario y demás datos privados no aparecen en logs ni quedan accesibles entre usuarios. Preparar política de privacidad y términos de uso coherentes con el comportamiento real de la aplicación y explicar el tratamiento de imágenes y funciones de IA.
+2. **Recuperación, backups y migraciones.** Promover 6.1 y 6.2 a requisito previo de lanzamiento: exportación/eliminación de datos, política de backups, restauración real probada y procedimiento de recuperación ante migraciones o despliegues defectuosos. Toda migración irreversible necesita estrategia explícita antes de producción.
+3. **Observabilidad, errores y abuso.** Cerrar 2.3–2.8: logs estructurados, monitorización de errores, rate limiting, health/readiness, rollback y rotación de secretos. Añadir estados de error, red, vacío y recuperación claros en los recorridos críticos sin exponer detalles internos.
+4. **Validación E2E y dispositivo real.** Revalidar registro/login, inventario, Macros, recetas, lotes, planes, historial, lista de compra y eliminación de cuenta. Completar las pruebas físicas pendientes de voz, cámara y código de barras en móvil/navegador real. Todo defecto bloqueante o de prioridad alta debe corregirse y volver a verificarse.
+5. **Responsive, rendimiento y accesibilidad básica.** Comprobar móvil, tablet y escritorio; carga inicial, consultas, imágenes y operaciones pesadas; foco, labels, contraste, tamaño táctil, teclado y lector de pantalla en los flujos esenciales. Mantener la auditoría sistemática de 3.2 como criterio de cierre.
+6. **Landing pública y CTA.** Crear una página pública que explique qué hace LaKitchen, con CTA principal visible para empezar/probar y, solo si aporta valor en móvil, CTA fijo. Mantener la aplicación autenticada separada de la landing y no indexar rutas privadas.
+7. **SEO técnico y compartición.** Añadir 404 personalizada, `robots.txt`, sitemap cuando corresponda, títulos y meta descriptions únicos, imagen Open Graph/social, `alt` útil y enlaces internos coherentes. Las páginas privadas, de cuenta y datos personales deben quedar fuera de indexación.
+8. **Analítica mínima y respetuosa con privacidad.** Medir únicamente tráfico, activación y conversiones necesarias para mejorar producto. No enviar a analítica contenido de comidas, fotos, inventario, objetivos, respuestas de IA ni otros datos privados. Añadir gestión de consentimiento solo cuando la solución elegida o la normativa aplicable lo requiera.
+9. **FAQ, contacto y documentación pública.** Añadir preguntas frecuentes sobre funcionamiento, privacidad, IA, fotos, datos nutricionales y eliminación de cuenta; ofrecer un canal claro para reportar problemas y mantener documentación de limitaciones reales.
+10. **Versionado y comunicación de release.** Identificar cada despliegue por versión/SHA, mantener changelog o release notes y documentar incidencias conocidas relevantes para usuarios.
+
+No son requisitos actuales de lanzamiento: testimonios, casos de estudio, mapa o indicaciones, Local Schema, foto de equipo o promesas comerciales de tiempo de respuesta.
+
+**Orden global ajustado:** completar primero la Fase 2, después los requisitos críticos de Fase 3 y 6 incorporados en este gate, cerrar el gate de lanzamiento y solo entonces priorizar nuevas funciones de Fase 5 o expansión SaaS que no sean necesarias para estabilidad.
