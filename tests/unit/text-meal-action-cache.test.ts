@@ -8,9 +8,9 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ from: vi.fn(), rpc: vi.fn() })) }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.createAdmin }));
 vi.mock("@/lib/supabase/auth", () => ({ getAuthenticatedUser: mocks.getUser }));
-vi.mock("@/lib/openai/text-meal-estimation", () => ({ estimateTextMealWithOpenAi: mocks.estimate, TEXT_MEAL_AI_MODEL_DEFAULT: "default-model" }));
+vi.mock("@/lib/openai/text-meal-estimation", () => ({ estimateTextMealWithOpenAi: mocks.estimate, TEXT_MEAL_AI_MODEL_DEFAULT: "default-model", TEXT_MEAL_PROVIDER_CONTRACT: { systemPrompt: "text-contract" } }));
 vi.mock("@/modules/meals/text-meal-cache", () => ({ createTextMealCacheKey: mocks.key, purgeExpiredTextMealCache: mocks.purge, readTextMealCache: mocks.read, writeTextMealCache: mocks.write }));
-vi.mock("@/lib/openai/photo-meal-estimation", () => ({ estimatePhotoMealWithOpenAi: vi.fn() }));
+vi.mock("@/lib/openai/photo-meal-estimation", () => ({ estimatePhotoMealWithOpenAi: vi.fn(), PHOTO_MEAL_PROVIDER_CONTRACT: { systemPrompt: "photo-contract" } }));
 
 import { estimateTextMealAction } from "@/app/macros/actions";
 
@@ -41,9 +41,9 @@ describe("estimateTextMealAction cache contract", () => {
 
   it("on a miss calls OpenAI with store-neutral provider options and caches only success", async () => {
     await expect(estimateTextMealAction({ description: "100 g arroz" })).resolves.toEqual(success);
-    expect(mocks.key).toHaveBeenCalledWith("100 g arroz", "default-model");
+    expect(mocks.key).toHaveBeenCalledWith("100 g arroz", "default-model", { systemPrompt: "text-contract" });
     expect(mocks.estimate).toHaveBeenCalledWith("100 g arroz", { apiKey: "secret", model: "default-model" });
-    expect(mocks.write).toHaveBeenCalledWith(expect.anything(), "user-a", "hash", "default-model", success);
+    expect(mocks.write).toHaveBeenCalledWith(expect.anything(), "user-a", "hash", "default-model", { systemPrompt: "text-contract" }, success);
     expect(mocks.purge).toHaveBeenCalledWith(mocks.admin);
   });
 

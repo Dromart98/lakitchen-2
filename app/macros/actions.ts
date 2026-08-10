@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isMealType } from "@/modules/meals/meal-types";
 import { parseMealBuilderConsumptionLines } from "@/modules/meals/meal-builder";
-import { estimateTextMealWithOpenAi, TEXT_MEAL_AI_MODEL_DEFAULT } from "@/lib/openai/text-meal-estimation";
-import { estimatePhotoMealWithOpenAi, PHOTO_MEAL_AI_MODEL_DEFAULT } from "@/lib/openai/photo-meal-estimation";
+import { estimateTextMealWithOpenAi, TEXT_MEAL_AI_MODEL_DEFAULT, TEXT_MEAL_PROVIDER_CONTRACT } from "@/lib/openai/text-meal-estimation";
+import { estimatePhotoMealWithOpenAi, PHOTO_MEAL_AI_MODEL_DEFAULT, PHOTO_MEAL_PROVIDER_CONTRACT } from "@/lib/openai/photo-meal-estimation";
 import { photoMealContextSchema, validatePhotoMealFile } from "@/modules/meals/photo-meal-ai";
 import { getAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -31,7 +31,7 @@ export async function estimateTextMealAction(input: unknown): Promise<TextMealEs
     const user = await getAuthenticatedUser(supabase, "text meal estimation");
     if (!user) return { status: "error", code: "unauthenticated" };
     const model = process.env.OPENAI_TEXT_MEAL_MODEL ?? TEXT_MEAL_AI_MODEL_DEFAULT;
-    const cacheKey = createTextMealCacheKey(request.data.description, model);
+    const cacheKey = createTextMealCacheKey(request.data.description, model, TEXT_MEAL_PROVIDER_CONTRACT);
     // The service-role client is created only after the browser session has
     // been authenticated; the cache owner always comes from that session.
     let cacheClient: TextMealCacheClient | null = null;
@@ -49,7 +49,7 @@ export async function estimateTextMealAction(input: unknown): Promise<TextMealEs
     if (!apiKey) return { status: "error", code: "missing-api-key" };
     const result = await estimateTextMealWithOpenAi(request.data.description, { apiKey, model });
     if (result.status === "success" && cacheClient) {
-      await writeTextMealCache(cacheClient, user.id, cacheKey, model, result).catch(() => undefined);
+      await writeTextMealCache(cacheClient, user.id, cacheKey, model, TEXT_MEAL_PROVIDER_CONTRACT, result).catch(() => undefined);
     }
     return result;
   } catch { return { status: "error", code: "unexpected-error" }; }
@@ -66,7 +66,7 @@ export async function estimatePhotoMealAction(formData: FormData): Promise<TextM
     if (!validated.ok) return { status: "error", code: validated.code };
     const bytes = new Uint8Array(await validated.file.arrayBuffer());
     const model = process.env.OPENAI_PHOTO_MEAL_MODEL ?? PHOTO_MEAL_AI_MODEL_DEFAULT;
-    const cacheKey = createPhotoMealCacheKey(bytes, context.data.context, model);
+    const cacheKey = createPhotoMealCacheKey(bytes, context.data.context, model, PHOTO_MEAL_PROVIDER_CONTRACT);
     let cacheClient: PhotoMealCacheClient | null = null;
     try {
       cacheClient = createAdminClient() as unknown as PhotoMealCacheClient;
@@ -83,7 +83,7 @@ export async function estimatePhotoMealAction(formData: FormData): Promise<TextM
     const imageDataUrl = `data:image/jpeg;base64,${Buffer.from(bytes).toString("base64")}`;
     const result = await estimatePhotoMealWithOpenAi(imageDataUrl, context.data.context, { apiKey, model });
     if (result.status === "success" && cacheClient) {
-      await writePhotoMealCache(cacheClient, user.id, cacheKey, model, result).catch(() => undefined);
+      await writePhotoMealCache(cacheClient, user.id, cacheKey, model, PHOTO_MEAL_PROVIDER_CONTRACT, result).catch(() => undefined);
     }
     return result;
   } catch { return { status: "error", code: "unexpected-error" }; }

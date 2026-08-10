@@ -2,7 +2,10 @@ import { createHash } from "node:crypto";
 
 import { validateCachedTextMealSuccess, type TextMealEstimationResult } from "@/modules/meals/text-meal-ai";
 
-export const PHOTO_MEAL_CACHE_CONTRACT_VERSION = "photo-meal-v1";
+function fingerprintContract(contract: unknown) {
+  return createHash("sha256").update(JSON.stringify(contract), "utf8").digest("hex");
+}
+
 export const PHOTO_MEAL_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const PHOTO_MEAL_CACHE_PURGE_LIMIT = 100;
 
@@ -29,11 +32,11 @@ export function createPhotoMealCacheKey(
   jpegBytes: Uint8Array,
   context: string,
   model: string,
-  contractVersion = PHOTO_MEAL_CACHE_CONTRACT_VERSION,
+  contract: unknown,
 ) {
   const normalizedContext = normalizePhotoMealCacheContext(context);
   return createHash("sha256")
-    .update(contractVersion, "utf8").update("\0")
+    .update(fingerprintContract(contract), "utf8").update("\0")
     .update(model, "utf8").update("\0")
     .update(normalizedContext, "utf8").update("\0")
     .update(jpegBytes)
@@ -48,14 +51,14 @@ export async function readPhotoMealCache(client: PhotoMealCacheClient, userId: s
   return validateCachedTextMealSuccess(data.result);
 }
 
-export async function writePhotoMealCache(client: PhotoMealCacheClient, userId: string, cacheKey: string, model: string, result: CachedSuccess, now = new Date()) {
+export async function writePhotoMealCache(client: PhotoMealCacheClient, userId: string, cacheKey: string, model: string, contract: unknown, result: CachedSuccess, now = new Date()) {
   const validated = validateCachedTextMealSuccess(result);
   if (!validated) return;
   await client.from("user_photo_meal_analysis_cache").upsert({
     user_id: userId,
     cache_key: cacheKey,
     model,
-    contract_version: PHOTO_MEAL_CACHE_CONTRACT_VERSION,
+    contract_version: fingerprintContract(contract),
     result: validated,
     expires_at: new Date(now.getTime() + PHOTO_MEAL_CACHE_TTL_MS).toISOString(),
   }, { onConflict: "user_id,cache_key" });

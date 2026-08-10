@@ -26,7 +26,7 @@ Estado ya cerrado:
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
 - **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
 
-Siguiente tarea: **iniciar la Fase 2 por 2.1 — Caché y reutilización**, auditando primero qué resultados ya se reutilizan y dónde siguen existiendo llamadas repetidas evitables.
+Siguiente tarea: **2.2 — Límites y presupuesto de IA**.
 
 Orden de implementación acordado:
 
@@ -211,11 +211,11 @@ No permitir que la IA calcule libremente estos valores cuando puedan obtenerse d
 
 Prioridad: alta.
 
-**Estado: en curso.** Primera tarea: **2.1 Caché y reutilización**.
+**Estado: en curso.** Siguiente tarea: **2.2 Límites y presupuesto de IA**.
 
 ### 2.1 Caché y reutilización
 
-**Estado: en curso.** Fases 2.1A y 2.1B completadas: los análisis válidos de Texto IA y Foto IA se reutilizan de forma privada por usuario durante 30 días mediante una huella de la entrada validada, el contexto normalizado, el modelo y la versión del contrato/prompt. En Foto IA la huella usa los bytes exactos del JPEG y no se persiste la imagen ni el contexto original. Los errores y solicitudes de aclaración no se almacenan.
+**Estado: completada.** Los análisis válidos de Texto IA y Foto IA se reutilizan de forma privada por usuario durante 30 días mediante una huella SHA-256 de la entrada validada, el contexto normalizado, el modelo y un fingerprint determinista del contrato efectivo del proveedor (prompt, retry cuando aplica, schema y opciones semánticas). En Foto IA la huella usa los bytes exactos del JPEG y no se persiste la imagen ni el contexto original. Los errores y solicitudes de aclaración no se almacenan. La auditoría final confirma que la resolución nutricional reutilizable restante pasa por `nutrition_catalog_items`, con frescura por fuente, y no requiere otra caché.
 
 - Reutilizar resultados nutricionales ya resueltos.
 - Evitar analizar varias veces el mismo alimento, texto o imagen.
