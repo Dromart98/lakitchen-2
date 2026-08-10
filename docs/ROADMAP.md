@@ -211,7 +211,7 @@ No permitir que la IA calcule libremente estos valores cuando puedan obtenerse d
 
 Prioridad: alta.
 
-**Estado: en curso.** Siguiente tarea: **2.2B2 Presupuesto diario aproximado de coste**.
+**Estado: en curso.** Siguiente tarea: **2.3 Logs estructurados y correlación**.
 
 ### 2.1 Caché y reutilización
 
@@ -223,9 +223,11 @@ Prioridad: alta.
 
 ### 2.2 Límites y presupuesto de IA
 
-**Estado: en curso.** **2.2A Medición privada de uso y coste: completada.** **2.2B1 Cuota diaria funcional y política por plan: completada.** **2.2B2 Presupuesto diario aproximado de coste: siguiente tarea.**
+**Estado: completada.** **2.2A Medición privada de uso y coste: completada.** **2.2B1 Cuota diaria funcional y política por plan: completada.** **2.2B2 Presupuesto diario aproximado de coste: completada.**
 
 2.2A mantiene un evento privado por invocación autenticada con función, proveedor, modelo, caché, intentos, latencia, resultado seguro, usage real agregado y coste histórico en micros USD según una versión explícita de precios. Los aciertos de caché no generan llamadas ni coste, los modelos sin tarifa conocida conservan coste desconocido y un fallo de telemetría no bloquea la función.
+
+2.2B2 mantiene el enforcement separado del histórico: antes de la primera llamada remota reserva atómicamente una parte provisional derivada del presupuesto diario configurado y de la cuota funcional, y después sustituye esa reserva por el coste real agregado de todos los intentos. Las reservas privadas tienen ID, liquidación idempotente y expiración; el presupuesto es una protección operativa aproximada, no un techo exacto de facturación.
 
 La auditoría server-side cubre Texto IA, Foto IA, nutrición de Inventario (incluida la selección IA entre candidatos USDA y el fallback nutricional), dictado de Inventario, dictado de Compra, sugerencias de Recetas y Plan diario. La ruta `/api/recipes/generate` queda fuera: usa `recipe-generator.service.ts`, un generador local determinista que no contacta a ningún proveedor y por tanto no produce usage medible. Las consultas deterministas a USDA y Open Food Facts tampoco son llamadas IA.
 

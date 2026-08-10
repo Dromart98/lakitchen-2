@@ -7,6 +7,7 @@ export const AI_PRICING_VERSION = "2026-08-10";
 export const AI_METERING_PERSIST_TIMEOUT_MS = 1_500;
 // Quota storage is a blocking guard, so keep its wait short and fail closed.
 export const AI_QUOTA_RESERVATION_TIMEOUT_MS = 1_500;
+export const AI_COST_GUARD_TIMEOUT_MS = 1_500;
 export const AI_DAILY_REQUEST_LIMIT_FALLBACK = 20;
 
 type TokenUsage = {
@@ -26,6 +27,10 @@ const MODEL_PRICING: Readonly<Record<string, Pricing>> = {
     outputUsdMicrosPerMillion: 15_000_000,
   },
 };
+
+export function hasKnownAiPricing(model: string): boolean {
+  return MODEL_PRICING[model] !== undefined;
+}
 
 const emptyUsage = (): TokenUsage => ({ inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, reasoningTokens: 0, totalTokens: 0 });
 
@@ -69,11 +74,27 @@ export type AiUsageFeature = "text_meal" | "photo_meal" | "inventory_nutrition" 
 
 type MeteringClient = { from(table: "ai_usage_events"): { insert(row: Record<string, unknown>): PromiseLike<{ error: unknown }> } };
 type QuotaClient = { rpc(name: "reserve_ai_daily_request", args: { p_user_id: string; p_limit: number }): PromiseLike<{ data: boolean | null; error: unknown }> };
-export type AiAccessErrorCode = "daily-ai-limit" | "ai-access-unavailable" | "ai-feature-disabled";
+type CostGuardClient = {
+  rpc(name: "reserve_ai_daily_cost", args: { p_user_id: string; p_reservation_id: string; p_budget_usd_micros: number; p_reserved_usd_micros: number }): PromiseLike<{ data: string | null; error: unknown }>;
+  rpc(name: "settle_ai_daily_cost", args: { p_user_id: string; p_reservation_id: string; p_actual_cost_usd_micros: number }): PromiseLike<{ data: boolean | null; error: unknown }>;
+};
+export type AiAccessErrorCode = "daily-ai-limit" | "daily-ai-cost-limit" | "ai-access-unavailable" | "ai-feature-disabled";
 
 export function getAiDailyRequestLimit(value = process.env.AI_DAILY_REQUEST_LIMIT): number {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : AI_DAILY_REQUEST_LIMIT_FALLBACK;
+}
+
+export function getAiDailyCostBudgetUsdMicros(value = process.env.AI_DAILY_COST_BUDGET_USD_MICROS): number | null {
+  if (value === undefined || !/^[1-9]\d*$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+// Each logical invocation provisionally reserves an equal share of the configured
+// daily budget. Real aggregated usage replaces that reservation at settlement.
+export function getAiProvisionalCostReservation(budgetUsdMicros: number, dailyRequestLimit: number): number {
+  return Math.max(1, Math.ceil(budgetUsdMicros / dailyRequestLimit));
 }
 
 async function waitForMeteringInsert(operation: PromiseLike<{ error: unknown }>) {
@@ -104,12 +125,29 @@ async function waitForQuotaReservation(operation: PromiseLike<{ data: boolean | 
   }
 }
 
-export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeature; model: string; client?: MeteringClient | null; quotaClient?: QuotaClient | null; plan?: AiPlan; featurePolicy?: typeof isAiFeatureEnabled; dailyLimit?: number; now?: () => number; baseFetch?: typeof fetch }) {
+async function waitForCostGuard<T>(operation: PromiseLike<{ data: T; error: unknown }>) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(operation),
+      new Promise<never>((_resolve, reject) => {
+        timeoutId = setTimeout(() => reject(new Error("cost-guard-timeout")), AI_COST_GUARD_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
+}
+
+export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeature; model: string; client?: MeteringClient | null; quotaClient?: QuotaClient | null; costGuardClient?: CostGuardClient | null; plan?: AiPlan; featurePolicy?: typeof isAiFeatureEnabled; dailyLimit?: number; dailyCostBudgetUsdMicros?: number | null; reservationId?: string; now?: () => number; baseFetch?: typeof fetch }) {
   const startedAt = (input.now ?? Date.now)();
   const aggregate = emptyUsage();
   let providerRequestCount = 0;
   let accessError: AiAccessErrorCode | null = null;
   let reservation: Promise<boolean> | null = null;
+  let costReservationCreated = false;
+  const costBudget = input.dailyCostBudgetUsdMicros === undefined ? getAiDailyCostBudgetUsdMicros() : input.dailyCostBudgetUsdMicros;
+  const reservationId = input.reservationId ?? crypto.randomUUID();
 
   function authorizeFeature(): boolean {
     if (!(input.featurePolicy ?? isAiFeatureEnabled)(input.plan ?? "default", input.feature)) {
@@ -130,7 +168,29 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
         }));
         if (error) throw new Error("quota-reservation-failed");
         if (data !== true) accessError = "daily-ai-limit";
-        return data === true;
+        if (data !== true) return false;
+
+        if (costBudget !== null) {
+          if (!hasKnownAiPricing(input.model)) {
+            accessError = "ai-access-unavailable";
+            return false;
+          }
+          const dailyLimit = input.dailyLimit ?? getAiDailyRequestLimit();
+          const client = input.costGuardClient ?? createAdminClient() as unknown as CostGuardClient;
+          const { data: costStatus, error: costError } = await waitForCostGuard(client.rpc("reserve_ai_daily_cost", {
+            p_user_id: input.userId,
+            p_reservation_id: reservationId,
+            p_budget_usd_micros: costBudget,
+            p_reserved_usd_micros: getAiProvisionalCostReservation(costBudget, dailyLimit),
+          }));
+          if (costError) throw new Error("cost-reservation-failed");
+          if (costStatus !== "reserved") {
+            accessError = costStatus === "limit" ? "daily-ai-cost-limit" : "ai-access-unavailable";
+            return false;
+          }
+          costReservationCreated = true;
+        }
+        return true;
       } catch {
         accessError = "ai-access-unavailable";
         return false;
@@ -164,6 +224,22 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
     const cacheHit = result.cacheHit === true;
     const usage = cacheHit ? emptyUsage() : aggregate;
     const attempts = cacheHit ? 0 : providerRequestCount;
+    const actualCost = cacheHit || accessError ? 0 : calculateAiCostUsdMicros(input.model, usage);
+    if (costReservationCreated) {
+      try {
+        if (actualCost === null) throw new Error("cost-settlement-missing-pricing");
+        const client = input.costGuardClient ?? createAdminClient() as unknown as CostGuardClient;
+        const { data, error } = await waitForCostGuard(client.rpc("settle_ai_daily_cost", {
+          p_user_id: input.userId,
+          p_reservation_id: reservationId,
+          p_actual_cost_usd_micros: actualCost,
+        }));
+        if (error || data !== true) throw new Error("cost-settlement-failed");
+      } catch {
+        // Leave the reservation active until its expiry rather than under-counting.
+        console.warn("ai_daily_cost_settlement_failed");
+      }
+    }
     let client = input.client;
     try {
       client ??= createAdminClient() as unknown as MeteringClient;
@@ -183,7 +259,7 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
         output_tokens: usage.outputTokens,
         reasoning_tokens: usage.reasoningTokens,
         total_tokens: usage.totalTokens,
-        estimated_cost_usd_micros: cacheHit || accessError ? 0 : calculateAiCostUsdMicros(input.model, usage),
+        estimated_cost_usd_micros: actualCost,
         pricing_version: AI_PRICING_VERSION,
       }));
       if (error) throw new Error("metering-insert-failed");

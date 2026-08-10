@@ -31,6 +31,7 @@ const errorMessages: Record<string, string> = {
   "nutrition-unavailable":
     "No se pudo calcular la nutrición del plan con tu inventario actual.",
   "missing-api-key": "La generación con IA no está configurada todavía.",
+  "daily-ai-cost-limit": "Has alcanzado el límite diario de funciones con IA. Podrás volver a usarlas mañana.",
   "daily-ai-limit": "Has alcanzado el límite de funciones con IA de hoy. Podrás volver a usarlas mañana.",
   "ai-access-unavailable": "Las funciones con IA no están disponibles ahora. Inténtalo más tarde.",
   "ai-feature-disabled": "Esta función no está disponible.",

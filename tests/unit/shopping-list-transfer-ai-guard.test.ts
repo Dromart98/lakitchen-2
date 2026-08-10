@@ -63,6 +63,7 @@ const pendingRedirect = /redirect:\/shopping-list\?shoppingListSuccess=item-tran
 describe("shopping transfer AI guard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
     mocks.usageRows.length = 0;
     mocks.featureEnabled = true;
     mocks.quotaRpc.mockResolvedValue({ data: true, error: null });
@@ -92,6 +93,20 @@ describe("shopping transfer AI guard", () => {
 
   it("keeps the transferred item pending when the daily limit blocks the fallback", async () => {
     mocks.quotaRpc.mockResolvedValue({ data: false, error: null });
+    mocks.resolve.mockImplementation(async (_client, _userId, _input, options) => {
+      await options.fetchImpl("https://api.openai.com/v1/responses");
+      return { status: "unresolved", reason: "provider-error", meteringCacheHit: false };
+    });
+    await expect(transferShoppingListItemToInventoryAction(form())).rejects.toThrow(pendingRedirect);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(transferRpc).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the transferred item pending when the cost budget blocks the fallback", async () => {
+    vi.stubEnv("AI_DAILY_COST_BUDGET_USD_MICROS", "1000");
+    mocks.quotaRpc.mockImplementation(async (name: string) => name === "reserve_ai_daily_request"
+      ? { data: true, error: null }
+      : { data: "limit", error: null });
     mocks.resolve.mockImplementation(async (_client, _userId, _input, options) => {
       await options.fetchImpl("https://api.openai.com/v1/responses");
       return { status: "unresolved", reason: "provider-error", meteringCacheHit: false };

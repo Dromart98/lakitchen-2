@@ -36,7 +36,7 @@ export type VoiceShoppingDraftItem = z.infer<typeof VoiceShoppingDraftItemSchema
 export type VoiceShoppingBatchResult =
   | { status: "success"; items: VoiceShoppingDraftItem[] }
   | { status: "needs-clarification"; items: VoiceShoppingDraftItem[]; message: string }
-  | { status: "error"; code: "invalid-input" | "too-many-products" | "not-configured" | "daily-ai-limit" | "ai-access-unavailable" | "ai-feature-disabled" | "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response"; message: string };
+  | { status: "error"; code: "invalid-input" | "too-many-products" | "not-configured" | "daily-ai-cost-limit" | "daily-ai-limit" | "ai-access-unavailable" | "ai-feature-disabled" | "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response"; message: string };
 
 export function parseVoiceShoppingBatchInput(text: string) {
   const value = text.trim();

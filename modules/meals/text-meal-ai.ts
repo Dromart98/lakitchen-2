@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export type MacroTotals = { calories: number; protein_g: number; carbs_g: number; fat_g: number };
 export type TextMealEstimatedIngredient = { normalized_name: string; display_name: string; name: string; quantity: number; unit: string; preparation: string | null; confidence: "high" | "medium" | "low"; calories: number; protein_g: number; carbs_g: number; fat_g: number };
-export type TextMealEstimationErrorCode = "invalid-input" | "invalid-photo" | "unsupported-photo" | "photo-too-large" | "photo-processing-failed" | "unauthenticated" | "missing-api-key" | "daily-ai-limit" | "ai-access-unavailable" | "ai-feature-disabled" | "provider-timeout" | "provider-error" | "invalid-ai-response" | "unexpected-error";
+export type TextMealEstimationErrorCode = "invalid-input" | "invalid-photo" | "unsupported-photo" | "photo-too-large" | "photo-processing-failed" | "unauthenticated" | "missing-api-key" | "daily-ai-cost-limit" | "daily-ai-limit" | "ai-access-unavailable" | "ai-feature-disabled" | "provider-timeout" | "provider-error" | "invalid-ai-response" | "unexpected-error";
 export type TextMealEstimationResult =
   | { status: "success"; suggested_name: string; ingredients: TextMealEstimatedIngredient[]; total: MacroTotals; assumptions: string[]; confidence: "high" | "medium" | "low" }
   | { status: "needs-clarification"; message: string }

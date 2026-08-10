@@ -396,6 +396,6 @@ export async function estimateVoiceShoppingBatchAction(text: string): Promise<Vo
   const result = await generateVoiceShoppingBatch(input, { apiKey, model, fetchImpl: meter.fetchImpl });
   await meter.finish(classifyAiResult(result));
   const accessError = meter.getAccessError();
-  if (accessError) return { status: "error", code: accessError, message: accessError === "daily-ai-limit" ? "Has alcanzado el límite de funciones con IA de hoy. Podrás volver a usarlas mañana." : "Esta función no está disponible ahora." };
+  if (accessError) return { status: "error", code: accessError, message: accessError === "daily-ai-cost-limit" ? "Has alcanzado el límite diario de funciones con IA. Podrás volver a usarlas mañana." : accessError === "daily-ai-limit" ? "Has alcanzado el límite de funciones con IA de hoy. Podrás volver a usarlas mañana." : "Esta función no está disponible ahora." };
   return result;
 }
