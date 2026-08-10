@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   estimate: vi.fn(), getUser: vi.fn(), read: vi.fn(), write: vi.fn(), purge: vi.fn(), key: vi.fn(() => "hash"),
-  createAdmin: vi.fn(), admin: { from: vi.fn() },
+  createAdmin: vi.fn(), admin: { from: vi.fn() }, featureEnabled: true,
 }));
+vi.mock("@/lib/ai/access-policy", () => ({ isAiFeatureEnabled: () => mocks.featureEnabled }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({})) }));
@@ -24,6 +25,7 @@ describe("estimatePhotoMealAction cache contract", () => {
     vi.clearAllMocks(); mocks.getUser.mockResolvedValue({ id: "user-a" }); mocks.read.mockResolvedValue(null);
     mocks.write.mockResolvedValue(undefined); mocks.purge.mockResolvedValue(undefined); mocks.createAdmin.mockReturnValue(mocks.admin);
     mocks.estimate.mockResolvedValue(success); process.env.OPENAI_API_KEY = "secret"; delete process.env.OPENAI_PHOTO_MEAL_MODEL;
+    mocks.featureEnabled = true;
   });
 
   it("returns a hit without OpenAI or provider configuration", async () => {
@@ -31,6 +33,12 @@ describe("estimatePhotoMealAction cache contract", () => {
     await expect(estimatePhotoMealAction(form())).resolves.toEqual(success);
     expect(mocks.read).toHaveBeenCalledWith(mocks.admin, "user-a", "hash");
     expect(mocks.estimate).not.toHaveBeenCalled(); expect(mocks.write).not.toHaveBeenCalled();
+  });
+
+  it("blocks a disabled feature before reading or returning a cache hit", async () => {
+    mocks.featureEnabled = false; mocks.read.mockResolvedValue(success);
+    await expect(estimatePhotoMealAction(form())).resolves.toEqual({ status: "error", code: "ai-feature-disabled" });
+    expect(mocks.read).not.toHaveBeenCalled(); expect(mocks.estimate).not.toHaveBeenCalled();
   });
 
   it("validates before lookup, then caches a successful miss for the session user", async () => {

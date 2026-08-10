@@ -48,7 +48,7 @@ export type VoiceInventoryDraftItem = z.infer<typeof VoiceInventoryDraftItemSche
 export type VoiceInventoryBatchResult =
  | { status: "success"; items: VoiceInventoryDraftItem[] }
  | { status: "needs-clarification"; items: VoiceInventoryDraftItem[]; message: string }
- | { status: "error"; code: "invalid-input" | "too-many-products" | "not-configured" | "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response"; message: string };
+ | { status: "error"; code: "invalid-input" | "too-many-products" | "not-configured" | "daily-ai-limit" | "ai-access-unavailable" | "ai-feature-disabled" | "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response"; message: string };
 
 export function parseVoiceInventoryBatchInput(text: string) { const value = text.trim(); return value && value.length <= VOICE_INVENTORY_BATCH_MAX_LENGTH ? value : null; }
 

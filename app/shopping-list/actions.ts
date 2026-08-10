@@ -10,6 +10,7 @@ import { toVoiceShoppingBatchSaveInput } from "@/modules/shopping/voice-shopping
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { classifyAiResult, createAiUsageMeter } from "@/lib/ai/metering";
+import { INVENTORY_NUTRITION_AI_MODEL_DEFAULT } from "@/modules/inventory/inventory-ai-nutrition";
 import {
   getShoppingListTransferNutritionPlan,
   planShoppingListTransferResolutionUpdate,
@@ -289,7 +290,18 @@ export async function transferShoppingListItemToInventoryAction(formData: FormDa
   if (nutritionPlan.status === "already-complete") {
     shoppingListSuccess = "item-transferred-with-nutrition";
   } else if (nutritionPlan.status === "estimate") {
-    const nutritionResult = await resolveInventoryNutritionForUser(supabase, user.id, nutritionPlan.input);
+    const model = process.env.OPENAI_INVENTORY_NUTRITION_MODEL ?? INVENTORY_NUTRITION_AI_MODEL_DEFAULT;
+    const meter = createAiUsageMeter({ userId: user.id, feature: "inventory_nutrition", model });
+    if (!meter.authorizeFeature()) {
+      await meter.finish({ outcome: "error", errorCode: "ai-feature-disabled" });
+      revalidateShoppingListTransferPaths();
+      redirect(`/shopping-list?shoppingListSuccess=${shoppingListSuccess}`);
+    }
+    const nutritionResult = await resolveInventoryNutritionForUser(supabase, user.id, nutritionPlan.input, {
+      fetchImpl: meter.fetchImpl,
+      openAiModel: model,
+    });
+    await meter.finish({ ...classifyAiResult(nutritionResult), cacheHit: nutritionResult.meteringCacheHit });
 
     if (nutritionResult.status === "resolved") {
       const resolutionUpdate = planShoppingListTransferResolutionUpdate(transferredItem.food_catalog_item_id, nutritionResult);
@@ -373,11 +385,17 @@ export async function estimateVoiceShoppingBatchAction(text: string): Promise<Vo
   if (!input) return { status: "error", code: "invalid-input", message: "Escribe una lista de entre 1 y 4.000 caracteres." };
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "shopping list batch estimate");
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return { status: "error", code: "not-configured", message: "El análisis no está disponible ahora." };
   const model = process.env.OPENAI_VOICE_SHOPPING_BATCH_MODEL || "gpt-5.6-terra";
   const meter = createAiUsageMeter({ userId: user.id, feature: "voice_shopping", model });
+  if (!meter.authorizeFeature()) {
+    await meter.finish({ outcome: "error", errorCode: "ai-feature-disabled" });
+    return { status: "error", code: "ai-feature-disabled", message: "Esta función no está disponible." };
+  }
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return { status: "error", code: "not-configured", message: "El análisis no está disponible ahora." };
   const result = await generateVoiceShoppingBatch(input, { apiKey, model, fetchImpl: meter.fetchImpl });
   await meter.finish(classifyAiResult(result));
+  const accessError = meter.getAccessError();
+  if (accessError) return { status: "error", code: accessError, message: accessError === "daily-ai-limit" ? "Has alcanzado el límite de funciones con IA de hoy. Podrás volver a usarlas mañana." : "Esta función no está disponible ahora." };
   return result;
 }

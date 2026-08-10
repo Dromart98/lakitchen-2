@@ -65,6 +65,13 @@ export async function generateDailyPlanAction(input: unknown): Promise<DailyPlan
     const user = await getAuthenticatedUser(supabase, "daily plan");
     if (!user) return { status: "error", code: "unauthenticated" };
 
+    const model = process.env.OPENAI_DAILY_PLAN_MODEL ?? DAILY_PLAN_AI_MODEL_DEFAULT;
+    const meter = createAiUsageMeter({ userId: user.id, feature: "daily_plan", model });
+    if (!meter.authorizeFeature()) {
+      await meter.finish({ outcome: "error", errorCode: "ai-feature-disabled" });
+      return { status: "error", code: "ai-feature-disabled" };
+    }
+
     const todayKey = getCurrentInventoryExpirationDateKey();
     if (!isAllowedPlanDate(request.data.plan_date, todayKey)) return { status: "error", code: "invalid-input" };
 
@@ -74,14 +81,14 @@ export async function generateDailyPlanAction(input: unknown): Promise<DailyPlan
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return { status: "error", code: "missing-api-key" };
 
-    const model = process.env.OPENAI_DAILY_PLAN_MODEL ?? DAILY_PLAN_AI_MODEL_DEFAULT;
-    const meter = createAiUsageMeter({ userId: user.id, feature: "daily_plan", model });
     const generated = await generateDailyPlanWithOpenAi(request.data, context.target, context.inventoryItems, context.planDateKey, {
       apiKey,
       model,
       fetchImpl: meter.fetchImpl,
     });
     await meter.finish(classifyAiResult(generated));
+    const accessError = meter.getAccessError();
+    if (accessError) return { status: "error", code: accessError };
     if (generated.status !== "success") {
       if (context.inventoryItems.length <= 3 && (generated.status === "needs-clarification" || generated.code === "invalid-ai-response")) {
         return { status: "needs-clarification", message: "No se pudo construir un día completo con los productos utilizables actuales. Completa la nutrición de más productos o añade variedad al inventario." };

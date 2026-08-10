@@ -33,6 +33,10 @@ export async function estimateTextMealAction(input: unknown): Promise<TextMealEs
     if (!user) return { status: "error", code: "unauthenticated" };
     const model = process.env.OPENAI_TEXT_MEAL_MODEL ?? TEXT_MEAL_AI_MODEL_DEFAULT;
     const meter = createAiUsageMeter({ userId: user.id, feature: "text_meal", model });
+    if (!meter.authorizeFeature()) {
+      await meter.finish({ outcome: "error", errorCode: "ai-feature-disabled" });
+      return { status: "error", code: "ai-feature-disabled" };
+    }
     const cacheKey = createTextMealCacheKey(request.data.description, model, TEXT_MEAL_PROVIDER_CONTRACT);
     // The service-role client is created only after the browser session has
     // been authenticated; the cache owner always comes from that session.
@@ -60,6 +64,8 @@ export async function estimateTextMealAction(input: unknown): Promise<TextMealEs
       await writeTextMealCache(cacheClient, user.id, cacheKey, model, TEXT_MEAL_PROVIDER_CONTRACT, result).catch(() => undefined);
     }
     await meter.finish(classifyAiResult(result));
+    const accessError = meter.getAccessError();
+    if (accessError) return { status: "error", code: accessError };
     return result;
   } catch { return { status: "error", code: "unexpected-error" }; }
 }
@@ -76,6 +82,10 @@ export async function estimatePhotoMealAction(formData: FormData): Promise<TextM
     const bytes = new Uint8Array(await validated.file.arrayBuffer());
     const model = process.env.OPENAI_PHOTO_MEAL_MODEL ?? PHOTO_MEAL_AI_MODEL_DEFAULT;
     const meter = createAiUsageMeter({ userId: user.id, feature: "photo_meal", model });
+    if (!meter.authorizeFeature()) {
+      await meter.finish({ outcome: "error", errorCode: "ai-feature-disabled" });
+      return { status: "error", code: "ai-feature-disabled" };
+    }
     const cacheKey = createPhotoMealCacheKey(bytes, context.data.context, model, PHOTO_MEAL_PROVIDER_CONTRACT);
     let cacheClient: PhotoMealCacheClient | null = null;
     try {
@@ -102,6 +112,8 @@ export async function estimatePhotoMealAction(formData: FormData): Promise<TextM
       await writePhotoMealCache(cacheClient, user.id, cacheKey, model, PHOTO_MEAL_PROVIDER_CONTRACT, result).catch(() => undefined);
     }
     await meter.finish(classifyAiResult(result));
+    const accessError = meter.getAccessError();
+    if (accessError) return { status: "error", code: accessError };
     return result;
   } catch { return { status: "error", code: "unexpected-error" }; }
 }

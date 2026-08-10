@@ -276,6 +276,13 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
     return { status: "error", code: "unauthenticated" };
   }
 
+  const model = process.env.OPENAI_RECIPE_MODEL ?? RECIPE_AI_MODEL_DEFAULT;
+  const meter = createAiUsageMeter({ userId: user.id, feature: "recipe_generation", model });
+  if (!meter.authorizeFeature()) {
+    await meter.finish({ outcome: "error", errorCode: "ai-feature-disabled" });
+    return { status: "error", code: "ai-feature-disabled" };
+  }
+
   const recipeClient = supabase as unknown as RecipeAiSupabaseClient;
   const { data, error } = await recipeClient
     .from("inventory_items")
@@ -309,8 +316,6 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
   if (!apiKey) return { status: "error", code: "missing-api-key" };
 
   try {
-    const model = process.env.OPENAI_RECIPE_MODEL ?? RECIPE_AI_MODEL_DEFAULT;
-    const meter = createAiUsageMeter({ userId: user.id, feature: "recipe_generation", model });
     const result = await generateRecipesWithOpenAi(request, inventoryItems, {
       apiKey,
       model,
@@ -320,6 +325,8 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
         : undefined,
     });
     await meter.finish(classifyAiResult(result));
+    const accessError = meter.getAccessError();
+    if (accessError) return { status: "error", code: accessError };
 
     if (result.status !== "success") return result;
 

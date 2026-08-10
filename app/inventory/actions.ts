@@ -38,15 +38,18 @@ export type InventoryNutritionAiActionResult =
   | { status: "needs-clarification"; message: string }
   | {
       status: "error";
-      code: "invalid-input" | "not-configured" | "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response";
+      code: "invalid-input" | "not-configured" | "daily-ai-limit" | "ai-access-unavailable" | "ai-feature-disabled" | "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response";
       message: string;
     };
 
-type InventoryNutritionAiErrorCode = "invalid-input" | "not-configured" | "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response";
+type InventoryNutritionAiErrorCode = "invalid-input" | "not-configured" | "daily-ai-limit" | "ai-access-unavailable" | "ai-feature-disabled" | "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response";
 
 const inventoryNutritionAiErrorMessages: Record<InventoryNutritionAiErrorCode, string> = {
   "invalid-input": "Completa un nombre y una unidad válidos antes de calcular.",
   "not-configured": "El cálculo nutricional no está configurado todavía.",
+  "daily-ai-limit": "Has alcanzado el límite de funciones con IA de hoy. Podrás volver a usarlas mañana.",
+  "ai-access-unavailable": "Las funciones con IA no están disponibles ahora. Inténtalo más tarde.",
+  "ai-feature-disabled": "Esta función no está disponible.",
   timeout: "La estimación está tardando demasiado. Inténtalo de nuevo.",
   "rate-limited": "Hay demasiadas solicitudes en este momento. Inténtalo de nuevo en unos minutos.",
   "provider-error": "No se pudieron estimar los macros. Inténtalo de nuevo.",
@@ -66,8 +69,14 @@ export async function estimateInventoryNutritionAction(input: InventoryNutrition
 
   const model = process.env.OPENAI_INVENTORY_NUTRITION_MODEL ?? INVENTORY_NUTRITION_AI_MODEL_DEFAULT;
   const meter = createAiUsageMeter({ userId: user.id, feature: "inventory_nutrition", model });
+  if (!meter.authorizeFeature()) {
+    await meter.finish({ outcome: "error", errorCode: "ai-feature-disabled" });
+    return inventoryNutritionAiError("ai-feature-disabled");
+  }
   const result = await resolveInventoryNutritionForUser(supabase, user.id, validatedInput, { fetchImpl: meter.fetchImpl, openAiModel: model });
   await meter.finish({ ...classifyAiResult(result), cacheHit: result.meteringCacheHit });
+  const accessError = meter.getAccessError();
+  if (accessError) return inventoryNutritionAiError(accessError);
   if (result.status === "needs-clarification") return result;
   if (result.status !== "resolved") return inventoryNutritionAiError(result.reason === "not-configured" ? "not-configured" : "provider-error");
   return { status: "success", estimate: { nutrition_basis: result.nutritionBasis, calories: result.calories, protein_g: result.proteinG, carbs_g: result.carbsG, fat_g: result.fatG, confidence: "medium", assumptions: result.assumptions, food_catalog_item_id: result.foodCatalogItemId ?? null } };
@@ -519,13 +528,19 @@ export async function estimateVoiceInventoryBatchAction(text: string) {
   if (!input) return { status: "error" as const, code: "invalid-input" as const, message: "Escribe una lista de hasta 4.000 caracteres." };
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "voice inventory batch estimate");
+  const model = process.env.OPENAI_VOICE_INVENTORY_BATCH_MODEL || "gpt-5.6-terra";
+  const meter = createAiUsageMeter({ userId: user.id, feature: "voice_inventory", model });
+  if (!meter.authorizeFeature()) {
+    await meter.finish({ outcome: "error", errorCode: "ai-feature-disabled" });
+    return { status: "error" as const, code: "ai-feature-disabled" as const, message: "Esta función no está disponible." };
+  }
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { status: "error" as const, code: "not-configured" as const, message: "La estimación con IA no está configurada todavía." };
   const { generateVoiceInventoryBatch } = await import("@/lib/openai/voice-inventory-batch-generation");
-  const model = process.env.OPENAI_VOICE_INVENTORY_BATCH_MODEL || "gpt-5.6-terra";
-  const meter = createAiUsageMeter({ userId: user.id, feature: "voice_inventory", model });
   const generated = await generateVoiceInventoryBatch(input, { apiKey, model, fetchImpl: meter.fetchImpl });
   await meter.finish(classifyAiResult(generated));
+  const accessError = meter.getAccessError();
+  if (accessError) return { status: "error" as const, code: accessError, message: accessError === "daily-ai-limit" ? "Has alcanzado el límite de funciones con IA de hoy. Podrás volver a usarlas mañana." : "Esta función no está disponible ahora." };
   if (generated.status === "error") return generated;
   try {
     const { applyNutritionCatalogToVoiceBatch } = await import("@/modules/inventory/voice-inventory-catalog");
