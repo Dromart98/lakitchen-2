@@ -93,7 +93,7 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
     let client = input.client;
     try {
       client ??= createAdminClient() as unknown as MeteringClient;
-      await client.from("ai_usage_events").insert({
+      const { error } = await client.from("ai_usage_events").insert({
         user_id: input.userId,
         feature: input.feature,
         provider: "openai",
@@ -112,16 +112,17 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
         estimated_cost_usd_micros: cacheHit ? 0 : calculateAiCostUsdMicros(input.model, usage),
         pricing_version: AI_PRICING_VERSION,
       });
-    } catch (error) {
-      console.warn("ai_usage_metering_write_failed", error instanceof Error ? error.message : "unknown");
+      if (error) throw new Error("metering-insert-failed");
+    } catch {
+      console.warn("ai_usage_metering_write_failed");
     }
   }
 
   return { fetchImpl, finish };
 }
 
-export function classifyAiResult(result: { status: string; code?: string }): { outcome: AiUsageOutcome; errorCode?: string } {
+export function classifyAiResult(result: { status: string; code?: string; reason?: "not-found" | "not-configured" | "provider-error" }): { outcome: AiUsageOutcome; errorCode?: string } {
   if (result.status === "success" || result.status === "resolved" || result.status === "selected") return { outcome: "success" };
   if (result.status === "needs-clarification") return { outcome: "clarification" };
-  return { outcome: "error", errorCode: result.code ?? "provider-error" };
+  return { outcome: "error", errorCode: result.code ?? result.reason ?? "provider-error" };
 }
