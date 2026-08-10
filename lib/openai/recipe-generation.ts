@@ -1,3 +1,4 @@
+import { createLogger } from "@/lib/server/logger";
 import {
   buildRecipeAiInputText,
   RECIPE_AI_JSON_SCHEMA,
@@ -80,7 +81,7 @@ function parseRecipeAiResponse(
   const extracted = extractRecipeAiOutputText(responseBody);
   if (extracted.status !== "success") {
     const code = extracted.status === "provider-error" ? "provider-error" : extracted.status;
-    console.warn("recipe_ai_response_rejected", { reason: code });
+    createLogger("ai", "recipe_generation").warn("provider_response_rejected", { reason: code });
     return { status: "error", code };
   }
 
@@ -88,7 +89,7 @@ function parseRecipeAiResponse(
     const parsedJson = JSON.parse(extracted.text) as unknown;
     return validateRecipeAiProviderOutput(request, inventoryItems, parsedJson, urgentInventoryItemIds);
   } catch {
-    console.warn("recipe_ai_response_rejected", { reason: "invalid-json" });
+    createLogger("ai", "recipe_generation").warn("provider_response_rejected", { reason: "invalid-json" });
     return { status: "error", code: "invalid-json" };
   }
 }

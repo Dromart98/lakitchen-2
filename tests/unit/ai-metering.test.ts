@@ -72,7 +72,7 @@ describe("private AI usage metering", () => {
       client: { from: () => ({ insert: async () => { throw new Error("database unavailable"); } }) } as never,
     });
     await expect(meter.finish({ outcome: "error", errorCode: "provider-timeout" })).resolves.toBeUndefined();
-    expect(warn).toHaveBeenCalledWith("ai_usage_metering_write_failed");
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('"event":"usage_metering_write_failed"'));
     warn.mockRestore();
   });
 
@@ -83,7 +83,7 @@ describe("private AI usage metering", () => {
       client: { from: () => ({ insert: async () => ({ error: { message: "private database detail" } }) }) } as never,
     });
     await expect(meter.finish({ outcome: "success" })).resolves.toBeUndefined();
-    expect(warn).toHaveBeenCalledWith("ai_usage_metering_write_failed");
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('"event":"usage_metering_write_failed"'));
     expect(warn).not.toHaveBeenCalledWith(expect.anything(), expect.stringContaining("private"));
     warn.mockRestore();
   });
@@ -99,7 +99,7 @@ describe("private AI usage metering", () => {
       const finish = meter.finish({ outcome: "success" });
       await vi.advanceTimersByTimeAsync(AI_METERING_PERSIST_TIMEOUT_MS);
       await expect(finish).resolves.toBeUndefined();
-      expect(warn).toHaveBeenCalledWith("ai_usage_metering_write_failed");
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('"event":"usage_metering_write_failed"'));
       expect(vi.getTimerCount()).toBe(0);
     } finally {
       warn.mockRestore();

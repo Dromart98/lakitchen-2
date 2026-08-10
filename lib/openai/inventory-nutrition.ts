@@ -1,3 +1,4 @@
+import { createLogger } from "@/lib/server/logger";
 import {
   buildInventoryNutritionAiInputText,
   INVENTORY_NUTRITION_AI_JSON_SCHEMA,
@@ -134,12 +135,12 @@ function parseInventoryNutritionAiResponse(
   const extracted = extractInventoryNutritionAiOutputText(responseBody);
 
   if (extracted.status === "provider-error") {
-    console.warn("inventory_nutrition_ai_response_rejected", { reason: extracted.reason });
+    createLogger("ai", "inventory_nutrition").warn("provider_response_rejected", { reason: extracted.reason });
     return { status: "error", code: "provider-error" };
   }
 
   if (extracted.status === "invalid-ai-response") {
-    console.warn("inventory_nutrition_ai_response_rejected", { reason: extracted.reason });
+    createLogger("ai", "inventory_nutrition").warn("provider_response_rejected", { reason: extracted.reason });
     return { status: "error", code: "invalid-ai-response" };
   }
 
@@ -147,12 +148,12 @@ function parseInventoryNutritionAiResponse(
     const parsedJson = JSON.parse(extracted.text) as unknown;
     const validated = validateInventoryNutritionAiOutput(input, parsedJson);
     if (validated.status === "invalid") {
-      console.warn("inventory_nutrition_ai_response_rejected", { reason: `validation-${validated.reason}` });
+      createLogger("ai", "inventory_nutrition").warn("provider_response_rejected", { reason: `validation-${validated.reason}` });
       return { status: "error", code: "invalid-ai-response" };
     }
     return validated;
   } catch {
-    console.warn("inventory_nutrition_ai_response_rejected", { reason: "invalid-json" });
+    createLogger("ai", "inventory_nutrition").warn("provider_response_rejected", { reason: "invalid-json" });
     return { status: "error", code: "invalid-ai-response" };
   }
 }

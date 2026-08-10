@@ -1,6 +1,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAiFeatureEnabled, type AiPlan } from "@/lib/ai/access-policy";
+import { createLogger } from "@/lib/server/logger";
 
 export const AI_PRICING_VERSION = "2026-08-10";
 // Metering is best-effort and must add only a short, bounded wait after the AI result is ready.
@@ -106,6 +107,7 @@ async function waitForQuotaReservation(operation: PromiseLike<{ data: boolean | 
 
 export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeature; model: string; client?: MeteringClient | null; quotaClient?: QuotaClient | null; plan?: AiPlan; featurePolicy?: typeof isAiFeatureEnabled; dailyLimit?: number; now?: () => number; baseFetch?: typeof fetch }) {
   const startedAt = (input.now ?? Date.now)();
+  const logger = createLogger("ai", `metering.${input.feature}`);
   const aggregate = emptyUsage();
   let providerRequestCount = 0;
   let accessError: AiAccessErrorCode | null = null;
@@ -131,8 +133,9 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
         if (error) throw new Error("quota-reservation-failed");
         if (data !== true) accessError = "daily-ai-limit";
         return data === true;
-      } catch {
+      } catch (error) {
         accessError = "ai-access-unavailable";
+        logger.warn("quota_reservation_failed", { error });
         return false;
       }
     })();
@@ -187,8 +190,8 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
         pricing_version: AI_PRICING_VERSION,
       }));
       if (error) throw new Error("metering-insert-failed");
-    } catch {
-      console.warn("ai_usage_metering_write_failed");
+    } catch (error) {
+      logger.warn("usage_metering_write_failed", { error });
     }
   }
 

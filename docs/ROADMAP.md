@@ -26,7 +26,7 @@ Estado ya cerrado:
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
 - **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
 
-Siguiente tarea: **2.2 — Límites y presupuesto de IA**.
+Siguiente tarea: **2.4 — Monitoreo de errores y alertas**.
 
 Orden de implementación acordado:
 
@@ -211,7 +211,7 @@ No permitir que la IA calcule libremente estos valores cuando puedan obtenerse d
 
 Prioridad: alta.
 
-**Estado: en curso.** Siguiente tarea: **2.2B2 Presupuesto diario aproximado de coste**.
+**Estado: en curso.** Siguiente tarea: **2.4 Monitoreo de errores y alertas**.
 
 ### 2.1 Caché y reutilización
 
@@ -223,7 +223,7 @@ Prioridad: alta.
 
 ### 2.2 Límites y presupuesto de IA
 
-**Estado: en curso.** **2.2A Medición privada de uso y coste: completada.** **2.2B1 Cuota diaria funcional y política por plan: completada.** **2.2B2 Presupuesto diario aproximado de coste: siguiente tarea.**
+**Estado: estabilizada.** **2.2A Medición privada de uso y coste: completada.** **2.2B1 Cuota diaria funcional y política por plan: completada.** **2.2B2 Presupuesto diario aproximado de coste: aplazada por decisión de producto.** 2.2A + 2.2B1 constituyen la protección activa.
 
 2.2A mantiene un evento privado por invocación autenticada con función, proveedor, modelo, caché, intentos, latencia, resultado seguro, usage real agregado y coste histórico en micros USD según una versión explícita de precios. Los aciertos de caché no generan llamadas ni coste, los modelos sin tarifa conocida conservan coste desconocido y un fallo de telemetría no bloquea la función.
 
@@ -241,12 +241,12 @@ Controlar:
 
 ### 2.3 Logs estructurados y correlación
 
-**Estado: pendiente. Prioridad: máxima dentro de la Fase 2.**
+**Estado: completada.** La capa común emite JSON en producción y salida legible en desarrollo, sanea centralmente campos privados, usa severidades coherentes y conserva un `correlation_id` server-side en los recorridos críticos migrados de autenticación, inventario/consumo, Compra→Inventario, resolución nutricional y guards/medición de IA. La migración del resto de logs ad hoc puede continuar de forma progresiva sobre esta infraestructura.
 
 - Sustituir logs ad hoc de producción por una capa común de logging estructurado, preferentemente JSON.
 - Incluir como mínimo timestamp, nivel, componente, evento, ruta o acción, versión de despliegue y un `request_id`/`correlation_id` estable por petición.
 - Asociar el usuario solo mediante un identificador interno seguro cuando sea imprescindible para diagnosticar, sin registrar correo, contenido de comidas, imágenes, tokens, claves ni otros datos sensibles.
-- Propagar el identificador de correlación a llamadas a Supabase, OpenAI y fuentes nutricionales cuando sea técnicamente viable.
+- Propagar el identificador de correlación por contexto asíncrono entre acciones, Supabase, OpenAI y fuentes nutricionales cuando sea técnicamente viable, sin alterar contratos públicos.
 - Separar logs de desarrollo de logs de producción y aplicar retención limitada.
 
 Criterio de cierre:
