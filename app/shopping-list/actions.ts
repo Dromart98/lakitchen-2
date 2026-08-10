@@ -9,6 +9,7 @@ import { parseVoiceShoppingBatchInput, type VoiceShoppingBatchResult } from "@/m
 import { toVoiceShoppingBatchSaveInput } from "@/modules/shopping/voice-shopping-batch-save";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { classifyAiResult, createAiUsageMeter } from "@/lib/ai/metering";
 import {
   getShoppingListTransferNutritionPlan,
   planShoppingListTransferResolutionUpdate,
@@ -371,8 +372,12 @@ export async function estimateVoiceShoppingBatchAction(text: string): Promise<Vo
   const input = parseVoiceShoppingBatchInput(text);
   if (!input) return { status: "error", code: "invalid-input", message: "Escribe una lista de entre 1 y 4.000 caracteres." };
   const supabase = await createClient();
-  await requireAuthenticatedUser(supabase, "shopping list batch estimate");
+  const user = await requireAuthenticatedUser(supabase, "shopping list batch estimate");
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { status: "error", code: "not-configured", message: "El análisis no está disponible ahora." };
-  return generateVoiceShoppingBatch(input, { apiKey, model: process.env.OPENAI_VOICE_SHOPPING_BATCH_MODEL || undefined });
+  const model = process.env.OPENAI_VOICE_SHOPPING_BATCH_MODEL || "gpt-5.6-terra";
+  const meter = createAiUsageMeter({ userId: user.id, feature: "voice_shopping", model });
+  const result = await generateVoiceShoppingBatch(input, { apiKey, model, fetchImpl: meter.fetchImpl });
+  await meter.finish(classifyAiResult(result));
+  return result;
 }

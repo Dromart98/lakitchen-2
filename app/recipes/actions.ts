@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { generateRecipesWithOpenAi } from "@/lib/openai/recipe-generation";
+import { classifyAiResult, createAiUsageMeter } from "@/lib/ai/metering";
 import { buildRecipeAiNutritionAllocations } from "@/modules/recipes/recipe-ai-nutrition";
 import { loadAndAttachRecipeAiUnitMeasures, type RecipeAiUnitMeasureClient } from "@/modules/recipes/recipe-ai-unit-measures.server";
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
@@ -17,6 +18,7 @@ import {
   parseRecipeAiRequest,
   RECIPE_AI_MAX_INVENTORY_ITEMS,
   RECIPE_AI_MIN_INVENTORY_ITEMS,
+  RECIPE_AI_MODEL_DEFAULT,
   type RecipeAiActionResult,
   type RecipeAiInventoryItem,
 } from "@/modules/recipes/recipe-ai-generation";
@@ -307,13 +309,17 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
   if (!apiKey) return { status: "error", code: "missing-api-key" };
 
   try {
+    const model = process.env.OPENAI_RECIPE_MODEL ?? RECIPE_AI_MODEL_DEFAULT;
+    const meter = createAiUsageMeter({ userId: user.id, feature: "recipe_generation", model });
     const result = await generateRecipesWithOpenAi(request, inventoryItems, {
       apiKey,
-      model: process.env.OPENAI_RECIPE_MODEL,
+      model,
+      fetchImpl: meter.fetchImpl,
       expirationContext: request.priority_mode === "expiration"
         ? { todayKey, urgentInventoryItemIds }
         : undefined,
     });
+    await meter.finish(classifyAiResult(result));
 
     if (result.status !== "success") return result;
 

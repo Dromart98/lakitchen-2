@@ -3,7 +3,7 @@ import { catalogBasisForUnit, catalogRequestKey, catalogRowFromResolution, findN
 import type { InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
 import type { NutritionResolution } from "@/modules/nutrition/resolution";
 
-export async function resolveInventoryNutritionForUser(client: any, userId: string, input: InventoryNutritionAiInput, options: Parameters<typeof resolveInventoryNutrition>[1] = {}): Promise<NutritionResolution & { foodCatalogItemId?: string | null }> {
+export async function resolveInventoryNutritionForUser(client: any, userId: string, input: InventoryNutritionAiInput, options: Parameters<typeof resolveInventoryNutrition>[1] = {}): Promise<NutritionResolution & { foodCatalogItemId?: string | null; meteringCacheHit?: boolean }> {
   const foodState = inferCatalogFoodState(input.name);
   const nutritionBasis = catalogBasisForUnit(input.unit);
   let hit;
@@ -15,7 +15,7 @@ export async function resolveInventoryNutritionForUser(client: any, userId: stri
   }
   if (hit) return { status: "resolved", normalizedName: hit.normalized_name, foodState: hit.food_state === "drained" || hit.food_state === "frozen" ? "unknown" : hit.food_state,
     nutritionBasis: hit.nutrition_basis, calories: hit.calories, proteinG: hit.protein_g, carbsG: hit.carbs_g, fatG: hit.fat_g,
-    needsReview: !hit.user_confirmed, provenance: { source: hit.source, externalId: hit.external_id ?? undefined, resolvedAt: hit.resolved_at }, assumptions: "Revisa los valores antes de guardar.", foodCatalogItemId: hit.food_catalog_item_id ?? null };
+    needsReview: !hit.user_confirmed, provenance: { source: hit.source, externalId: hit.external_id ?? undefined, resolvedAt: hit.resolved_at }, assumptions: "Revisa los valores antes de guardar.", foodCatalogItemId: hit.food_catalog_item_id ?? null, meteringCacheHit: true };
   const resolution = await resolveInventoryNutrition(input, options);
   if (resolution.status === "resolved") {
     const compatibleFoodState = foodState === "drained" || foodState === "frozen" ? "unknown" : foodState;

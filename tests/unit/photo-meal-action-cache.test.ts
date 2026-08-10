@@ -36,7 +36,7 @@ describe("estimatePhotoMealAction cache contract", () => {
   it("validates before lookup, then caches a successful miss for the session user", async () => {
     await expect(estimatePhotoMealAction(form())).resolves.toEqual(success);
     expect(mocks.key).toHaveBeenCalledWith(new Uint8Array([0xff, 0xd8, 0xff, 1]), "Pollo", "default-photo-model", { systemPrompt: "photo-contract" });
-    expect(mocks.estimate).toHaveBeenCalledWith(expect.stringMatching(/^data:image\/jpeg;base64,/), "Pollo", { apiKey: "secret", model: "default-photo-model" });
+    expect(mocks.estimate).toHaveBeenCalledWith(expect.stringMatching(/^data:image\/jpeg;base64,/), "Pollo", expect.objectContaining({ apiKey: "secret", model: "default-photo-model", fetchImpl: expect.any(Function) }));
     expect(mocks.write).toHaveBeenCalledWith(mocks.admin, "user-a", "hash", "default-photo-model", { systemPrompt: "photo-contract" }, success);
     expect(mocks.purge).toHaveBeenCalledWith(mocks.admin);
   });

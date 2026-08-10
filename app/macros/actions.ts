@@ -14,6 +14,7 @@ import { textMealRequestSchema, type TextMealEstimationResult } from "@/modules/
 import { isValidUuid } from "@/modules/meals/meal-validation";
 import { createTextMealCacheKey, purgeExpiredTextMealCache, readTextMealCache, writeTextMealCache, type TextMealCacheClient } from "@/modules/meals/text-meal-cache";
 import { createPhotoMealCacheKey, purgeExpiredPhotoMealCache, readPhotoMealCache, writePhotoMealCache, type PhotoMealCacheClient } from "@/modules/meals/photo-meal-cache";
+import { classifyAiResult, createAiUsageMeter } from "@/lib/ai/metering";
 
 type AiMealInventoryRpcClient = {
   rpc: (functionName: "consume_ai_meal_inventory_and_log_meal", args: {
@@ -31,6 +32,7 @@ export async function estimateTextMealAction(input: unknown): Promise<TextMealEs
     const user = await getAuthenticatedUser(supabase, "text meal estimation");
     if (!user) return { status: "error", code: "unauthenticated" };
     const model = process.env.OPENAI_TEXT_MEAL_MODEL ?? TEXT_MEAL_AI_MODEL_DEFAULT;
+    const meter = createAiUsageMeter({ userId: user.id, feature: "text_meal", model });
     const cacheKey = createTextMealCacheKey(request.data.description, model, TEXT_MEAL_PROVIDER_CONTRACT);
     // The service-role client is created only after the browser session has
     // been authenticated; the cache owner always comes from that session.
@@ -44,13 +46,20 @@ export async function estimateTextMealAction(input: unknown): Promise<TextMealEs
     const cached = cacheClient
       ? await readTextMealCache(cacheClient, user.id, cacheKey).catch(() => null)
       : null;
-    if (cached) return cached;
+    if (cached) {
+      await meter.finish({ outcome: "success", cacheHit: true });
+      return cached;
+    }
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return { status: "error", code: "missing-api-key" };
-    const result = await estimateTextMealWithOpenAi(request.data.description, { apiKey, model });
+    if (!apiKey) {
+      await meter.finish({ outcome: "error", errorCode: "not-configured" });
+      return { status: "error", code: "missing-api-key" };
+    }
+    const result = await estimateTextMealWithOpenAi(request.data.description, { apiKey, model, fetchImpl: meter.fetchImpl });
     if (result.status === "success" && cacheClient) {
       await writeTextMealCache(cacheClient, user.id, cacheKey, model, TEXT_MEAL_PROVIDER_CONTRACT, result).catch(() => undefined);
     }
+    await meter.finish(classifyAiResult(result));
     return result;
   } catch { return { status: "error", code: "unexpected-error" }; }
 }
@@ -66,6 +75,7 @@ export async function estimatePhotoMealAction(formData: FormData): Promise<TextM
     if (!validated.ok) return { status: "error", code: validated.code };
     const bytes = new Uint8Array(await validated.file.arrayBuffer());
     const model = process.env.OPENAI_PHOTO_MEAL_MODEL ?? PHOTO_MEAL_AI_MODEL_DEFAULT;
+    const meter = createAiUsageMeter({ userId: user.id, feature: "photo_meal", model });
     const cacheKey = createPhotoMealCacheKey(bytes, context.data.context, model, PHOTO_MEAL_PROVIDER_CONTRACT);
     let cacheClient: PhotoMealCacheClient | null = null;
     try {
@@ -77,14 +87,21 @@ export async function estimatePhotoMealAction(formData: FormData): Promise<TextM
     const cached = cacheClient
       ? await readPhotoMealCache(cacheClient, user.id, cacheKey).catch(() => null)
       : null;
-    if (cached) return cached;
+    if (cached) {
+      await meter.finish({ outcome: "success", cacheHit: true });
+      return cached;
+    }
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return { status: "error", code: "missing-api-key" };
+    if (!apiKey) {
+      await meter.finish({ outcome: "error", errorCode: "not-configured" });
+      return { status: "error", code: "missing-api-key" };
+    }
     const imageDataUrl = `data:image/jpeg;base64,${Buffer.from(bytes).toString("base64")}`;
-    const result = await estimatePhotoMealWithOpenAi(imageDataUrl, context.data.context, { apiKey, model });
+    const result = await estimatePhotoMealWithOpenAi(imageDataUrl, context.data.context, { apiKey, model, fetchImpl: meter.fetchImpl });
     if (result.status === "success" && cacheClient) {
       await writePhotoMealCache(cacheClient, user.id, cacheKey, model, PHOTO_MEAL_PROVIDER_CONTRACT, result).catch(() => undefined);
     }
+    await meter.finish(classifyAiResult(result));
     return result;
   } catch { return { status: "error", code: "unexpected-error" }; }
 }

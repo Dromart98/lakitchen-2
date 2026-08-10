@@ -42,7 +42,7 @@ describe("estimateTextMealAction cache contract", () => {
   it("on a miss calls OpenAI with store-neutral provider options and caches only success", async () => {
     await expect(estimateTextMealAction({ description: "100 g arroz" })).resolves.toEqual(success);
     expect(mocks.key).toHaveBeenCalledWith("100 g arroz", "default-model", { systemPrompt: "text-contract" });
-    expect(mocks.estimate).toHaveBeenCalledWith("100 g arroz", { apiKey: "secret", model: "default-model" });
+    expect(mocks.estimate).toHaveBeenCalledWith("100 g arroz", expect.objectContaining({ apiKey: "secret", model: "default-model", fetchImpl: expect.any(Function) }));
     expect(mocks.write).toHaveBeenCalledWith(expect.anything(), "user-a", "hash", "default-model", { systemPrompt: "text-contract" }, success);
     expect(mocks.purge).toHaveBeenCalledWith(mocks.admin);
   });
@@ -68,7 +68,7 @@ describe("estimateTextMealAction cache contract", () => {
   it("continues with OpenAI when the server-only cache client cannot be created", async () => {
     mocks.createAdmin.mockImplementation(() => { throw new Error("missing cache configuration"); });
     await expect(estimateTextMealAction({ description: "100 g arroz" })).resolves.toEqual(success);
-    expect(mocks.estimate).toHaveBeenCalledWith("100 g arroz", { apiKey: "secret", model: "default-model" });
+    expect(mocks.estimate).toHaveBeenCalledWith("100 g arroz", expect.objectContaining({ apiKey: "secret", model: "default-model", fetchImpl: expect.any(Function) }));
     expect(mocks.read).not.toHaveBeenCalled();
     expect(mocks.write).not.toHaveBeenCalled();
     expect(mocks.purge).not.toHaveBeenCalled();
