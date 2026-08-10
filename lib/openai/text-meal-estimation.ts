@@ -21,6 +21,8 @@ const EXPLICIT_QUANTITY_PATTERN_SOURCE = String.raw`\b\d+(?:[.,]\d+)?\s*(?:g|gr|
 // This object is also the deterministic cache contract. Keep every setting
 // capable of changing a successful provider result here and consume it below.
 export const TEXT_MEAL_PROVIDER_CONTRACT = {
+  // Increment when request shaping or output normalization/validation semantics change.
+  processingVersion: 1,
   endpoint: OPENAI_RESPONSES_ENDPOINT,
   systemPrompt: TEXT_MEAL_SYSTEM_PROMPT,
   retryInstruction: TEXT_MEAL_RETRY_INSTRUCTION,

@@ -15,6 +15,8 @@ El texto adicional sirve de contexto útil. Una cantidad explícita y razonable 
 Las unidades permitidas son: g, ml, unidad, unidades, loncha, lonchas, cucharadita, cucharaditas, cucharada, cucharadas, taza, tazas, lata, latas, plato y platos. No des consejos médicos, no afirmes exactitud ni que la comida se ha registrado. Si status es success, message debe ser null. Si status es needs-clarification, suggested_name, ingredients, assumptions y confidence deben ser null. Devuelve exclusivamente JSON conforme al esquema.`;
 
 export const PHOTO_MEAL_PROVIDER_CONTRACT = {
+  // Increment when request shaping or output normalization/validation semantics change.
+  processingVersion: 1,
   endpoint: ENDPOINT,
   systemPrompt: PHOTO_MEAL_SYSTEM_PROMPT,
   defaultContext: "Analiza esta fotografía de comida.",

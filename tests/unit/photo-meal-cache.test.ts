@@ -34,6 +34,7 @@ describe("photo meal analysis cache", () => {
     expect(key).not.toBe(createPhotoMealCacheKey(new Uint8Array([0xff, 0xd8, 0xff, 2]), "pollo asado", "model-a", PHOTO_MEAL_PROVIDER_CONTRACT));
     expect(key).not.toBe(createPhotoMealCacheKey(bytes, "pollo cocido", "model-a", PHOTO_MEAL_PROVIDER_CONTRACT));
     expect(key).not.toBe(createPhotoMealCacheKey(bytes, "pollo asado", "model-b", PHOTO_MEAL_PROVIDER_CONTRACT));
+    expect(key).not.toBe(createPhotoMealCacheKey(bytes, "pollo asado", "model-a", { ...PHOTO_MEAL_PROVIDER_CONTRACT, processingVersion: 2 }));
     expect(key).not.toBe(createPhotoMealCacheKey(bytes, "pollo asado", "model-a", { ...PHOTO_MEAL_PROVIDER_CONTRACT, systemPrompt: `${PHOTO_MEAL_PROVIDER_CONTRACT.systemPrompt} cambio` }));
     expect(key).not.toBe(createPhotoMealCacheKey(bytes, "pollo asado", "model-a", {
       ...PHOTO_MEAL_PROVIDER_CONTRACT,

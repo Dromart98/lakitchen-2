@@ -42,6 +42,7 @@ describe("text meal analysis cache", () => {
     expect(key).not.toContain("arroz");
     expect(key).not.toBe(createTextMealCacheKey("arroz crudo", "model-a", TEXT_MEAL_PROVIDER_CONTRACT));
     expect(key).not.toBe(createTextMealCacheKey("arroz cocido", "model-b", TEXT_MEAL_PROVIDER_CONTRACT));
+    expect(key).not.toBe(createTextMealCacheKey("arroz cocido", "model-a", { ...TEXT_MEAL_PROVIDER_CONTRACT, processingVersion: 2 }));
     expect(key).not.toBe(createTextMealCacheKey("arroz cocido", "model-a", { ...TEXT_MEAL_PROVIDER_CONTRACT, systemPrompt: `${TEXT_MEAL_PROVIDER_CONTRACT.systemPrompt} cambio` }));
     expect(key).not.toBe(createTextMealCacheKey("arroz cocido", "model-a", { ...TEXT_MEAL_PROVIDER_CONTRACT, retryInstruction: `${TEXT_MEAL_PROVIDER_CONTRACT.retryInstruction} cambio` }));
     expect(key).not.toBe(createTextMealCacheKey("arroz cocido", "model-a", {

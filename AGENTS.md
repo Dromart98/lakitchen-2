@@ -38,3 +38,4 @@ Estas instrucciones complementan las instrucciones globales de Codex. No repitas
 - Usa los scripts vigentes de `package.json`: `npm run typecheck`, `npm run lint`, `npm test` y `npm run build` cuando correspondan al alcance.
 - Añade o ajusta pruebas cerca del dominio afectado cuando cambie comportamiento; no uses únicamente el build como prueba funcional.
 - Cuando una tarea cambie capacidades, restricciones o diseño duradero, actualiza únicamente la documentación afectada (`PRODUCT.md`, `DESIGN.md` o documentación específica) y evita duplicar el mismo estado en varios archivos.
+- Cualquier cambio semántico en el request shaping, la normalización o la validación de Texto IA o Foto IA debe incrementar el `processingVersion` de su contrato de proveedor.
