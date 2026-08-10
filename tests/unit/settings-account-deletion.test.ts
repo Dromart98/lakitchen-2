@@ -107,7 +107,7 @@ describe("account deletion contracts", () => {
       /references\s+auth\.users\s*\(id\)\s+on\s+delete\s+\w+/gi,
     );
 
-    expect(authReferences?.length).toBe(18);
+    expect(authReferences?.length).toBe(19);
     for (const reference of authReferences ?? []) {
       expect(reference.toLowerCase()).toContain("on delete cascade");
     }
@@ -125,6 +125,9 @@ describe("account deletion contracts", () => {
     );
     expect(migrations).toMatch(
       /ai_usage_events[\s\S]{0,200}references auth\.users\(id\) on delete cascade/i,
+    );
+    expect(migrations).toMatch(
+      /ai_daily_request_usage[\s\S]{0,200}references auth\.users\(id\) on delete cascade/i,
     );
   });
 });

@@ -211,7 +211,7 @@ No permitir que la IA calcule libremente estos valores cuando puedan obtenerse d
 
 Prioridad: alta.
 
-**Estado: en curso.** Siguiente tarea: **2.2B Presupuestos y límites funcionales diarios**.
+**Estado: en curso.** Siguiente tarea: **2.2B2 Presupuesto diario aproximado de coste**.
 
 ### 2.1 Caché y reutilización
 
@@ -223,7 +223,7 @@ Prioridad: alta.
 
 ### 2.2 Límites y presupuesto de IA
 
-**Estado: en curso.** **2.2A Medición privada de uso y coste: completada.** **2.2B Presupuestos y límites funcionales diarios: siguiente tarea.**
+**Estado: en curso.** **2.2A Medición privada de uso y coste: completada.** **2.2B1 Cuota diaria funcional y política por plan: completada.** **2.2B2 Presupuesto diario aproximado de coste: siguiente tarea.**
 
 2.2A mantiene un evento privado por invocación autenticada con función, proveedor, modelo, caché, intentos, latencia, resultado seguro, usage real agregado y coste histórico en micros USD según una versión explícita de precios. Los aciertos de caché no generan llamadas ni coste, los modelos sin tarifa conocida conservan coste desconocido y un fallo de telemetría no bloquea la función.
 

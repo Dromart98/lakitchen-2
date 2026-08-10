@@ -320,6 +320,8 @@ export async function generateRecipeAiSuggestionsAction(input: unknown): Promise
         : undefined,
     });
     await meter.finish(classifyAiResult(result));
+    const accessError = meter.getAccessError();
+    if (accessError) return { status: "error", code: accessError };
 
     if (result.status !== "success") return result;
 

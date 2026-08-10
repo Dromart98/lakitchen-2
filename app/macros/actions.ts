@@ -60,6 +60,8 @@ export async function estimateTextMealAction(input: unknown): Promise<TextMealEs
       await writeTextMealCache(cacheClient, user.id, cacheKey, model, TEXT_MEAL_PROVIDER_CONTRACT, result).catch(() => undefined);
     }
     await meter.finish(classifyAiResult(result));
+    const accessError = meter.getAccessError();
+    if (accessError) return { status: "error", code: accessError };
     return result;
   } catch { return { status: "error", code: "unexpected-error" }; }
 }
@@ -102,6 +104,8 @@ export async function estimatePhotoMealAction(formData: FormData): Promise<TextM
       await writePhotoMealCache(cacheClient, user.id, cacheKey, model, PHOTO_MEAL_PROVIDER_CONTRACT, result).catch(() => undefined);
     }
     await meter.finish(classifyAiResult(result));
+    const accessError = meter.getAccessError();
+    if (accessError) return { status: "error", code: accessError };
     return result;
   } catch { return { status: "error", code: "unexpected-error" }; }
 }

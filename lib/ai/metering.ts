@@ -1,9 +1,11 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isAiFeatureEnabled, type AiPlan } from "@/lib/ai/access-policy";
 
 export const AI_PRICING_VERSION = "2026-08-10";
 // Metering is best-effort and must add only a short, bounded wait after the AI result is ready.
 export const AI_METERING_PERSIST_TIMEOUT_MS = 1_500;
+export const AI_DAILY_REQUEST_LIMIT_FALLBACK = 20;
 
 type TokenUsage = {
   inputTokens: number;
@@ -64,6 +66,13 @@ export type AiUsageOutcome = "success" | "clarification" | "error";
 export type AiUsageFeature = "text_meal" | "photo_meal" | "inventory_nutrition" | "voice_inventory" | "voice_shopping" | "recipe_generation" | "daily_plan";
 
 type MeteringClient = { from(table: "ai_usage_events"): { insert(row: Record<string, unknown>): PromiseLike<{ error: unknown }> } };
+type QuotaClient = { rpc(name: "reserve_ai_daily_request", args: { p_user_id: string; p_limit: number }): PromiseLike<{ data: boolean | null; error: unknown }> };
+export type AiAccessErrorCode = "daily-ai-limit" | "ai-access-unavailable" | "ai-feature-disabled";
+
+export function getAiDailyRequestLimit(value = process.env.AI_DAILY_REQUEST_LIMIT): number {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : AI_DAILY_REQUEST_LIMIT_FALLBACK;
+}
 
 async function waitForMeteringInsert(operation: PromiseLike<{ error: unknown }>) {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -79,14 +88,42 @@ async function waitForMeteringInsert(operation: PromiseLike<{ error: unknown }>)
   }
 }
 
-export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeature; model: string; client?: MeteringClient | null; now?: () => number; baseFetch?: typeof fetch }) {
+export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeature; model: string; client?: MeteringClient | null; quotaClient?: QuotaClient | null; plan?: AiPlan; featurePolicy?: typeof isAiFeatureEnabled; dailyLimit?: number; now?: () => number; baseFetch?: typeof fetch }) {
   const startedAt = (input.now ?? Date.now)();
   const aggregate = emptyUsage();
   let providerRequestCount = 0;
+  let accessError: AiAccessErrorCode | null = null;
+  let reservation: Promise<boolean> | null = null;
+
+  async function reserveOnce(): Promise<boolean> {
+    if (!(input.featurePolicy ?? isAiFeatureEnabled)(input.plan ?? "default", input.feature)) {
+      accessError = "ai-feature-disabled";
+      return false;
+    }
+    if (!reservation) reservation = (async () => {
+      try {
+        const client = input.quotaClient ?? createAdminClient() as unknown as QuotaClient;
+        const { data, error } = await client.rpc("reserve_ai_daily_request", {
+          p_user_id: input.userId,
+          p_limit: input.dailyLimit ?? getAiDailyRequestLimit(),
+        });
+        if (error) throw new Error("quota-reservation-failed");
+        if (data !== true) accessError = "daily-ai-limit";
+        return data === true;
+      } catch {
+        accessError = "ai-access-unavailable";
+        return false;
+      }
+    })();
+    return reservation;
+  }
 
   const fetchImpl: typeof fetch = async (request, init) => {
     const url = typeof request === "string" || request instanceof URL ? String(request) : request.url;
     const isOpenAiRequest = new URL(url).hostname === "api.openai.com";
+    if (isOpenAiRequest && !await reserveOnce()) {
+      return new Response(null, { status: 429, headers: { "x-lakitchen-ai-access": accessError ?? "ai-access-unavailable" } });
+    }
     if (isOpenAiRequest) providerRequestCount += 1;
     const response = await (input.baseFetch ?? fetch)(request, init);
     if (isOpenAiRequest) {
@@ -118,14 +155,14 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
         provider_request_count: attempts,
         attempts,
         duration_ms: Math.max(0, (input.now ?? Date.now)() - startedAt),
-        outcome: result.outcome,
-        error_code: result.outcome === "error" ? result.errorCode ?? "unknown" : null,
+        outcome: accessError ? "error" : result.outcome,
+        error_code: accessError ?? (result.outcome === "error" ? result.errorCode ?? "unknown" : null),
         input_tokens: usage.inputTokens,
         cached_input_tokens: usage.cachedInputTokens,
         output_tokens: usage.outputTokens,
         reasoning_tokens: usage.reasoningTokens,
         total_tokens: usage.totalTokens,
-        estimated_cost_usd_micros: cacheHit ? 0 : calculateAiCostUsdMicros(input.model, usage),
+        estimated_cost_usd_micros: cacheHit || accessError ? 0 : calculateAiCostUsdMicros(input.model, usage),
         pricing_version: AI_PRICING_VERSION,
       }));
       if (error) throw new Error("metering-insert-failed");
@@ -134,7 +171,7 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
     }
   }
 
-  return { fetchImpl, finish };
+  return { fetchImpl, finish, getAccessError: () => accessError };
 }
 
 export function classifyAiResult(result: { status: string; code?: string; reason?: "not-found" | "not-configured" | "provider-error" }): { outcome: AiUsageOutcome; errorCode?: string } {

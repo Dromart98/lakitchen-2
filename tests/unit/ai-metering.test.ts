@@ -29,6 +29,7 @@ describe("private AI usage metering", () => {
     const responses = [usageBody(100, 20, 30, 10), usageBody(200, 0, 40, 15)];
     const meter = createAiUsageMeter({
       userId: "user-a", feature: "text_meal", model: "gpt-5.6-terra", client: recordingClient(rows), now: () => 150,
+      quotaClient: { rpc: async () => ({ data: true, error: null }) },
       baseFetch: vi.fn(async () => Response.json(responses.shift())),
     });
     await meter.fetchImpl("https://api.openai.com/v1/responses");

@@ -82,6 +82,8 @@ export async function generateDailyPlanAction(input: unknown): Promise<DailyPlan
       fetchImpl: meter.fetchImpl,
     });
     await meter.finish(classifyAiResult(generated));
+    const accessError = meter.getAccessError();
+    if (accessError) return { status: "error", code: accessError };
     if (generated.status !== "success") {
       if (context.inventoryItems.length <= 3 && (generated.status === "needs-clarification" || generated.code === "invalid-ai-response")) {
         return { status: "needs-clarification", message: "No se pudo construir un día completo con los productos utilizables actuales. Completa la nutrición de más productos o añade variedad al inventario." };

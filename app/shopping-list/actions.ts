@@ -379,5 +379,7 @@ export async function estimateVoiceShoppingBatchAction(text: string): Promise<Vo
   const meter = createAiUsageMeter({ userId: user.id, feature: "voice_shopping", model });
   const result = await generateVoiceShoppingBatch(input, { apiKey, model, fetchImpl: meter.fetchImpl });
   await meter.finish(classifyAiResult(result));
+  const accessError = meter.getAccessError();
+  if (accessError) return { status: "error", code: accessError, message: accessError === "daily-ai-limit" ? "Has alcanzado el límite de funciones con IA de hoy. Podrás volver a usarlas mañana." : "Esta función no está disponible ahora." };
   return result;
 }
