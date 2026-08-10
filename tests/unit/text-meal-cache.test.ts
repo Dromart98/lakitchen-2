@@ -46,6 +46,34 @@ describe("text meal analysis cache", () => {
     expect(key).not.toBe(createTextMealCacheKey("arroz cocido", "model-a", { ...TEXT_MEAL_PROVIDER_CONTRACT, retryInstruction: `${TEXT_MEAL_PROVIDER_CONTRACT.retryInstruction} cambio` }));
     expect(key).not.toBe(createTextMealCacheKey("arroz cocido", "model-a", {
       ...TEXT_MEAL_PROVIDER_CONTRACT,
+      retryPolicy: { ...TEXT_MEAL_PROVIDER_CONTRACT.retryPolicy, errorCodes: ["provider-error"] },
+    }));
+    expect(key).not.toBe(createTextMealCacheKey("arroz cocido", "model-a", {
+      ...TEXT_MEAL_PROVIDER_CONTRACT,
+      retryPolicy: {
+        ...TEXT_MEAL_PROVIDER_CONTRACT.retryPolicy,
+        needsClarification: { ...TEXT_MEAL_PROVIDER_CONTRACT.retryPolicy.needsClarification, enabled: false },
+      },
+    }));
+    expect(key).not.toBe(createTextMealCacheKey("arroz cocido", "model-a", {
+      ...TEXT_MEAL_PROVIDER_CONTRACT,
+      retryPolicy: {
+        ...TEXT_MEAL_PROVIDER_CONTRACT.retryPolicy,
+        needsClarification: { ...TEXT_MEAL_PROVIDER_CONTRACT.retryPolicy.needsClarification, requiresExplicitQuantity: false },
+      },
+    }));
+    expect(key).not.toBe(createTextMealCacheKey("arroz cocido", "model-a", {
+      ...TEXT_MEAL_PROVIDER_CONTRACT,
+      retryPolicy: {
+        ...TEXT_MEAL_PROVIDER_CONTRACT.retryPolicy,
+        needsClarification: {
+          ...TEXT_MEAL_PROVIDER_CONTRACT.retryPolicy.needsClarification,
+          explicitQuantityPattern: { source: "changed", flags: "i" },
+        },
+      },
+    }));
+    expect(key).not.toBe(createTextMealCacheKey("arroz cocido", "model-a", {
+      ...TEXT_MEAL_PROVIDER_CONTRACT,
       responseFormat: { ...TEXT_MEAL_PROVIDER_CONTRACT.responseFormat, schema: { type: "object", required: ["changed"] } },
     }));
   });

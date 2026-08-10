@@ -17,7 +17,6 @@ Usa needs-clarification solo cuando no puedas identificar el alimento, haya inte
 
 export const TEXT_MEAL_RETRY_INSTRUCTION = `Segundo intento: corrige la respuesta anterior sin relajar ninguna regla. Si la descripción contiene una cantidad explícita para un alimento identificable, usa una referencia nutricional genérica razonable y devuelve success salvo que exista una ambigüedad realmente irresoluble. Mantén exactamente el JSON Schema y todos los límites numéricos.`;
 const EXPLICIT_QUANTITY_PATTERN_SOURCE = String.raw`\b\d+(?:[.,]\d+)?\s*(?:g|gr|gramos?|kg|ml|l|litros?|unidades?|uds?|lonchas?|cucharaditas?|cucharadas?|tazas?|latas?|platos?)\b`;
-const EXPLICIT_QUANTITY_PATTERN = new RegExp(EXPLICIT_QUANTITY_PATTERN_SOURCE, "i");
 
 // This object is also the deterministic cache contract. Keep every setting
 // capable of changing a successful provider result here and consume it below.
@@ -25,7 +24,14 @@ export const TEXT_MEAL_PROVIDER_CONTRACT = {
   endpoint: OPENAI_RESPONSES_ENDPOINT,
   systemPrompt: TEXT_MEAL_SYSTEM_PROMPT,
   retryInstruction: TEXT_MEAL_RETRY_INSTRUCTION,
-  retryExplicitQuantityPattern: { source: EXPLICIT_QUANTITY_PATTERN_SOURCE, flags: "i" },
+  retryPolicy: {
+    errorCodes: ["invalid-ai-response"],
+    needsClarification: {
+      enabled: true,
+      requiresExplicitQuantity: true,
+      explicitQuantityPattern: { source: EXPLICIT_QUANTITY_PATTERN_SOURCE, flags: "i" },
+    },
+  },
   responseFormat: { type: "json_schema", name: "text_meal_estimation", strict: true, schema: TEXT_MEAL_JSON_SCHEMA },
   store: false,
   reasoning: { effort: "low" },
@@ -69,13 +75,13 @@ export function normalizeTextMealProviderOutput(value: unknown): unknown {
   return value;
 }
 
-function hasExplicitQuantity(description: string) {
-  return EXPLICIT_QUANTITY_PATTERN.test(description);
-}
-
 function shouldRetry(result: TextMealEstimationResult, description: string) {
-  if (result.status === "error") return result.code === "invalid-ai-response";
-  return result.status === "needs-clarification" && hasExplicitQuantity(description);
+  const policy = TEXT_MEAL_PROVIDER_CONTRACT.retryPolicy;
+  if (result.status === "error") return policy.errorCodes.some((code) => code === result.code);
+  if (result.status !== "needs-clarification" || !policy.needsClarification.enabled) return false;
+  if (!policy.needsClarification.requiresExplicitQuantity) return true;
+  const { source, flags } = policy.needsClarification.explicitQuantityPattern;
+  return new RegExp(source, flags).test(description);
 }
 
 async function requestTextMealAttempt(
