@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getSentryEnvironment, getSentryRelease, sanitizeSentryEvent } from "@/lib/monitoring/sentry";
+import { getSentryEnvironment, getSentryRelease, sanitizeSentryEvent, sentryBaseOptions } from "@/lib/monitoring/sentry";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -33,6 +33,11 @@ describe("Sentry monitoring privacy contract", () => {
     expect(event).toMatchObject({ tags: { correlation_id: "correlation-safe" }, exception: { values: [{ type: "ProviderError", value: "ProviderError (details redacted)" }] } });
     expect(event?.exception?.values?.[0].stacktrace?.frames?.[0]).toMatchObject({ filename: "/app/action.ts", function: "run" });
     expect(event?.exception?.values?.[0].stacktrace?.frames?.[1]).toMatchObject({ filename: "/scripts/validate-sentry.ts", module: "/lib/server/error-reporter.ts" });
+  });
+
+  it("explicitly disables Sentry user-info and IP inference for browser monitoring", () => {
+    expect(sentryBaseOptions.sendDefaultPii).toBe(false);
+    expect(sentryBaseOptions.dataCollection).toEqual({ userInfo: false });
   });
 
   it("uses Vercel deployment metadata with safe fallbacks", () => {
