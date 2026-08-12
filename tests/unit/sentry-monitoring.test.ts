@@ -29,7 +29,7 @@ describe("Sentry monitoring privacy contract", () => {
       },
     });
     const serialized = JSON.stringify(event);
-    for (const privateValue of ["person@example.com", "private-id", "private meal", "private dinner", "provider private", "token=secret", "dictated", "34644", "Documents", "Proyectos", "C:\\\\Users"] ) expect(serialized).not.toContain(privateValue);
+    for (const privateValue of ["person@example.com", "private-id", "private meal", "private dinner", "provider private", "token=secret", "dictated", "34644", "Documents", "Proyectos", "C:\\\\Users"]) expect(serialized).not.toContain(privateValue);
     expect(event).toMatchObject({ tags: { correlation_id: "correlation-safe" }, exception: { values: [{ type: "ProviderError", value: "ProviderError (details redacted)" }] } });
     expect(event?.exception?.values?.[0].stacktrace?.frames?.[0]).toMatchObject({ filename: "/app/action.ts", function: "run" });
     expect(event?.exception?.values?.[0].stacktrace?.frames?.[1]).toMatchObject({ filename: "/scripts/validate-sentry.ts", module: "/lib/server/error-reporter.ts" });
