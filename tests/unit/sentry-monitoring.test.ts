@@ -15,12 +15,24 @@ describe("Sentry monitoring privacy contract", () => {
       breadcrumbs: [{ message: "dictated private dinner" }],
       tags: { correlation_id: "correlation-safe", private_user_id: "private-id" },
       contexts: { monitoring: { correlation_id: "correlation-safe", prompt: "private dinner" }, device: { name: "private" } },
-      exception: { values: [{ type: "ProviderError", value: "person@example.com raw provider response", stacktrace: { frames: [{ filename: "/app/action.ts?token=secret", function: "run", context_line: "private meal" }] } }] },
+      exception: {
+        values: [{
+          type: "ProviderError",
+          value: "person@example.com raw provider response",
+          stacktrace: {
+            frames: [
+              { filename: "/app/action.ts?token=secret", function: "run", context_line: "private meal" },
+              { filename: "C:\\Users\\34644\\Documents\\Proyectos\\lakitchen-2\\scripts\\validate-sentry.ts", module: "C:\\Users\\34644\\Documents\\Proyectos\\lakitchen-2\\lib\\server\\error-reporter.ts" },
+            ],
+          },
+        }],
+      },
     });
     const serialized = JSON.stringify(event);
-    for (const privateValue of ["person@example.com", "private-id", "private meal", "private dinner", "provider private", "token=secret", "dictated"]) expect(serialized).not.toContain(privateValue);
+    for (const privateValue of ["person@example.com", "private-id", "private meal", "private dinner", "provider private", "token=secret", "dictated", "34644", "Documents", "Proyectos", "C:\\\\Users"] ) expect(serialized).not.toContain(privateValue);
     expect(event).toMatchObject({ tags: { correlation_id: "correlation-safe" }, exception: { values: [{ type: "ProviderError", value: "ProviderError (details redacted)" }] } });
     expect(event?.exception?.values?.[0].stacktrace?.frames?.[0]).toMatchObject({ filename: "/app/action.ts", function: "run" });
+    expect(event?.exception?.values?.[0].stacktrace?.frames?.[1]).toMatchObject({ filename: "/scripts/validate-sentry.ts", module: "/lib/server/error-reporter.ts" });
   });
 
   it("uses Vercel deployment metadata with safe fallbacks", () => {
