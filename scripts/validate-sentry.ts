@@ -11,7 +11,11 @@ async function main(): Promise<void> {
     return;
   }
 
-  Sentry.init(sentryBaseOptions);
+  const tunnel = process.env.SENTRY_VALIDATION_TUNNEL_URL?.trim();
+  Sentry.init({
+    ...sentryBaseOptions,
+    ...(tunnel ? { tunnel } : {}),
+  });
   const correlationId = `sentry-validation-${crypto.randomUUID()}`;
   withCorrelation(() => {
     reportUnexpectedError(new Error("Sentry validation person@example.com Bearer validation-secret"), {
@@ -22,7 +26,12 @@ async function main(): Promise<void> {
     });
   }, correlationId);
   const flushed = await Sentry.flush(5_000);
-  console.info(JSON.stringify({ flushed, correlation_id: correlationId, expected_message: "Error (details redacted)" }));
+  console.info(JSON.stringify({
+    flushed,
+    correlation_id: correlationId,
+    expected_message: "Error (details redacted)",
+    via_tunnel: Boolean(tunnel),
+  }));
   if (!flushed) process.exitCode = 1;
 }
 
