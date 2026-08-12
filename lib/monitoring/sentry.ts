@@ -86,6 +86,7 @@ export const sentryBaseOptions = {
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   enabled: Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN),
   sendDefaultPii: false,
+  dataCollection: { userInfo: false },
   tracesSampleRate: 0,
   release: getSentryRelease(),
   environment: getSentryEnvironment(),
