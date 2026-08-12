@@ -23,6 +23,8 @@ import { buildObservedPackageEquivalenceProposals } from "@/modules/inventory/vo
 import { buildBarcodePackageEquivalenceProposal } from "@/modules/inventory/barcode-package-equivalence";
 import { classifyAiResult, createAiUsageMeter } from "@/lib/ai/metering";
 import { INVENTORY_NUTRITION_AI_MODEL_DEFAULT } from "@/modules/inventory/inventory-ai-nutrition";
+import { hasCorrelation, withCorrelationIfMissing } from "@/lib/server/logger";
+import type { VoiceInventoryBatchResult } from "@/modules/inventory/voice-inventory-batch";
 
 type InventoryLocation = "pantry" | "fridge" | "freezer";
 type InventoryUnit = "ud" | "g" | "kg" | "ml" | "l";
@@ -61,6 +63,7 @@ function inventoryNutritionAiError(code: keyof typeof inventoryNutritionAiErrorM
 }
 
 export async function estimateInventoryNutritionAction(input: InventoryNutritionAiInput): Promise<InventoryNutritionAiActionResult> {
+  if (!hasCorrelation()) return withCorrelationIfMissing(() => estimateInventoryNutritionAction(input));
   const validatedInput = parseInventoryNutritionAiInput(input);
   if (!validatedInput) return inventoryNutritionAiError("invalid-input");
 
@@ -522,7 +525,8 @@ export async function deleteInventoryItemAction(formData: FormData) {
   redirect(`${INVENTORY_PATH}?inventorySuccess=item-deleted`);
 }
 
-export async function estimateVoiceInventoryBatchAction(text: string) {
+export async function estimateVoiceInventoryBatchAction(text: string): Promise<VoiceInventoryBatchResult> {
+  if (!hasCorrelation()) return withCorrelationIfMissing(() => estimateVoiceInventoryBatchAction(text));
   const { parseVoiceInventoryBatchInput } = await import("@/modules/inventory/voice-inventory-batch");
   const input = parseVoiceInventoryBatchInput(text);
   if (!input) return { status: "error" as const, code: "invalid-input" as const, message: "Escribe una lista de hasta 4.000 caracteres." };

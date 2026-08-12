@@ -11,6 +11,7 @@ import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { classifyAiResult, createAiUsageMeter } from "@/lib/ai/metering";
 import { INVENTORY_NUTRITION_AI_MODEL_DEFAULT } from "@/modules/inventory/inventory-ai-nutrition";
+import { createLogger, hasCorrelation, withCorrelationIfMissing } from "@/lib/server/logger";
 import {
   getShoppingListTransferNutritionPlan,
   planShoppingListTransferResolutionUpdate,
@@ -232,7 +233,9 @@ export async function setShoppingListItemPurchasedAction(formData: FormData) {
   redirect(`/shopping-list?shoppingListSuccess=${isPurchased ? "item-purchased" : "item-pending"}`);
 }
 
-export async function transferShoppingListItemToInventoryAction(formData: FormData) {
+export async function transferShoppingListItemToInventoryAction(formData: FormData): Promise<never> {
+  if (!hasCorrelation()) return withCorrelationIfMissing(() => transferShoppingListItemToInventoryAction(formData));
+  const logger = createLogger("shopping_list", "transfer_to_inventory");
   const id = String(formData.get("id") ?? "").trim();
   const location = String(formData.get("location") ?? "");
 
@@ -258,7 +261,7 @@ export async function transferShoppingListItemToInventoryAction(formData: FormDa
   };
 
   if (error) {
-    console.warn("Supabase could not transfer the shopping list item to inventory:", error.message);
+    logger.error("transfer_failed", { error });
     redirect("/shopping-list?shoppingListError=transfer-failed");
   }
 
@@ -280,7 +283,7 @@ export async function transferShoppingListItemToInventoryAction(formData: FormDa
     };
 
   if (transferredItemError || !transferredItem) {
-    console.warn("Supabase could not load the transferred inventory item for nutrition estimation:", transferredItemError?.message ?? "not-found");
+    logger.warn("transferred_inventory_read_failed", { error: transferredItemError, reason: transferredItem ? undefined : "not-found" });
     revalidateShoppingListTransferPaths();
     redirect(`/shopping-list?shoppingListSuccess=${shoppingListSuccess}`);
   }
@@ -325,19 +328,19 @@ export async function transferShoppingListItemToInventoryAction(formData: FormDa
           };
 
         if (updateNutritionError) {
-          console.warn("Supabase could not save automatic nutrition after shopping list transfer:", updateNutritionError.message);
+          logger.warn("nutrition_update_failed", { error: updateNutritionError });
         } else if (updatedNutritionRows?.length === 1) {
           if (!resolutionUpdate.needsReview) {
             shoppingListSuccess = "item-transferred-with-nutrition";
           }
         } else {
-          console.warn("Automatic nutrition after shopping list transfer was not saved because the transferred item changed concurrently.");
+          logger.warn("nutrition_update_conflict");
         }
       } else {
-        console.warn("Automatic nutrition after shopping list transfer found conflicting food identities.");
+        logger.warn("nutrition_identity_conflict");
       }
     } else {
-      console.warn("Automatic nutrition after shopping list transfer was not completed:", nutritionResult.status);
+      logger.warn("nutrition_resolution_incomplete", { status: nutritionResult.status });
     }
   }
 
@@ -381,6 +384,7 @@ export async function deleteShoppingListItemAction(formData: FormData) {
 
 /** Estimates a local-only shopping-list draft; it deliberately performs no persistence. */
 export async function estimateVoiceShoppingBatchAction(text: string): Promise<VoiceShoppingBatchResult> {
+  if (!hasCorrelation()) return withCorrelationIfMissing(() => estimateVoiceShoppingBatchAction(text));
   const input = parseVoiceShoppingBatchInput(text);
   if (!input) return { status: "error", code: "invalid-input", message: "Escribe una lista de entre 1 y 4.000 caracteres." };
   const supabase = await createClient();

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createLogger, withCorrelationIfMissing } from "@/lib/server/logger";
 import { isMealType } from "@/modules/meals/meal-types";
 import {
   parseMealBuilderConsumptionLines,
@@ -38,7 +39,8 @@ function getSafeMealBuilderError(error: { code?: string; message: string }) {
   return "consume-failed";
 }
 
-export async function consumeMealBuilderAndLogMealAction(formData: FormData) {
+async function consumeMealBuilderAndLogMeal(formData: FormData) {
+  const logger = createLogger("inventory", "consume_meal_builder_and_log_meal");
   const returnPath = resolveMealBuilderReturnPath(formData.get("return_to"));
   const mealName = String(formData.get("meal_name") ?? "").trim();
   const mealType = String(formData.get("meal_type") ?? "").trim();
@@ -58,7 +60,7 @@ export async function consumeMealBuilderAndLogMealAction(formData: FormData) {
   }) as { data: string | null; error: { code?: string; message: string } | null };
 
   if (error) {
-    console.warn("Supabase could not consume meal builder items and log a meal:", error.message);
+    logger.error("atomic_consumption_failed", { error, code: getSafeMealBuilderError(error) });
     redirectWithMealError(getSafeMealBuilderError(error), returnPath);
   }
 
@@ -69,4 +71,8 @@ export async function consumeMealBuilderAndLogMealAction(formData: FormData) {
   revalidatePath("/weekly-summary");
 
   redirect(buildMealBuilderResultDestination("mealSuccess", "meal-consumed-logged"));
+}
+
+export async function consumeMealBuilderAndLogMealAction(formData: FormData) {
+  return withCorrelationIfMissing(() => consumeMealBuilderAndLogMeal(formData));
 }

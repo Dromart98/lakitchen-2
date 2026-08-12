@@ -1,3 +1,4 @@
+import { createLogger } from "@/lib/server/logger";
 import {
   buildDailyPlanInputText,
   DAILY_PLAN_JSON_SCHEMA,
@@ -81,18 +82,18 @@ export function normalizeDailyPlanProviderOutput(value: unknown): unknown {
 function parseDailyPlanResponse(request: DailyPlanPublicRequest, inventoryItems: DailyPlanInventoryItem[], referenceDate: string, responseBody: unknown): DailyPlanGenerationResult {
   const extracted = extractDailyPlanOutputText(responseBody);
   if (extracted.status !== "success") {
-    console.warn("daily_plan_ai_response_rejected", { reason: extracted.status });
+    createLogger("ai", "daily_plan_generation").warn("provider_response_rejected", { reason: extracted.status });
     return { status: "error", code: extracted.status === "provider-error" ? "provider-error" : "invalid-ai-response" };
   }
   try {
     const parsed = normalizeDailyPlanProviderOutput(JSON.parse(extracted.text) as unknown);
     const validated = validateDailyPlanProviderOutput(request, inventoryItems, parsed, referenceDate);
     if (validated.status === "error" && validated.code === "invalid-ai-response") {
-      console.warn("daily_plan_ai_response_rejected", { reason: "semantic-validation" });
+      createLogger("ai", "daily_plan_generation").warn("provider_response_rejected", { reason: "semantic-validation" });
     }
     return validated;
   } catch {
-    console.warn("daily_plan_ai_response_rejected", { reason: "invalid-json" });
+    createLogger("ai", "daily_plan_generation").warn("provider_response_rejected", { reason: "invalid-json" });
     return { status: "error", code: "invalid-ai-response" };
   }
 }

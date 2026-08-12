@@ -7,6 +7,7 @@ import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { generateRecipesWithOpenAi } from "@/lib/openai/recipe-generation";
 import { classifyAiResult, createAiUsageMeter } from "@/lib/ai/metering";
+import { hasCorrelation, withCorrelationIfMissing } from "@/lib/server/logger";
 import { buildRecipeAiNutritionAllocations } from "@/modules/recipes/recipe-ai-nutrition";
 import { loadAndAttachRecipeAiUnitMeasures, type RecipeAiUnitMeasureClient } from "@/modules/recipes/recipe-ai-unit-measures.server";
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
@@ -264,6 +265,7 @@ type RecipeAiSupabaseClient = {
 };
 
 export async function generateRecipeAiSuggestionsAction(input: unknown): Promise<RecipeAiActionResult> {
+  if (!hasCorrelation()) return withCorrelationIfMissing(() => generateRecipeAiSuggestionsAction(input));
   const request = parseRecipeAiRequest(input);
   if (!request) return { status: "error", code: "invalid-input" };
 

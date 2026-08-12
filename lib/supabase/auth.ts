@@ -1,6 +1,8 @@
 import type { User } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 
+import { createLogger } from "@/lib/server/logger";
+
 import type { createClient } from "./server";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -9,7 +11,7 @@ export async function getAuthenticatedUser(supabase: SupabaseServerClient, conte
   const { data, error } = await supabase.auth.getUser();
 
   if (error) {
-    console.warn(`Supabase could not read the ${context} auth user:`, error.message);
+    createLogger("auth", context).warn("auth_user_read_failed", { error });
   }
 
   return data.user ?? null;

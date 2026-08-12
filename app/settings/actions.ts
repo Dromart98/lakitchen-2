@@ -5,10 +5,12 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createLogger, withCorrelationIfMissing } from "@/lib/server/logger";
 
 const SETTINGS_PATH = "/settings";
 
-export async function deleteAccountAction(formData: FormData) {
+async function deleteAccount(formData: FormData) {
+  const logger = createLogger("auth", "delete_account");
   if (formData.get("delete_confirmation") !== "confirmed") {
     redirect(`${SETTINGS_PATH}?accountError=confirmation-required`);
   }
@@ -27,7 +29,7 @@ export async function deleteAccountAction(formData: FormData) {
   }
 
   if (deletionFailed) {
-    console.warn("Account deletion could not be completed safely.");
+    logger.error("account_deletion_failed");
     redirect(`${SETTINGS_PATH}?accountError=delete-failed`);
   }
 
@@ -35,4 +37,8 @@ export async function deleteAccountAction(formData: FormData) {
   // revocation can no longer find it, then return to the public entry point.
   await supabase.auth.signOut({ scope: "local" });
   redirect("/login?accountDeleted=true");
+}
+
+export async function deleteAccountAction(formData: FormData) {
+  return withCorrelationIfMissing(() => deleteAccount(formData));
 }

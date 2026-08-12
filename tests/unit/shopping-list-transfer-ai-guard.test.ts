@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   quotaRpc: vi.fn(),
   usageRows: [] as Record<string, unknown>[],
   revalidate: vi.fn(),
+  usageError: null as unknown,
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));
@@ -16,7 +17,7 @@ vi.mock("@/lib/nutrition/catalog-resolver", () => ({ resolveInventoryNutritionFo
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     rpc: mocks.quotaRpc,
-    from: () => ({ insert: async (row: Record<string, unknown>) => { mocks.usageRows.push(row); return { error: null }; } }),
+    from: () => ({ insert: async (row: Record<string, unknown>) => { mocks.usageRows.push(row); return { error: mocks.usageError }; } }),
   }),
 }));
 
@@ -65,6 +66,7 @@ describe("shopping transfer AI guard", () => {
     vi.clearAllMocks();
     mocks.usageRows.length = 0;
     mocks.featureEnabled = true;
+    mocks.usageError = null;
     mocks.quotaRpc.mockResolvedValue({ data: true, error: null });
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({})));
   });
@@ -108,5 +110,28 @@ describe("shopping transfer AI guard", () => {
     expect(mocks.quotaRpc).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
     expect(transferRpc).toHaveBeenCalledOnce();
+  });
+
+  it("keeps one correlation ID across the action and metering layers and separates operations", async () => {
+    mocks.usageError = { message: "private database response" };
+    mocks.resolve.mockResolvedValue({ status: "unresolved", reason: "provider-error", meteringCacheHit: false });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await expect(transferShoppingListItemToInventoryAction(form())).rejects.toThrow(pendingRedirect);
+    await expect(transferShoppingListItemToInventoryAction(form())).rejects.toThrow(pendingRedirect);
+
+    const records = warn.mock.calls.map(([line]) => JSON.parse(String(line).slice(String(line).indexOf("{"))));
+    const operationIds = records.reduce<string[][]>((groups, record) => {
+      if (record.event === "usage_metering_write_failed") groups.push([record.correlation_id]);
+      else groups.at(-1)?.push(record.correlation_id);
+      return groups;
+    }, []);
+    expect(operationIds).toHaveLength(2);
+    expect(operationIds[0]).toHaveLength(2);
+    expect(new Set(operationIds[0]).size).toBe(1);
+    expect(new Set(operationIds[1]).size).toBe(1);
+    expect(operationIds[0][0]).not.toBe(operationIds[1][0]);
+    expect(JSON.stringify(records)).not.toContain("private database response");
+    warn.mockRestore();
   });
 });

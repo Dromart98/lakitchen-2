@@ -1,9 +1,11 @@
 import { resolveInventoryNutrition } from "@/lib/nutrition/hybrid-resolver";
+import { createLogger } from "@/lib/server/logger";
 import { catalogBasisForUnit, catalogRequestKey, catalogRowFromResolution, findNutritionCatalogMatches, inferCatalogFoodState, persistNutritionCatalogRowWithIdentity } from "@/modules/nutrition/catalog";
 import type { InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
 import type { NutritionResolution } from "@/modules/nutrition/resolution";
 
 export async function resolveInventoryNutritionForUser(client: any, userId: string, input: InventoryNutritionAiInput, options: Parameters<typeof resolveInventoryNutrition>[1] = {}): Promise<NutritionResolution & { foodCatalogItemId?: string | null; meteringCacheHit?: boolean }> {
+  const logger = createLogger("nutrition", "resolve_inventory_nutrition");
   const foodState = inferCatalogFoodState(input.name);
   const nutritionBasis = catalogBasisForUnit(input.unit);
   let hit;
@@ -11,7 +13,7 @@ export async function resolveInventoryNutritionForUser(client: any, userId: stri
     const matches = await findNutritionCatalogMatches(client, userId, [{ name: input.name, foodState, nutritionBasis }]);
     hit = matches.get(catalogRequestKey(input.name, foodState, nutritionBasis));
   } catch (error) {
-    console.warn("Supabase could not read the nutrition catalog:", error instanceof Error ? error.message : error);
+    logger.warn("catalog_read_failed", { error });
   }
   if (hit) return { status: "resolved", normalizedName: hit.normalized_name, foodState: hit.food_state === "drained" || hit.food_state === "frozen" ? "unknown" : hit.food_state,
     nutritionBasis: hit.nutrition_basis, calories: hit.calories, proteinG: hit.protein_g, carbsG: hit.carbs_g, fatG: hit.fat_g,
@@ -23,7 +25,7 @@ export async function resolveInventoryNutritionForUser(client: any, userId: stri
       const persisted = await persistNutritionCatalogRowWithIdentity(client, catalogRowFromResolution(userId, input.name, { ...resolution, foodState: compatibleFoodState }));
       return { ...resolution, foodCatalogItemId: persisted.foodCatalogItemId };
     }
-    catch (error) { console.warn("Supabase could not cache resolved nutrition:", error instanceof Error ? error.message : error); }
+    catch (error) { logger.warn("catalog_write_failed", { error }); }
   }
   return resolution;
 }
