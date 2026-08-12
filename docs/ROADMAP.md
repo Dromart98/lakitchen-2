@@ -257,7 +257,7 @@ Criterio de cierre:
 
 ### 2.4 Monitoreo de errores y alertas
 
-**Estado: pendiente. Prioridad: máxima.**
+**Estado: implementación completada; cierre pendiente de validación controlada en Sentry. Prioridad: máxima.** El SDK cubre navegador, Server Components/Actions y runtimes Node/Edge, sin tracing ni Replay. La sanitización central elimina PII, secretos y payloads; los fallos inesperados reportados comparten `correlation_id` con el logger. La comprobación se ejecuta solo por CLI con `SENTRY_VALIDATION=1 npm run sentry:validate`; antes de marcar la fase como completada deben verificarse en el proyecto real el evento, release, correlación, stack saneado, ausencia de datos privados y las alertas externas de errores nuevos, regresiones, picos y recurrencias críticas. Tras ese cierre, la siguiente tarea es **2.5 Rate limiting y protección frente a abuso**.
 
 - Incorporar monitorización centralizada de excepciones y fallos no controlados en cliente y servidor, con stack trace, versión de release, ruta/componente y correlación con los logs estructurados.
 - Agrupar errores equivalentes y registrar frecuencia, primera/última aparición y regresiones por versión.
