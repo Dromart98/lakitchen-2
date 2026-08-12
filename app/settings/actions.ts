@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { createLogger, withCorrelation } from "@/lib/server/logger";
+import { createLogger, withCorrelationIfMissing } from "@/lib/server/logger";
 
 const SETTINGS_PATH = "/settings";
 
@@ -40,5 +40,5 @@ async function deleteAccount(formData: FormData) {
 }
 
 export async function deleteAccountAction(formData: FormData) {
-  return withCorrelation(() => deleteAccount(formData));
+  return withCorrelationIfMissing(() => deleteAccount(formData));
 }

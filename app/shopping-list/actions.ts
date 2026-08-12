@@ -11,7 +11,7 @@ import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { classifyAiResult, createAiUsageMeter } from "@/lib/ai/metering";
 import { INVENTORY_NUTRITION_AI_MODEL_DEFAULT } from "@/modules/inventory/inventory-ai-nutrition";
-import { createLogger, hasCorrelation, withCorrelation } from "@/lib/server/logger";
+import { createLogger, hasCorrelation, withCorrelationIfMissing } from "@/lib/server/logger";
 import {
   getShoppingListTransferNutritionPlan,
   planShoppingListTransferResolutionUpdate,
@@ -234,7 +234,7 @@ export async function setShoppingListItemPurchasedAction(formData: FormData) {
 }
 
 export async function transferShoppingListItemToInventoryAction(formData: FormData): Promise<never> {
-  if (!hasCorrelation()) return withCorrelation(() => transferShoppingListItemToInventoryAction(formData));
+  if (!hasCorrelation()) return withCorrelationIfMissing(() => transferShoppingListItemToInventoryAction(formData));
   const logger = createLogger("shopping_list", "transfer_to_inventory");
   const id = String(formData.get("id") ?? "").trim();
   const location = String(formData.get("location") ?? "");
@@ -384,6 +384,7 @@ export async function deleteShoppingListItemAction(formData: FormData) {
 
 /** Estimates a local-only shopping-list draft; it deliberately performs no persistence. */
 export async function estimateVoiceShoppingBatchAction(text: string): Promise<VoiceShoppingBatchResult> {
+  if (!hasCorrelation()) return withCorrelationIfMissing(() => estimateVoiceShoppingBatchAction(text));
   const input = parseVoiceShoppingBatchInput(text);
   if (!input) return { status: "error", code: "invalid-input", message: "Escribe una lista de entre 1 y 4.000 caracteres." };
   const supabase = await createClient();

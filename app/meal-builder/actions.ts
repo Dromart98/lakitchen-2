@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { createLogger, withCorrelation } from "@/lib/server/logger";
+import { createLogger, withCorrelationIfMissing } from "@/lib/server/logger";
 import { isMealType } from "@/modules/meals/meal-types";
 import {
   parseMealBuilderConsumptionLines,
@@ -74,5 +74,5 @@ async function consumeMealBuilderAndLogMeal(formData: FormData) {
 }
 
 export async function consumeMealBuilderAndLogMealAction(formData: FormData) {
-  return withCorrelation(() => consumeMealBuilderAndLogMeal(formData));
+  return withCorrelationIfMissing(() => consumeMealBuilderAndLogMeal(formData));
 }

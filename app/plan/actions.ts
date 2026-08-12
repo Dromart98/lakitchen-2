@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { DAILY_PLAN_AI_MODEL_DEFAULT, generateDailyPlanWithOpenAi } from "@/lib/openai/daily-plan-generation";
 import { classifyAiResult, createAiUsageMeter } from "@/lib/ai/metering";
+import { hasCorrelation, withCorrelationIfMissing } from "@/lib/server/logger";
 import { getCurrentInventoryExpirationDateKey } from "@/modules/inventory/inventory-expiration";
 import {
   buildDailyPlanTarget,
@@ -57,6 +58,7 @@ async function loadDailyPlanContext(supabase: any, userId: string, planDateKey: 
 }
 
 export async function generateDailyPlanAction(input: unknown): Promise<DailyPlanActionResult> {
+  if (!hasCorrelation()) return withCorrelationIfMissing(() => generateDailyPlanAction(input));
   const request = dailyPlanPublicRequestSchema.safeParse(input);
   if (!request.success) return { status: "error", code: "invalid-input" };
 

@@ -16,16 +16,18 @@ export type StructuredLogRecord = {
 };
 
 const context = new AsyncLocalStorage<{ correlationId: string }>();
-const blockedKeys = /(?:authorization|cookie|email|image|password|prompt|raw|response|secret|token|api[_-]?key|meal|dictat|content)/i;
+const blockedKeys = /(?:authorization|body|bytes|content|cookie|description|dictat|email|file|formdata|image|input|meal|password|payload|prompt|query|raw|request|response|secret|text|token|url|api[_-]?key)/i;
 const email = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const bearer = /\bBearer\s+[A-Za-z0-9._~+/-]+=*/i;
 const jwt = /\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/;
 const dataImage = /data:image\/[a-z0-9.+-]+;base64,/i;
+const urlWithPrivateData = /^https?:\/\/[^\s?#]+(?:\?[^\s]*|#[^\s]*)$/i;
 
 function safeValue(key: string, value: unknown, depth = 0): unknown {
   if (blockedKeys.test(key)) return "[REDACTED]";
   if (depth > 4) return "[REDACTED]";
-  if (/^(?:error|exception)$/i.test(key) && value && typeof value === "object") {
+  if (/^(?:error|exception)$/i.test(key)) {
+    if (!value || typeof value !== "object") return "[REDACTED]";
     const candidate = value as { name?: unknown; code?: unknown; status?: unknown };
     return {
       name: typeof candidate.name === "string" ? candidate.name : "Error",
@@ -33,8 +35,9 @@ function safeValue(key: string, value: unknown, depth = 0): unknown {
       ...(typeof candidate.status === "number" ? { status: candidate.status } : {}),
     };
   }
+  if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) return "[REDACTED]";
   if (typeof value === "string") {
-    if (email.test(value) || bearer.test(value) || jwt.test(value) || dataImage.test(value)) return "[REDACTED]";
+    if (email.test(value) || bearer.test(value) || jwt.test(value) || dataImage.test(value) || urlWithPrivateData.test(value)) return "[REDACTED]";
     return value.length > 256 ? `${value.slice(0, 64)}…[TRUNCATED]` : value;
   }
   if (value instanceof Error) return { name: value.name };
@@ -51,6 +54,10 @@ export function createCorrelationId(): string {
 
 export function withCorrelation<T>(operation: () => T, correlationId = createCorrelationId()): T {
   return context.run({ correlationId }, operation);
+}
+
+export function withCorrelationIfMissing<T>(operation: () => T): T {
+  return context.getStore() ? operation() : withCorrelation(operation);
 }
 
 export function getCorrelationId(): string {

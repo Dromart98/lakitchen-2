@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createCorrelationId, createStructuredLogRecord, getCorrelationId, log, withCorrelation } from "@/lib/server/logger";
+import { createCorrelationId, createStructuredLogRecord, getCorrelationId, log, withCorrelation, withCorrelationIfMissing } from "@/lib/server/logger";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -16,6 +16,13 @@ describe("structured server logger", () => {
       await Promise.resolve();
       expect(getCorrelationId()).toBe(first);
     });
+  });
+
+  it("does not replace an existing correlation context", () => {
+    withCorrelation(() => {
+      const outer = getCorrelationId();
+      withCorrelationIfMissing(() => expect(getCorrelationId()).toBe(outer));
+    }, "existing-request");
   });
 
   it("generates non-sequential distinct operation IDs", () => {
@@ -39,5 +46,24 @@ describe("structured server logger", () => {
     const serialized = JSON.stringify(record);
     for (const privateValue of ["person@example.com", "session=secret", "private dinner", "private", "data:image", "Bearer abc", "raw provider payload", "key"]) expect(serialized).not.toContain(privateValue);
     expect(record).toMatchObject({ email: "[REDACTED]", cookie: "[REDACTED]", prompt: "[REDACTED]", image: "[REDACTED]" });
+  });
+
+  it("redacts common private payload names, binaries, URLs and string errors", () => {
+    const privateValue = "private-marker";
+    const record = createStructuredLogRecord({
+      level: "error", event: "failed", component: "ai", action: "call", correlationId: "request-3",
+      fields: {
+        input: privateValue, text: privateValue, description: privateValue, body: privateValue,
+        payload: privateValue, request: privateValue, file: privateValue, bytes: privateValue,
+        formData: privateValue, query: privateValue, url: `https://example.test/?q=${privateValue}`,
+        endpoint: `https://example.test/search?q=${privateValue}`,
+        attachment: new Uint8Array([112, 114, 105, 118, 97, 116, 101]),
+        buffer: new ArrayBuffer(8), error: privateValue,
+      },
+    });
+    expect(JSON.stringify(record)).not.toContain(privateValue);
+    for (const key of ["input", "text", "description", "body", "payload", "request", "file", "bytes", "formData", "query", "url", "endpoint", "attachment", "buffer", "error"]) {
+      expect(record[key]).toBe("[REDACTED]");
+    }
   });
 });

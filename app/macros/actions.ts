@@ -15,6 +15,7 @@ import { isValidUuid } from "@/modules/meals/meal-validation";
 import { createTextMealCacheKey, purgeExpiredTextMealCache, readTextMealCache, writeTextMealCache, type TextMealCacheClient } from "@/modules/meals/text-meal-cache";
 import { createPhotoMealCacheKey, purgeExpiredPhotoMealCache, readPhotoMealCache, writePhotoMealCache, type PhotoMealCacheClient } from "@/modules/meals/photo-meal-cache";
 import { classifyAiResult, createAiUsageMeter } from "@/lib/ai/metering";
+import { hasCorrelation, withCorrelationIfMissing } from "@/lib/server/logger";
 
 type AiMealInventoryRpcClient = {
   rpc: (functionName: "consume_ai_meal_inventory_and_log_meal", args: {
@@ -25,6 +26,7 @@ type AiMealInventoryRpcClient = {
   }) => Promise<{ error: { code?: string; message: string } | null }>;
 };
 export async function estimateTextMealAction(input: unknown): Promise<TextMealEstimationResult> {
+  if (!hasCorrelation()) return withCorrelationIfMissing(() => estimateTextMealAction(input));
   const request = textMealRequestSchema.safeParse(input);
   if (!request.success) return { status: "error", code: "invalid-input" };
   try {
@@ -71,6 +73,7 @@ export async function estimateTextMealAction(input: unknown): Promise<TextMealEs
 }
 
 export async function estimatePhotoMealAction(formData: FormData): Promise<TextMealEstimationResult> {
+  if (!hasCorrelation()) return withCorrelationIfMissing(() => estimatePhotoMealAction(formData));
   const context = photoMealContextSchema.safeParse({ context: formData.get("context") ?? "" });
   if (!context.success) return { status: "error", code: "invalid-input" };
   try {
