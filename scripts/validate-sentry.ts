@@ -4,10 +4,13 @@ import { sentryBaseOptions } from "../lib/monitoring/sentry";
 import { reportUnexpectedError } from "../lib/server/error-reporter";
 import { withCorrelation } from "../lib/server/logger";
 
-if (process.env.SENTRY_VALIDATION !== "1" || !process.env.NEXT_PUBLIC_SENTRY_DSN) {
-  console.error("Validation is disabled. Set SENTRY_VALIDATION=1 and NEXT_PUBLIC_SENTRY_DSN explicitly.");
-  process.exitCode = 1;
-} else {
+async function main(): Promise<void> {
+  if (process.env.SENTRY_VALIDATION !== "1" || !process.env.NEXT_PUBLIC_SENTRY_DSN) {
+    console.error("Validation is disabled. Set SENTRY_VALIDATION=1 and NEXT_PUBLIC_SENTRY_DSN explicitly.");
+    process.exitCode = 1;
+    return;
+  }
+
   Sentry.init(sentryBaseOptions);
   const correlationId = `sentry-validation-${crypto.randomUUID()}`;
   withCorrelation(() => {
@@ -22,3 +25,8 @@ if (process.env.SENTRY_VALIDATION !== "1" || !process.env.NEXT_PUBLIC_SENTRY_DSN
   console.info(JSON.stringify({ flushed, correlation_id: correlationId, expected_message: "Error (details redacted)" }));
   if (!flushed) process.exitCode = 1;
 }
+
+main().catch(() => {
+  console.error("Sentry validation failed.");
+  process.exitCode = 1;
+});
