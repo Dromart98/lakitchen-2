@@ -3,6 +3,7 @@ import type { ErrorEvent, EventHint } from "@sentry/nextjs";
 const PRIVATE_KEY = /(?:authorization|body|bytes|content|cookie|description|dictat|email|file|formdata|image|input|meal|password|payload|prompt|query|raw|request|response|secret|text|token|url|user|api[_-]?key)/i;
 const PRIVATE_VALUE = /(?:\bBearer\s+\S+|\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b|data:image\/[^;]+;base64,)/i;
 const ALLOWED_TAGS = new Set(["action", "component", "correlation_id", "route", "runtime"]);
+const SAFE_STACK_SEGMENTS = ["/node_modules/", "/app/", "/lib/", "/scripts/", "/src/", "/tests/"];
 
 export function getSentryRelease(): string | undefined {
   return process.env.VERCEL_GIT_COMMIT_SHA || process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || process.env.APP_RELEASE;
@@ -15,6 +16,24 @@ export function getSentryEnvironment(): string {
 function safeString(value: string): string {
   if (PRIVATE_VALUE.test(value) || value.length > 256) return "[REDACTED]";
   return value;
+}
+
+function safeStackLocation(value: string): string {
+  const clean = value.split("?")[0].replace(/\\/g, "/");
+  const withoutFileScheme = clean.replace(/^file:\/\/+/, "");
+  const isAbsolute = clean.startsWith("/") || /^file:\/\//i.test(clean) || /^[A-Za-z]:\//.test(withoutFileScheme);
+
+  if (!isAbsolute) return safeString(clean);
+
+  let safeStart = -1;
+  for (const segment of SAFE_STACK_SEGMENTS) {
+    const index = withoutFileScheme.lastIndexOf(segment);
+    if (index > safeStart) safeStart = index;
+  }
+  if (safeStart >= 0) return safeString(withoutFileScheme.slice(safeStart));
+
+  const basename = withoutFileScheme.split("/").filter(Boolean).at(-1);
+  return safeString(basename ?? "[REDACTED]");
 }
 
 function sanitizeValue(value: unknown, key = "", depth = 0): unknown {
@@ -35,9 +54,9 @@ export function sanitizeSentryEvent(event: ErrorEvent, _hint?: EventHint): Error
     stacktrace: value.stacktrace ? {
       ...value.stacktrace,
       frames: value.stacktrace.frames?.map((frame) => ({
-        filename: frame.filename ? safeString(frame.filename.split("?")[0]) : frame.filename,
+        filename: frame.filename ? safeStackLocation(frame.filename) : frame.filename,
         function: frame.function ? safeString(frame.function) : frame.function,
-        module: frame.module ? safeString(frame.module) : frame.module,
+        module: frame.module ? safeStackLocation(frame.module) : frame.module,
         lineno: frame.lineno,
         colno: frame.colno,
         in_app: frame.in_app,
