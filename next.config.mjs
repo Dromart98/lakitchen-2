@@ -12,6 +12,5 @@ const nextConfig = {
 
 export default withSentryConfig(nextConfig, {
   silent: true,
-  tunnelRoute: "/api/monitoring",
   sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
 });
