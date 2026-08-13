@@ -6,7 +6,9 @@ import { AI_DAILY_REQUEST_LIMIT_FALLBACK, AI_QUOTA_RESERVATION_TIMEOUT_MS, creat
 const migration = readFileSync("supabase/migrations/20260810170000_create_ai_daily_request_usage.sql", "utf8").toLowerCase();
 
 function client(reserve: () => Promise<{ data: boolean | null; error: unknown }>) {
-  return { rpc: vi.fn(reserve) };
+  return { rpc: vi.fn((name: string) => name === "reserve_ai_burst_request"
+    ? Promise.resolve({ data: { allowed: true, retry_after_seconds: 0 }, error: null })
+    : reserve()) };
 }
 
 describe("daily AI request guard", () => {
@@ -22,7 +24,7 @@ describe("daily AI request guard", () => {
     const meter = createAiUsageMeter({ userId: "user-a", feature: "text_meal", model: "model", quotaClient, baseFetch: provider });
     await meter.fetchImpl("https://api.openai.com/v1/responses");
     await meter.fetchImpl("https://api.openai.com/v1/responses");
-    expect(quotaClient.rpc).toHaveBeenCalledTimes(1);
+    expect(quotaClient.rpc).toHaveBeenCalledTimes(2);
     expect(provider).toHaveBeenCalledTimes(2);
   });
 
@@ -63,7 +65,7 @@ describe("daily AI request guard", () => {
       expect(meter.getAccessError()).toBe("ai-access-unavailable");
       expect(vi.getTimerCount()).toBe(0);
       expect((await meter.fetchImpl("https://api.openai.com/v1/responses")).status).toBe(429);
-      expect(quotaClient.rpc).toHaveBeenCalledOnce();
+      expect(quotaClient.rpc).toHaveBeenCalledTimes(2);
       expect(provider).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
@@ -94,7 +96,7 @@ describe("daily AI request guard", () => {
     expect(meter.authorizeFeature()).toBe(true);
     expect(quotaClient.rpc).not.toHaveBeenCalled();
     await meter.fetchImpl("https://api.openai.com/v1/responses");
-    expect(quotaClient.rpc).toHaveBeenCalledOnce();
+    expect(quotaClient.rpc).toHaveBeenCalledTimes(2);
     expect(provider).toHaveBeenCalledOnce();
   });
 });

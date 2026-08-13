@@ -67,7 +67,9 @@ describe("shopping transfer AI guard", () => {
     mocks.usageRows.length = 0;
     mocks.featureEnabled = true;
     mocks.usageError = null;
-    mocks.quotaRpc.mockResolvedValue({ data: true, error: null });
+    mocks.quotaRpc.mockImplementation(async (name: string) => name === "reserve_ai_burst_request"
+      ? { data: { allowed: true, retry_after_seconds: 0 }, error: null }
+      : { data: true, error: null });
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({})));
   });
 
@@ -87,13 +89,15 @@ describe("shopping transfer AI guard", () => {
       return { status: "unresolved", reason: "provider-error", meteringCacheHit: false };
     });
     await expect(transferShoppingListItemToInventoryAction(form())).rejects.toThrow(pendingRedirect);
-    expect(mocks.quotaRpc).toHaveBeenCalledOnce();
+    expect(mocks.quotaRpc).toHaveBeenCalledTimes(2);
     expect(fetch).toHaveBeenCalledOnce();
     expect(transferRpc).toHaveBeenCalledOnce();
   });
 
   it("keeps the transferred item pending when the daily limit blocks the fallback", async () => {
-    mocks.quotaRpc.mockResolvedValue({ data: false, error: null });
+    mocks.quotaRpc.mockImplementation(async (name: string) => name === "reserve_ai_burst_request"
+      ? { data: { allowed: true, retry_after_seconds: 0 }, error: null }
+      : { data: false, error: null });
     mocks.resolve.mockImplementation(async (_client, _userId, _input, options) => {
       await options.fetchImpl("https://api.openai.com/v1/responses");
       return { status: "unresolved", reason: "provider-error", meteringCacheHit: false };

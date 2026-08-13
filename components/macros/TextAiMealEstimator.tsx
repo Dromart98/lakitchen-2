@@ -25,7 +25,7 @@ const errors: Record<string, string> = {
   "invalid-input": "Describe la comida con al menos 3 caracteres.",
   unauthenticated: "Tu sesión ha caducado. Vuelve a iniciar sesión.",
   "missing-api-key": "La estimación no está disponible ahora.",
-  "daily-ai-limit": "Has alcanzado el límite de funciones con IA de hoy. Podrás volver a usarlas mañana.",
+  "ai-burst-limit": "Has hecho varias solicitudes seguidas. Espera un momento y vuelve a intentarlo.", "daily-ai-limit": "Has alcanzado el límite de funciones con IA de hoy. Podrás volver a usarlas mañana.",
   "ai-access-unavailable": "Las funciones con IA no están disponibles ahora. Inténtalo más tarde.",
   "ai-feature-disabled": "Esta función no está disponible.",
   "provider-timeout": "La estimación tardó demasiado. Inténtalo de nuevo.",

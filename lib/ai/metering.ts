@@ -9,6 +9,8 @@ export const AI_METERING_PERSIST_TIMEOUT_MS = 1_500;
 // Quota storage is a blocking guard, so keep its wait short and fail closed.
 export const AI_QUOTA_RESERVATION_TIMEOUT_MS = 1_500;
 export const AI_DAILY_REQUEST_LIMIT_FALLBACK = 20;
+export const AI_BURST_REQUEST_LIMIT_FALLBACK = 5;
+export const AI_BURST_WINDOW_SECONDS_FALLBACK = 60;
 
 type TokenUsage = {
   inputTokens: number;
@@ -69,12 +71,24 @@ export type AiUsageOutcome = "success" | "clarification" | "error";
 export type AiUsageFeature = "text_meal" | "photo_meal" | "inventory_nutrition" | "voice_inventory" | "voice_shopping" | "recipe_generation" | "daily_plan";
 
 type MeteringClient = { from(table: "ai_usage_events"): { insert(row: Record<string, unknown>): PromiseLike<{ error: unknown }> } };
-type QuotaClient = { rpc(name: "reserve_ai_daily_request", args: { p_user_id: string; p_limit: number }): PromiseLike<{ data: boolean | null; error: unknown }> };
-export type AiAccessErrorCode = "daily-ai-limit" | "ai-access-unavailable" | "ai-feature-disabled";
+type QuotaClient = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }> };
+type BurstReservation = { allowed: boolean; retry_after_seconds: number };
+type BurstClient = QuotaClient;
+export type AiAccessErrorCode = "ai-burst-limit" | "daily-ai-limit" | "ai-access-unavailable" | "ai-feature-disabled";
 
 export function getAiDailyRequestLimit(value = process.env.AI_DAILY_REQUEST_LIMIT): number {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : AI_DAILY_REQUEST_LIMIT_FALLBACK;
+}
+
+export function getAiBurstRequestLimit(value = process.env.AI_BURST_REQUEST_LIMIT): number {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : AI_BURST_REQUEST_LIMIT_FALLBACK;
+}
+
+export function getAiBurstWindowSeconds(value = process.env.AI_BURST_WINDOW_SECONDS): number {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : AI_BURST_WINDOW_SECONDS_FALLBACK;
 }
 
 async function waitForMeteringInsert(operation: PromiseLike<{ error: unknown }>) {
@@ -91,7 +105,7 @@ async function waitForMeteringInsert(operation: PromiseLike<{ error: unknown }>)
   }
 }
 
-async function waitForQuotaReservation(operation: PromiseLike<{ data: boolean | null; error: unknown }>) {
+async function waitForQuotaReservation<T>(operation: PromiseLike<{ data: T; error: unknown }>) {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -105,12 +119,13 @@ async function waitForQuotaReservation(operation: PromiseLike<{ data: boolean | 
   }
 }
 
-export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeature; model: string; client?: MeteringClient | null; quotaClient?: QuotaClient | null; plan?: AiPlan; featurePolicy?: typeof isAiFeatureEnabled; dailyLimit?: number; now?: () => number; baseFetch?: typeof fetch }) {
+export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeature; model: string; client?: MeteringClient | null; quotaClient?: QuotaClient | null; burstClient?: BurstClient | null; plan?: AiPlan; featurePolicy?: typeof isAiFeatureEnabled; dailyLimit?: number; burstLimit?: number; burstWindowSeconds?: number; now?: () => number; baseFetch?: typeof fetch }) {
   const startedAt = (input.now ?? Date.now)();
   const logger = createLogger("ai", `metering.${input.feature}`);
   const aggregate = emptyUsage();
   let providerRequestCount = 0;
   let accessError: AiAccessErrorCode | null = null;
+  let retryAfterSeconds: number | null = null;
   let reservation: Promise<boolean> | null = null;
 
   function authorizeFeature(): boolean {
@@ -125,7 +140,21 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
     if (!authorizeFeature()) return false;
     if (!reservation) reservation = (async () => {
       try {
-        const client = input.quotaClient ?? createAdminClient() as unknown as QuotaClient;
+        const adminClient = input.burstClient ?? input.quotaClient ?? createAdminClient();
+        const burstClient = adminClient as unknown as BurstClient;
+        const burst = await waitForQuotaReservation(burstClient.rpc("reserve_ai_burst_request", {
+          p_user_id: input.userId,
+          p_limit: input.burstLimit ?? getAiBurstRequestLimit(),
+          p_window_seconds: input.burstWindowSeconds ?? getAiBurstWindowSeconds(),
+        }));
+        const burstData = burst.data as Partial<BurstReservation> | null;
+        if (burst.error || !burstData || typeof burstData.allowed !== "boolean" || typeof burstData.retry_after_seconds !== "number") throw new Error("burst-reservation-failed");
+        if (!burstData.allowed) {
+          accessError = "ai-burst-limit";
+          retryAfterSeconds = Math.max(1, Math.ceil(burstData.retry_after_seconds));
+          return false;
+        }
+        const client = (input.quotaClient ?? adminClient) as unknown as QuotaClient;
         const { data, error } = await waitForQuotaReservation(client.rpc("reserve_ai_daily_request", {
           p_user_id: input.userId,
           p_limit: input.dailyLimit ?? getAiDailyRequestLimit(),
@@ -146,7 +175,9 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
     const url = typeof request === "string" || request instanceof URL ? String(request) : request.url;
     const isOpenAiRequest = new URL(url).hostname === "api.openai.com";
     if (isOpenAiRequest && !await reserveOnce()) {
-      return new Response(null, { status: 429, headers: { "x-lakitchen-ai-access": accessError ?? "ai-access-unavailable" } });
+      const headers: Record<string, string> = { "x-lakitchen-ai-access": accessError ?? "ai-access-unavailable" };
+      if (accessError === "ai-burst-limit" && retryAfterSeconds !== null) headers["Retry-After"] = String(retryAfterSeconds);
+      return new Response(null, { status: 429, headers });
     }
     if (isOpenAiRequest) providerRequestCount += 1;
     const response = await (input.baseFetch ?? fetch)(request, init);

@@ -98,6 +98,7 @@ export type DailyPlanErrorCode =
   | "insufficient-inventory"
   | "nutrition-unavailable"
   | "missing-api-key"
+  | "ai-burst-limit"
   | "daily-ai-limit"
   | "ai-access-unavailable"
   | "ai-feature-disabled"
