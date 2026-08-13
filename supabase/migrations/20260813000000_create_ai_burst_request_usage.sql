@@ -1,7 +1,6 @@
 create table public.ai_burst_request_usage (
   user_id uuid primary key references auth.users(id) on delete cascade,
-  window_started_at timestamptz not null,
-  request_count integer not null check (request_count >= 1),
+  request_timestamps timestamptz[] not null default array[]::timestamptz[],
   updated_at timestamptz not null default now()
 );
 
@@ -22,41 +21,55 @@ set search_path = ''
 as $$
 declare
   server_now timestamptz := statement_timestamp();
+  cutoff timestamptz;
   usage_row public.ai_burst_request_usage%rowtype;
+  recent_requests timestamptz[];
+  oldest_request timestamptz;
   retry_after integer;
 begin
   if p_user_id is null or p_limit <= 0 or p_window_seconds <= 0 then
     raise exception 'invalid burst guard configuration' using errcode = '22023';
   end if;
 
-  insert into public.ai_burst_request_usage as usage (user_id, window_started_at, request_count, updated_at)
-  values (p_user_id, server_now, 1, server_now)
-  on conflict (user_id) do update
-    set window_started_at = case
-          when usage.window_started_at + make_interval(secs => p_window_seconds) <= server_now then server_now
-          else usage.window_started_at
-        end,
-        request_count = case
-          when usage.window_started_at + make_interval(secs => p_window_seconds) <= server_now then 1
-          else usage.request_count + 1
-        end,
-        updated_at = server_now
-    where usage.window_started_at + make_interval(secs => p_window_seconds) <= server_now
-       or usage.request_count < p_limit
-  returning * into usage_row;
+  cutoff := server_now - make_interval(secs => p_window_seconds);
 
-  if usage_row.user_id is not null then
-    return jsonb_build_object('allowed', true, 'retry_after_seconds', 0);
+  insert into public.ai_burst_request_usage (user_id, request_timestamps, updated_at)
+  values (p_user_id, array[]::timestamptz[], server_now)
+  on conflict (user_id) do nothing;
+
+  select *
+  into usage_row
+  from public.ai_burst_request_usage
+  where user_id = p_user_id
+  for update;
+
+  select coalesce(array_agg(requested_at order by requested_at), array[]::timestamptz[])
+  into recent_requests
+  from unnest(usage_row.request_timestamps) as requested_at
+  where requested_at > cutoff;
+
+  if cardinality(recent_requests) >= p_limit then
+    oldest_request := recent_requests[1];
+    retry_after := greatest(1, ceil(extract(epoch from
+      (oldest_request + make_interval(secs => p_window_seconds) - server_now)
+    ))::integer);
+
+    update public.ai_burst_request_usage
+    set request_timestamps = recent_requests,
+        updated_at = server_now
+    where user_id = p_user_id;
+
+    return jsonb_build_object('allowed', false, 'retry_after_seconds', retry_after);
   end if;
 
-  select greatest(1, ceil(extract(epoch from
-    (window_started_at + make_interval(secs => p_window_seconds) - server_now)
-  ))::integer)
-  into retry_after
-  from public.ai_burst_request_usage
+  recent_requests := array_append(recent_requests, server_now);
+
+  update public.ai_burst_request_usage
+  set request_timestamps = recent_requests,
+      updated_at = server_now
   where user_id = p_user_id;
 
-  return jsonb_build_object('allowed', false, 'retry_after_seconds', retry_after);
+  return jsonb_build_object('allowed', true, 'retry_after_seconds', 0);
 end;
 $$;
 
