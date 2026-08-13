@@ -1,6 +1,6 @@
 # Roadmap estratégico de Lakitchenapp
 
-Última actualización: 10 de agosto de 2026.
+Última actualización: 13 de agosto de 2026.
 
 ## Principios de producto
 
@@ -26,7 +26,7 @@ Estado ya cerrado:
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
 - **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
 
-Siguiente tarea: **2.4 — Monitoreo de errores y alertas**.
+Siguiente tarea: **2.5 — Rate limiting y protección frente a abuso**.
 
 Orden de implementación acordado:
 
@@ -211,7 +211,7 @@ No permitir que la IA calcule libremente estos valores cuando puedan obtenerse d
 
 Prioridad: alta.
 
-**Estado: en curso.** Siguiente tarea: **2.4 Monitoreo de errores y alertas**.
+**Estado: en curso.** Siguiente tarea: **2.5 Rate limiting y protección frente a abuso**.
 
 ### 2.1 Caché y reutilización
 
@@ -257,7 +257,7 @@ Criterio de cierre:
 
 ### 2.4 Monitoreo de errores y alertas
 
-**Estado: implementación completada; cierre pendiente de validación controlada en Sentry. Prioridad: máxima.** El SDK cubre navegador, Server Components/Actions y runtimes Node/Edge, sin tracing ni Replay. La sanitización central elimina PII, secretos y payloads; los fallos inesperados reportados comparten `correlation_id` con el logger. La comprobación se ejecuta solo por CLI con `SENTRY_VALIDATION=1 npm run sentry:validate`; antes de marcar la fase como completada deben verificarse en el proyecto real el evento, release, correlación, stack saneado, ausencia de datos privados y las alertas externas de errores nuevos, regresiones, picos y recurrencias críticas. Tras ese cierre, la siguiente tarea es **2.5 Rate limiting y protección frente a abuso**.
+**Estado: completada.** El SDK cubre navegador, Server Components/Actions y runtimes Node/Edge, sin tracing ni Replay. La sanitización central elimina PII, secretos, payloads, respuestas crudas y rutas locales del stack; los fallos inesperados comparten `correlation_id` con el logger. La validación controlada en el proyecto real confirmó recepción del evento con release, entorno `production`, correlación y stack saneados, sin secretos ni contenido privado. Sentry mantiene `sendDefaultPii: false` y `dataCollection.userInfo: false`; la alerta de issues de alta prioridad fue disparada por el fallo simulado y quedó restringida a `production`. Siguiente tarea: **2.5 Rate limiting y protección frente a abuso**.
 
 - Incorporar monitorización centralizada de excepciones y fallos no controlados en cliente y servidor, con stack trace, versión de release, ruta/componente y correlación con los logs estructurados.
 - Agrupar errores equivalentes y registrar frecuencia, primera/última aparición y regresiones por versión.
