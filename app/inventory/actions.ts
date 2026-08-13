@@ -40,15 +40,16 @@ export type InventoryNutritionAiActionResult =
   | { status: "needs-clarification"; message: string }
   | {
       status: "error";
-      code: "invalid-input" | "not-configured" | "daily-ai-limit" | "ai-access-unavailable" | "ai-feature-disabled" | "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response";
+      code: "invalid-input" | "not-configured" | "ai-burst-limit" | "daily-ai-limit" | "ai-access-unavailable" | "ai-feature-disabled" | "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response";
       message: string;
     };
 
-type InventoryNutritionAiErrorCode = "invalid-input" | "not-configured" | "daily-ai-limit" | "ai-access-unavailable" | "ai-feature-disabled" | "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response";
+type InventoryNutritionAiErrorCode = "invalid-input" | "not-configured" | "ai-burst-limit" | "daily-ai-limit" | "ai-access-unavailable" | "ai-feature-disabled" | "timeout" | "rate-limited" | "provider-error" | "invalid-ai-response";
 
 const inventoryNutritionAiErrorMessages: Record<InventoryNutritionAiErrorCode, string> = {
   "invalid-input": "Completa un nombre y una unidad válidos antes de calcular.",
   "not-configured": "El cálculo nutricional no está configurado todavía.",
+  "ai-burst-limit": "Has hecho varias solicitudes seguidas. Espera un momento y vuelve a intentarlo.",
   "daily-ai-limit": "Has alcanzado el límite de funciones con IA de hoy. Podrás volver a usarlas mañana.",
   "ai-access-unavailable": "Las funciones con IA no están disponibles ahora. Inténtalo más tarde.",
   "ai-feature-disabled": "Esta función no está disponible.",
@@ -544,7 +545,7 @@ export async function estimateVoiceInventoryBatchAction(text: string): Promise<V
   const generated = await generateVoiceInventoryBatch(input, { apiKey, model, fetchImpl: meter.fetchImpl });
   await meter.finish(classifyAiResult(generated));
   const accessError = meter.getAccessError();
-  if (accessError) return { status: "error" as const, code: accessError, message: accessError === "daily-ai-limit" ? "Has alcanzado el límite de funciones con IA de hoy. Podrás volver a usarlas mañana." : "Esta función no está disponible ahora." };
+  if (accessError) return { status: "error" as const, code: accessError, message: accessError === "daily-ai-limit" ? "Has alcanzado el límite de funciones con IA de hoy. Podrás volver a usarlas mañana." : accessError === "ai-burst-limit" ? "Has hecho varias solicitudes seguidas. Espera un momento y vuelve a intentarlo." : "Esta función no está disponible ahora." };
   if (generated.status === "error") return generated;
   try {
     const { applyNutritionCatalogToVoiceBatch } = await import("@/modules/inventory/voice-inventory-catalog");

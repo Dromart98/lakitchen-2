@@ -273,7 +273,9 @@ Criterio de cierre:
 
 ### 2.5 Rate limiting y protección frente a abuso
 
-**Estado: pendiente. Prioridad: alta.**
+**Estado: en curso. Prioridad: alta.**
+
+**2.5A implementada:** las acciones IA autenticadas comparten un límite antiabuso server-side de 5 acciones por 60 segundos y usuario, configurable e independiente de la cuota diaria. La reserva es atómica, privada y se realiza solo al llegar a OpenAI. Quedan pendientes los límites de autenticación y búsquedas externas.
 
 - Auditar todas las superficies remotas expuestas y aplicar límites donde el abuso pueda consumir recursos, coste o disponibilidad.
 - Proteger especialmente autenticación, recuperación, registro, búsquedas externas, generación con IA y cualquier endpoint/API público susceptible de automatización.

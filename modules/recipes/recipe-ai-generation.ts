@@ -85,6 +85,7 @@ export type RecipeAiErrorCode =
   | "empty-inventory"
   | "insufficient-inventory"
   | "missing-api-key"
+  | "ai-burst-limit"
   | "daily-ai-limit"
   | "ai-access-unavailable"
   | "ai-feature-disabled"

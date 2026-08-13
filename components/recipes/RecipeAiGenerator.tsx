@@ -13,7 +13,7 @@ const generationErrorMessages: Record<string, string> = {
   "empty-inventory": "Añade productos al inventario antes de generar recetas.",
   "insufficient-inventory": "Necesitas al menos dos productos disponibles para generar sugerencias útiles.",
   "missing-api-key": "La generación con IA no está configurada todavía.",
-  "daily-ai-limit": "Has alcanzado el límite de funciones con IA de hoy. Podrás volver a usarlas mañana.",
+  "ai-burst-limit": "Has hecho varias solicitudes seguidas. Espera un momento y vuelve a intentarlo.", "daily-ai-limit": "Has alcanzado el límite de funciones con IA de hoy. Podrás volver a usarlas mañana.",
   "ai-access-unavailable": "Las funciones con IA no están disponibles ahora. Inténtalo más tarde.",
   "ai-feature-disabled": "Esta función no está disponible.",
   timeout: "La generación ha tardado demasiado. Inténtalo de nuevo en unos minutos.",
