@@ -8,8 +8,8 @@ const addAction = actions.slice(actions.indexOf("export async function addInvent
 describe("inventory barcode package memory persistence", () => {
   it("keeps inventory, remembered barcode, server lookup and proposal in order", () => {
     expect(addAction.indexOf('.from("inventory_items").insert')).toBeLessThan(addAction.indexOf('.from("user_barcode_products")'));
-    expect(addAction.indexOf('.from("user_barcode_products")')).toBeLessThan(addAction.indexOf("lookupOpenFoodFactsProduct(barcodeValidation.barcode)"));
-    expect(addAction.indexOf("lookupOpenFoodFactsProduct(barcodeValidation.barcode)")).toBeLessThan(addAction.indexOf('rpc("save_food_quantity_equivalence_proposal"'));
+    expect(addAction.indexOf('.from("user_barcode_products")')).toBeLessThan(addAction.indexOf("lookupOpenFoodFactsProduct(barcodeValidation.barcode,"));
+    expect(addAction.indexOf("lookupOpenFoodFactsProduct(barcodeValidation.barcode,")).toBeLessThan(addAction.indexOf('rpc("save_food_quantity_equivalence_proposal"'));
   });
 
   it("uses the server result and barcode identity, never editable form quantity or unit", () => {

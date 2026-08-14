@@ -3,8 +3,13 @@ import { createLogger } from "@/lib/server/logger";
 import { catalogBasisForUnit, catalogRequestKey, catalogRowFromResolution, findNutritionCatalogMatches, inferCatalogFoodState, persistNutritionCatalogRowWithIdentity } from "@/modules/nutrition/catalog";
 import type { InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
 import type { NutritionResolution } from "@/modules/nutrition/resolution";
+import { createExternalSearchFetch } from "@/lib/server/external-search-rate-limit";
 
-export async function resolveInventoryNutritionForUser(client: any, userId: string, input: InventoryNutritionAiInput, options: Parameters<typeof resolveInventoryNutrition>[1] = {}): Promise<NutritionResolution & { foodCatalogItemId?: string | null; meteringCacheHit?: boolean }> {
+type ResolverOptions = Parameters<typeof resolveInventoryNutrition>[1] & {
+  externalSearchClient?: Parameters<typeof createExternalSearchFetch>[0]["client"];
+};
+
+export async function resolveInventoryNutritionForUser(client: any, userId: string, input: InventoryNutritionAiInput, options: ResolverOptions = {}): Promise<NutritionResolution & { foodCatalogItemId?: string | null; meteringCacheHit?: boolean }> {
   const logger = createLogger("nutrition", "resolve_inventory_nutrition");
   const foodState = inferCatalogFoodState(input.name);
   const nutritionBasis = catalogBasisForUnit(input.unit);
@@ -18,7 +23,11 @@ export async function resolveInventoryNutritionForUser(client: any, userId: stri
   if (hit) return { status: "resolved", normalizedName: hit.normalized_name, foodState: hit.food_state === "drained" || hit.food_state === "frozen" ? "unknown" : hit.food_state,
     nutritionBasis: hit.nutrition_basis, calories: hit.calories, proteinG: hit.protein_g, carbsG: hit.carbs_g, fatG: hit.fat_g,
     needsReview: !hit.user_confirmed, provenance: { source: hit.source, externalId: hit.external_id ?? undefined, resolvedAt: hit.resolved_at }, assumptions: "Revisa los valores antes de guardar.", foodCatalogItemId: hit.food_catalog_item_id ?? null, meteringCacheHit: true };
-  const resolution = await resolveInventoryNutrition(input, options);
+  const { externalSearchClient, ...resolverOptions } = options;
+  const resolution = await resolveInventoryNutrition(input, {
+    ...resolverOptions,
+    fetchImpl: createExternalSearchFetch({ userId, baseFetch: options.fetchImpl, client: externalSearchClient }),
+  });
   if (resolution.status === "resolved") {
     const compatibleFoodState = foodState === "drained" || foodState === "frozen" ? "unknown" : foodState;
     try {

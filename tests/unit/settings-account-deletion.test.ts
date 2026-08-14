@@ -107,7 +107,7 @@ describe("account deletion contracts", () => {
       /references\s+auth\.users\s*\(id\)\s+on\s+delete\s+\w+/gi,
     );
 
-    expect(authReferences?.length).toBe(20);
+    expect(authReferences?.length).toBe(21);
     for (const reference of authReferences ?? []) {
       expect(reference.toLowerCase()).toContain("on delete cascade");
     }

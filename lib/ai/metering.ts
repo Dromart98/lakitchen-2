@@ -229,7 +229,7 @@ export function createAiUsageMeter(input: { userId: string; feature: AiUsageFeat
   return { authorizeFeature, fetchImpl, finish, getAccessError: () => accessError };
 }
 
-export function classifyAiResult(result: { status: string; code?: string; reason?: "not-found" | "not-configured" | "provider-error" }): { outcome: AiUsageOutcome; errorCode?: string } {
+export function classifyAiResult(result: { status: string; code?: string; reason?: string }): { outcome: AiUsageOutcome; errorCode?: string } {
   if (result.status === "success" || result.status === "resolved" || result.status === "selected") return { outcome: "success" };
   if (result.status === "needs-clarification") return { outcome: "clarification" };
   return { outcome: "error", errorCode: result.code ?? result.reason ?? "provider-error" };

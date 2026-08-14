@@ -4,6 +4,8 @@ import { applyNutritionCatalogToVoiceBatch } from "@/modules/inventory/voice-inv
 import { confirmedCatalogRow, persistConfirmedNutritionBatch, persistNutritionCatalogRow, shouldReplaceCatalogRow, type NutritionCatalogRow } from "@/modules/nutrition/catalog";
 import { buildVoiceInventoryBatchCatalogMetadata } from "@/modules/inventory/voice-inventory-batch-save";
 
+const externalSearchClient = { rpc: vi.fn(async () => ({ data: { allowed: true, retry_after_seconds: 0 }, error: null })) };
+
 const catalogRow = (values: Partial<NutritionCatalogRow> = {}): NutritionCatalogRow => ({
   user_id: "user-a", normalized_name: "pechuga de pollo cruda", aliases: [], food_state: "raw", nutrition_basis: "per_100g",
   calories: 111, protein_g: 24, carbs_g: 0, fat_g: 1.5, source: "user", external_id: null,
@@ -72,7 +74,7 @@ describe("catalog-first integrations", () => {
   it("returns a manual catalog hit without USDA or OpenAI calls", async () => {
     const { client } = catalogClient([catalogRow()]);
     const fetchImpl = vi.fn();
-    const result = await resolveInventoryNutritionForUser(client, "user-a", { name: "Pechuga de pollo cruda", quantity: 1, unit: "kg", category: "protein" }, { usdaApiKey: "key", openAiApiKey: "key", fetchImpl });
+    const result = await resolveInventoryNutritionForUser(client, "user-a", { name: "Pechuga de pollo cruda", quantity: 1, unit: "kg", category: "protein" }, { usdaApiKey: "key", openAiApiKey: "key", fetchImpl, externalSearchClient });
     expect(result).toMatchObject({ status: "resolved", calories: 111, provenance: { source: "user" } });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -115,11 +117,11 @@ describe("catalog-first integrations", () => {
       .mockResolvedValueOnce(json({ status: "completed", output_text: JSON.stringify({ status: "selected", fdc_id: 42 }) }))
       .mockResolvedValueOnce(json({ fdcId: 42, description: "Rice, cooked", dataType: "Foundation", foodNutrients: [{ nutrient: { id: 2047 }, amount: 130 }, { nutrient: { id: 1003 }, amount: 2.7 }, { nutrient: { id: 1005 }, amount: 28 }, { nutrient: { id: 1004 }, amount: 0.3 }] }));
     const input = { name: "Arroz cocido", quantity: 100, unit: "g", category: "carbohydrate" } as const;
-    const first = await resolveInventoryNutritionForUser(client, "user-a", input, { usdaApiKey: "usda", openAiApiKey: "openai", fetchImpl });
+    const first = await resolveInventoryNutritionForUser(client, "user-a", input, { usdaApiKey: "usda", openAiApiKey: "openai", fetchImpl, externalSearchClient });
     expect(first).toMatchObject({ status: "resolved", provenance: { source: "usda", externalId: "42" } });
     expect(rows[0]).toMatchObject({ normalized_name: "arroz cocido", aliases: ["rice cooked"], external_id: "42" });
     expect(fetchImpl).toHaveBeenCalledTimes(3);
-    const second = await resolveInventoryNutritionForUser(client, "user-a", input, { usdaApiKey: "usda", openAiApiKey: "openai", fetchImpl });
+    const second = await resolveInventoryNutritionForUser(client, "user-a", input, { usdaApiKey: "usda", openAiApiKey: "openai", fetchImpl, externalSearchClient });
     expect(second).toMatchObject({ status: "resolved", provenance: { source: "usda" } });
     expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
@@ -221,10 +223,10 @@ describe("catalog-first integrations", () => {
     const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
     const fetchImpl = vi.fn().mockResolvedValueOnce(new Response("", { status: 503 })).mockResolvedValueOnce(json({ status: "completed", output_text: JSON.stringify(aiOutput) }));
     const input = { name: "Arroz cocido", quantity: 100, unit: "g", category: "carbohydrate" } as const;
-    await expect(resolveInventoryNutritionForUser(client, "user-a", input, { usdaApiKey: "usda", openAiApiKey: "openai", fetchImpl })).resolves.toMatchObject({ status: "resolved", provenance: { source: "ai" } });
+    await expect(resolveInventoryNutritionForUser(client, "user-a", input, { usdaApiKey: "usda", openAiApiKey: "openai", fetchImpl, externalSearchClient })).resolves.toMatchObject({ status: "resolved", provenance: { source: "ai" } });
     expect(rows[0]).toMatchObject({ source: "ai", calories: 129 });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
-    await expect(resolveInventoryNutritionForUser(client, "user-a", input, { usdaApiKey: "usda", openAiApiKey: "openai", fetchImpl })).resolves.toMatchObject({ status: "resolved", provenance: { source: "ai" } });
+    await expect(resolveInventoryNutritionForUser(client, "user-a", input, { usdaApiKey: "usda", openAiApiKey: "openai", fetchImpl, externalSearchClient })).resolves.toMatchObject({ status: "resolved", provenance: { source: "ai" } });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 });

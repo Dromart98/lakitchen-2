@@ -6,6 +6,7 @@ import type { NutritionResolution } from "@/modules/nutrition/resolution";
 export async function resolveInventoryNutrition(input: InventoryNutritionAiInput, options: { usdaApiKey?: string; openAiApiKey?: string; openAiModel?: string; fetchImpl?: typeof fetch } = {}): Promise<NutritionResolution> {
   const usda = await lookupUsdaFood(input, { apiKey: options.usdaApiKey, openAiApiKey: options.openAiApiKey, openAiModel: options.openAiModel ?? process.env.OPENAI_INVENTORY_NUTRITION_MODEL, fetchImpl: options.fetchImpl });
   if (usda.status === "resolved" || usda.status === "needs-clarification") return usda;
+  if (usda.reason === "external-search-limit" || usda.reason === "external-search-unavailable") return usda;
   const apiKey = options.openAiApiKey ?? process.env.OPENAI_API_KEY;
   if (!apiKey) return usda;
   const ai = await estimateInventoryNutritionWithOpenAi(input, { apiKey, model: options.openAiModel ?? process.env.OPENAI_INVENTORY_NUTRITION_MODEL, fetchImpl: options.fetchImpl });

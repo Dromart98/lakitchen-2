@@ -20,7 +20,7 @@ export type ResolvedNutrition = {
 export type NutritionResolution =
   | ResolvedNutrition
   | { status: "needs-clarification"; message: string }
-  | { status: "unresolved"; reason: "not-found" | "not-configured" | "provider-error" };
+  | { status: "unresolved"; reason: "not-found" | "not-configured" | "provider-error" | "external-search-limit" | "external-search-unavailable" };
 
 export function isCompleteNutrition(values: { calories: unknown; proteinG: unknown; carbsG: unknown; fatG: unknown }) {
   return [values.calories, values.proteinG, values.carbsG, values.fatG]
