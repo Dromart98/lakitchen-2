@@ -41,6 +41,17 @@ describe("inventory barcode package memory persistence", () => {
     expect(addAction).toContain("revalidatePath(INVENTORY_EQUIVALENCES_PATH)");
   });
 
+  it("treats every external package lookup failure as a failed proposal", () => {
+    const proposalBlock = addAction.slice(
+      addAction.indexOf("const external = await lookupOpenFoodFactsProduct"),
+      addAction.indexOf("} else if", addAction.indexOf("const external = await lookupOpenFoodFactsProduct")),
+    );
+    expect(proposalBlock).toContain('external.status === "provider-error"');
+    expect(proposalBlock).toContain('external.status === "rate-limited"');
+    expect(proposalBlock).toContain('external.status === "access-unavailable"');
+    expect(proposalBlock).toContain("proposalFailed = true");
+  });
+
   it("does not adopt the proposal for inventory or barcode defaults", () => {
     const inventoryInsert = addAction.slice(addAction.indexOf('.from("inventory_items").insert'), addAction.indexOf("if (error)"));
     const barcodeUpsert = addAction.slice(addAction.indexOf('.from("user_barcode_products")'), addAction.indexOf("if (barcodeError"));

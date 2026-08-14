@@ -316,7 +316,7 @@ export async function addInventoryItemAction(formData: FormData) {
       let proposalFailed = false;
       try {
         const external = await lookupOpenFoodFactsProduct(barcodeValidation.barcode, { fetchImpl: createExternalSearchFetch({ userId: user.id }) });
-        if (external.status === "provider-error") {
+        if (external.status === "provider-error" || external.status === "rate-limited" || external.status === "access-unavailable") {
           console.warn("The package measure lookup failed while remembering a barcode product.");
           proposalFailed = true;
         } else if (external.status === "found" && external.product.package) {
