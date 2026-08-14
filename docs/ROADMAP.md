@@ -26,7 +26,7 @@ Estado ya cerrado:
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
 - **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
 
-Siguiente tarea: **2.5 — Rate limiting y protección frente a abuso**.
+Siguiente tarea: **2.7 — Plan de rollback de despliegues**.
 
 Orden de implementación acordado:
 
@@ -211,7 +211,7 @@ No permitir que la IA calcule libremente estos valores cuando puedan obtenerse d
 
 Prioridad: alta.
 
-**Estado: en curso.** Siguiente tarea: **2.5 Rate limiting y protección frente a abuso**.
+**Estado: en curso.** Siguiente tarea: **2.7 Plan de rollback de despliegues**.
 
 ### 2.1 Caché y reutilización
 
@@ -257,7 +257,7 @@ Criterio de cierre:
 
 ### 2.4 Monitoreo de errores y alertas
 
-**Estado: completada.** El SDK cubre navegador, Server Components/Actions y runtimes Node/Edge, sin tracing ni Replay. La sanitización central elimina PII, secretos, payloads, respuestas crudas y rutas locales del stack; los fallos inesperados comparten `correlation_id` con el logger. La validación controlada en el proyecto real confirmó recepción del evento con release, entorno `production`, correlación y stack saneados, sin secretos ni contenido privado. Sentry mantiene `sendDefaultPii: false` y `dataCollection.userInfo: false`; la alerta de issues de alta prioridad fue disparada por el fallo simulado y quedó restringida a `production`. Siguiente tarea: **2.5 Rate limiting y protección frente a abuso**.
+**Estado: completada.** El SDK cubre navegador, Server Components/Actions y runtimes Node/Edge, sin tracing ni Replay. La sanitización central elimina PII, secretos, payloads, respuestas crudas y rutas locales del stack; los fallos inesperados comparten `correlation_id` con el logger. La validación controlada en el proyecto real confirmó recepción del evento con release, entorno `production`, correlación y stack saneados, sin secretos ni contenido privado. Sentry mantiene `sendDefaultPii: false` y `dataCollection.userInfo: false`; la alerta de issues de alta prioridad fue disparada por el fallo simulado y quedó restringida a `production`.
 
 - Incorporar monitorización centralizada de excepciones y fallos no controlados en cliente y servidor, con stack trace, versión de release, ruta/componente y correlación con los logs estructurados.
 - Agrupar errores equivalentes y registrar frecuencia, primera/última aparición y regresiones por versión.
@@ -275,7 +275,7 @@ Criterio de cierre:
 
 **Estado: completada. Prioridad: alta.**
 
-**2.5A + 2.5B + 2.5C implementadas:** las acciones IA autenticadas comparten un límite antiabuso server-side de 5 acciones por 60 segundos y usuario, configurable e independiente de la cuota diaria. La reserva es atómica, privada y se realiza solo al llegar a OpenAI. Autenticación mantiene las llamadas directas a Supabase Auth y usa sus límites nativos. Las búsquedas nutricionales externas reales comparten por separado un límite configurable de 10 por 60 segundos y usuario; catálogo y códigos recordados no reservan, y cada resolución lógica reserva una sola vez. Los rechazos se presentan sin exponer proveedores, datos de cuentas ni detalles internos. Siguiente fase: **2.6 Health checks y readiness**.
+**2.5A + 2.5B + 2.5C implementadas:** las acciones IA autenticadas comparten un límite antiabuso server-side de 5 acciones por 60 segundos y usuario, configurable e independiente de la cuota diaria. La reserva es atómica, privada y se realiza solo al llegar a OpenAI. Autenticación mantiene las llamadas directas a Supabase Auth y usa sus límites nativos. Las búsquedas nutricionales externas reales comparten por separado un límite configurable de 10 por 60 segundos y usuario; catálogo y códigos recordados no reservan, y cada resolución lógica reserva una sola vez. Los rechazos se presentan sin exponer proveedores, datos de cuentas ni detalles internos.
 
 - Auditar todas las superficies remotas expuestas y aplicar límites donde el abuso pueda consumir recursos, coste o disponibilidad.
 - Proteger especialmente autenticación, recuperación, registro, búsquedas externas, generación con IA y cualquier endpoint/API público susceptible de automatización.
@@ -291,7 +291,7 @@ Criterio de cierre:
 
 ### 2.6 Health checks y readiness
 
-**Estado: pendiente. Prioridad: alta.**
+**Estado: completada. Prioridad: alta.** Liveness público confirma únicamente que la aplicación responde. Readiness realiza una operación `HEAD` mínima, de solo lectura y sin filas contra Supabase, con timeout corto; responde mediante contratos genéricos, deterministas y `no-store`, sin consultar dependencias no críticas ni exponer diagnósticos. Siguiente tarea: **2.7 Plan de rollback de despliegues**.
 
 - Añadir un endpoint de salud mínimo que confirme que la aplicación responde sin revelar configuración interna.
 - Separar, si hace falta, `liveness` de `readiness`: la segunda debe comprobar únicamente dependencias críticas necesarias para servir tráfico, como acceso básico a Supabase.
