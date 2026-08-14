@@ -18,8 +18,8 @@ export async function checkSupabaseReadiness(
       }, timeoutMs);
     });
     const response = await Promise.race([
-      fetchImplementation(`${supabaseUrl}/rest/v1/inventory_items?select=id&limit=0`, {
-        method: "HEAD",
+      fetchImplementation(`${supabaseUrl}/auth/v1/health`, {
+        method: "GET",
         headers: {
           apikey: supabasePublishableKey,
         },
