@@ -85,32 +85,29 @@ Cuando sea posible, comprobar el deployment de destino directamente antes de pro
 
 Si el candidato no es verificable o presenta errores, elegir otro deployment estable o detener el procedimiento.
 
-## 4. Ejecutar rollback
+## 4. Cambiar producción al deployment estable
 
-Para volver a un despliegue concreto:
-
-```bash
-vercel rollback <deployment-id-o-url>
-```
-
-Comprobar después el estado:
+El procedimiento base es promover directamente el deployment estable ya existente, sin reconstruirlo:
 
 ```bash
-vercel rollback status
-```
-
-Objetivo operativo: completar desde el inicio del cambio de tráfico hasta la primera comprobación satisfactoria de health/readiness en menos de cinco minutos.
-
-### Alternativa: promover un deployment existente
-
-Cuando el flujo operativo requiera apuntar producción explícitamente a un deployment previamente validado:
-
-```bash
-vercel promote <deployment-id-o-url>
+vercel promote <deployment-id-o-url> --yes
 vercel promote status
 ```
 
-Usar siempre un deployment concreto ya identificado por SHA. No reconstruir una versión antigua para realizar el rollback si el artefacto validado sigue disponible.
+Usar siempre un deployment concreto ya identificado por SHA. No reconstruir una versión antigua si el artefacto validado sigue disponible.
+
+Objetivo operativo: completar desde el inicio del cambio de tráfico hasta la primera comprobación satisfactoria de health/readiness en menos de cinco minutos.
+
+### Atajo opcional: `vercel rollback`
+
+Vercel también dispone de:
+
+```bash
+vercel rollback <deployment-id-o-url>
+vercel rollback status
+```
+
+El rollback dirigido a un deployment concreto está sujeto a disponibilidad según el plan de Vercel. No debe ser el único procedimiento documentado ni bloquear la recuperación si no está disponible. Cuando el plan lo permita, puede usarse como atajo equivalente para devolver tráfico a una versión anterior.
 
 ## 5. Verificación inmediata tras el cambio
 
@@ -156,7 +153,7 @@ Abortar el candidato de rollback si ocurre cualquiera de estas condiciones:
 En un simulacro no destructivo, restaurar inmediatamente el deployment que estaba activo al comenzar la prueba usando su deployment ID/URL registrado:
 
 ```bash
-vercel promote <deployment-original-id-o-url>
+vercel promote <deployment-original-id-o-url> --yes
 vercel promote status
 ```
 
