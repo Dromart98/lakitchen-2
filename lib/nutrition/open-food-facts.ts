@@ -3,6 +3,7 @@ import { z } from "zod";
 import { validateBarcodeInput } from "@/modules/barcodes/barcode";
 import type { InventoryNutritionBasis } from "@/modules/inventory/inventory-nutrition";
 import { isCompleteNutrition } from "@/modules/nutrition/resolution";
+import { externalSearchFailure } from "@/lib/server/external-search-rate-limit";
 
 // Product Read API v3: https://openfoodfacts.github.io/openfoodfacts-server/api/ref-v3/
 const endpoint = "https://world.openfoodfacts.org/api/v3/product";
@@ -49,7 +50,9 @@ export type OpenFoodFactsNutrition = {
 export type OpenFoodFactsProductResult =
   | { status: "found"; product: { barcode: string; name: string; package: OpenFoodFactsPackage | null; nutrition: OpenFoodFactsNutrition | null } }
   | { status: "not-found" }
-  | { status: "provider-error" };
+  | { status: "provider-error" }
+  | { status: "rate-limited" }
+  | { status: "access-unavailable" };
 
 function normalizedPackage(quantity: unknown, unit: unknown): OpenFoodFactsPackage | null {
   const parsedQuantity = typeof quantity === "number" ? quantity : typeof quantity === "string" && quantity.trim() ? Number(quantity) : Number.NaN;
@@ -95,6 +98,8 @@ export async function lookupOpenFoodFactsProduct(rawBarcode: string, options: { 
     const response = await (options.fetchImpl ?? fetch)(`${endpoint}/${validation.barcode}?fields=${encodeURIComponent(fields)}`, {
       headers: { "User-Agent": "LaKitchenapp/1.1 (https://lakitchenapp.com)" }, cache: "no-store", signal: AbortSignal.timeout(timeoutMs),
     });
+    const guardFailure = externalSearchFailure(response);
+    if (guardFailure) return { status: guardFailure === "external-search-limit" ? "rate-limited" : "access-unavailable" };
     if (response.status === 404) return { status: "not-found" };
     if (!response.ok) return { status: "provider-error" };
     const parsed = payloadSchema.safeParse(await response.json());

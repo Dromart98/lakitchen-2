@@ -25,6 +25,7 @@ import { classifyAiResult, createAiUsageMeter } from "@/lib/ai/metering";
 import { INVENTORY_NUTRITION_AI_MODEL_DEFAULT } from "@/modules/inventory/inventory-ai-nutrition";
 import { hasCorrelation, withCorrelationIfMissing } from "@/lib/server/logger";
 import type { VoiceInventoryBatchResult } from "@/modules/inventory/voice-inventory-batch";
+import { createExternalSearchFetch } from "@/lib/server/external-search-rate-limit";
 
 type InventoryLocation = "pantry" | "fridge" | "freezer";
 type InventoryUnit = "ud" | "g" | "kg" | "ml" | "l";
@@ -82,7 +83,11 @@ export async function estimateInventoryNutritionAction(input: InventoryNutrition
   const accessError = meter.getAccessError();
   if (accessError) return inventoryNutritionAiError(accessError);
   if (result.status === "needs-clarification") return result;
-  if (result.status !== "resolved") return inventoryNutritionAiError(result.reason === "not-configured" ? "not-configured" : "provider-error");
+  if (result.status !== "resolved") {
+    if (result.reason === "external-search-limit") return inventoryNutritionAiError("rate-limited");
+    if (result.reason === "external-search-unavailable") return inventoryNutritionAiError("ai-access-unavailable");
+    return inventoryNutritionAiError(result.reason === "not-configured" ? "not-configured" : "provider-error");
+  }
   return { status: "success", estimate: { nutrition_basis: result.nutritionBasis, calories: result.calories, protein_g: result.proteinG, carbs_g: result.carbsG, fat_g: result.fatG, confidence: "medium", assumptions: result.assumptions, food_catalog_item_id: result.foodCatalogItemId ?? null } };
 }
 
@@ -127,7 +132,9 @@ export async function lookupBarcodeProductAction(rawBarcode: string): Promise<Ba
   }
 
   if (!data) {
-    const external = await lookupOpenFoodFactsProduct(validation.barcode);
+    const external = await lookupOpenFoodFactsProduct(validation.barcode, { fetchImpl: createExternalSearchFetch({ userId: user.id }) });
+    if (external.status === "rate-limited") return { status: "error", message: "Has hecho varias búsquedas seguidas. Espera un momento y vuelve a intentarlo." };
+    if (external.status === "access-unavailable") return { status: "error", message: "La búsqueda no está disponible ahora. Inténtalo más tarde." };
     if (external.status === "provider-error") return { status: "error", message: "No se pudo consultar el producto. Inténtalo de nuevo." };
     if (external.status === "not-found") return { status: "unknown", barcode: validation.barcode, message: "No encontramos este código. Completa los datos manualmente." };
     const nutrition = external.product.nutrition;
@@ -308,8 +315,8 @@ export async function addInventoryItemAction(formData: FormData) {
     if (foodCatalogItemId) {
       let proposalFailed = false;
       try {
-        const external = await lookupOpenFoodFactsProduct(barcodeValidation.barcode);
-        if (external.status === "provider-error") {
+        const external = await lookupOpenFoodFactsProduct(barcodeValidation.barcode, { fetchImpl: createExternalSearchFetch({ userId: user.id }) });
+        if (external.status === "provider-error" || external.status === "rate-limited" || external.status === "access-unavailable") {
           console.warn("The package measure lookup failed while remembering a barcode product.");
           proposalFailed = true;
         } else if (external.status === "found" && external.product.package) {

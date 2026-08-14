@@ -273,9 +273,9 @@ Criterio de cierre:
 
 ### 2.5 Rate limiting y protección frente a abuso
 
-**Estado: en curso. Prioridad: alta.**
+**Estado: completada. Prioridad: alta.**
 
-**2.5A + 2.5B implementadas:** las acciones IA autenticadas comparten un límite antiabuso server-side de 5 acciones por 60 segundos y usuario, configurable e independiente de la cuota diaria. La reserva es atómica, privada y se realiza solo al llegar a OpenAI. Autenticación mantiene las llamadas directas a Supabase Auth, usa sus límites nativos y presenta de forma segura los errores 429 sin exponer detalles del proveedor ni datos de cuentas. Quedan pendientes únicamente los límites de búsquedas externas.
+**2.5A + 2.5B + 2.5C implementadas:** las acciones IA autenticadas comparten un límite antiabuso server-side de 5 acciones por 60 segundos y usuario, configurable e independiente de la cuota diaria. La reserva es atómica, privada y se realiza solo al llegar a OpenAI. Autenticación mantiene las llamadas directas a Supabase Auth y usa sus límites nativos. Las búsquedas nutricionales externas reales comparten por separado un límite configurable de 10 por 60 segundos y usuario; catálogo y códigos recordados no reservan, y cada resolución lógica reserva una sola vez. Los rechazos se presentan sin exponer proveedores, datos de cuentas ni detalles internos. Siguiente fase: **2.6 Health checks y readiness**.
 
 - Auditar todas las superficies remotas expuestas y aplicar límites donde el abuso pueda consumir recursos, coste o disponibilidad.
 - Proteger especialmente autenticación, recuperación, registro, búsquedas externas, generación con IA y cualquier endpoint/API público susceptible de automatización.

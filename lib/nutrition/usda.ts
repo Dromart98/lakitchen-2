@@ -3,6 +3,7 @@ import { z } from "zod";
 import { selectUsdaCandidateWithOpenAi } from "@/lib/openai/usda-candidate-selector";
 import { getInventoryNutritionFoodStateExpectation, type InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
 import { isCompleteNutrition, type NutritionResolution } from "@/modules/nutrition/resolution";
+import { externalSearchFailure } from "@/lib/server/external-search-rate-limit";
 
 // Official search/detail contract and authentication: https://fdc.nal.usda.gov/api-guide/
 const baseUrl = "https://api.nal.usda.gov/fdc/v1";
@@ -66,7 +67,7 @@ export async function lookupUsdaFood(input: InventoryNutritionAiInput, options: 
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: toSearchQuery(input.name), dataType: [...allowedDataTypes], pageSize: 12 }), signal: AbortSignal.timeout(timeoutMs), cache: "no-store",
     });
-    if (!search.ok) return { status: "unresolved", reason: "provider-error" };
+    if (!search.ok) return { status: "unresolved", reason: externalSearchFailure(search) ?? "provider-error" };
     const parsedSearch = searchSchema.safeParse(await search.json());
     if (!parsedSearch.success) return { status: "unresolved", reason: "provider-error" };
     const selection = selectUsdaCandidate(input, parsedSearch.data.foods);

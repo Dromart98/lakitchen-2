@@ -8,8 +8,8 @@ const addAction = actions.slice(actions.indexOf("export async function addInvent
 describe("inventory barcode package memory persistence", () => {
   it("keeps inventory, remembered barcode, server lookup and proposal in order", () => {
     expect(addAction.indexOf('.from("inventory_items").insert')).toBeLessThan(addAction.indexOf('.from("user_barcode_products")'));
-    expect(addAction.indexOf('.from("user_barcode_products")')).toBeLessThan(addAction.indexOf("lookupOpenFoodFactsProduct(barcodeValidation.barcode)"));
-    expect(addAction.indexOf("lookupOpenFoodFactsProduct(barcodeValidation.barcode)")).toBeLessThan(addAction.indexOf('rpc("save_food_quantity_equivalence_proposal"'));
+    expect(addAction.indexOf('.from("user_barcode_products")')).toBeLessThan(addAction.indexOf("lookupOpenFoodFactsProduct(barcodeValidation.barcode,"));
+    expect(addAction.indexOf("lookupOpenFoodFactsProduct(barcodeValidation.barcode,")).toBeLessThan(addAction.indexOf('rpc("save_food_quantity_equivalence_proposal"'));
   });
 
   it("uses the server result and barcode identity, never editable form quantity or unit", () => {
@@ -39,6 +39,17 @@ describe("inventory barcode package memory persistence", () => {
     expect(addAction).toContain("catch (proposalError)");
     expect(addAction).toContain("item-created-barcode-measure-failed");
     expect(addAction).toContain("revalidatePath(INVENTORY_EQUIVALENCES_PATH)");
+  });
+
+  it("treats every external package lookup failure as a failed proposal", () => {
+    const proposalBlock = addAction.slice(
+      addAction.indexOf("const external = await lookupOpenFoodFactsProduct"),
+      addAction.indexOf("} else if", addAction.indexOf("const external = await lookupOpenFoodFactsProduct")),
+    );
+    expect(proposalBlock).toContain('external.status === "provider-error"');
+    expect(proposalBlock).toContain('external.status === "rate-limited"');
+    expect(proposalBlock).toContain('external.status === "access-unavailable"');
+    expect(proposalBlock).toContain("proposalFailed = true");
   });
 
   it("does not adopt the proposal for inventory or barcode defaults", () => {
