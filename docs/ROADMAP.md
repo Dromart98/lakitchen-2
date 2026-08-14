@@ -291,7 +291,7 @@ Criterio de cierre:
 
 ### 2.6 Health checks y readiness
 
-**Estado: completada. Prioridad: alta.** Liveness público confirma únicamente que la aplicación responde. Readiness realiza una operación `HEAD` mínima, de solo lectura y sin filas contra Supabase, con timeout corto; responde mediante contratos genéricos, deterministas y `no-store`, sin consultar dependencias no críticas ni exponer diagnósticos. Siguiente tarea: **2.7 Plan de rollback de despliegues**.
+**Estado: en validación. Prioridad: alta.** Liveness público confirma únicamente que la aplicación responde. Readiness consulta el health oficial de Supabase Auth con la configuración pública existente y un timeout corto; responde mediante contratos genéricos, deterministas y `no-store`, sin consultar tablas, dependencias no críticas ni exponer diagnósticos. La fase no se cerrará hasta validar el probe corregido en producción; no se avanza todavía a 2.7.
 
 - Añadir un endpoint de salud mínimo que confirme que la aplicación responde sin revelar configuración interna.
 - Separar, si hace falta, `liveness` de `readiness`: la segunda debe comprobar únicamente dependencias críticas necesarias para servir tráfico, como acceso básico a Supabase.
