@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 
 import { LaKitchenLogo } from "@/components/brand/LaKitchenLogo";
 import { createClient } from "@/lib/supabase/client";
+import { getSafeAuthErrorMessage } from "@/modules/auth/safe-auth-error";
 
 type AuthState = {
   error?: string;
@@ -36,7 +37,7 @@ export function LoginForm() {
       : await supabase.auth.signUp({ email, password });
 
     if (error) {
-      setState({ error: "No se pudo completar la autenticación. Inténtalo de nuevo." });
+      setState({ error: getSafeAuthErrorMessage(error) });
       setPendingMode(null);
       return;
     }
