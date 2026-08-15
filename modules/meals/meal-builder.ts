@@ -26,6 +26,7 @@ const MEAL_BUILDER_ERROR_MESSAGES: Record<string, string> = {
   "incompatible-unit": "Uno de los productos tiene una unidad incompatible con su base nutricional.",
   "invalid-payload": "Los datos de la comida no son válidos. Revisa la selección e inténtalo de nuevo.",
   "submission-conflict": "Esta confirmación ya se usó con datos distintos. Genera una nueva estimación e inténtalo de nuevo.",
+  "idempotency-conflict": "Esta confirmación ya se usó con una comida distinta. Revisa los datos e inténtalo de nuevo.",
   unauthenticated: "Tu sesión ha caducado. Vuelve a iniciar sesión.",
   "consume-failed": "No se pudo registrar la comida. Inténtalo de nuevo.",
 };

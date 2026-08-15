@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { consumeMealBuilderAndLogMealAction } from "@/app/meal-builder/actions";
 import { PendingSubmitButton } from "@/components/forms/PendingSubmitButton";
@@ -117,6 +117,11 @@ export function InventoryMealBuilder({
   const [rows, setRows] = useState<BuilderRow[]>(() => createInitialRows(initialRows));
   const [mealName, setMealName] = useState(initialMealName);
   const [mealType, setMealType] = useState<MealType | "">(initialMealType);
+  const [requestId, setRequestId] = useState("");
+
+  useEffect(() => {
+    setRequestId(crypto.randomUUID());
+  }, []);
 
   const selectedItemIds = useMemo(
     () => new Set(rows.map((row) => row.itemId).filter(Boolean)),
@@ -143,7 +148,7 @@ export function InventoryMealBuilder({
     () => (selectedLines ? createMealBuilderConsumptionPayload(selectedLines) : null),
     [selectedLines],
   );
-  const canSubmitMeal = Boolean(mealName.trim() && isMealType(mealType) && total && consumptionPayload);
+  const canSubmitMeal = Boolean(requestId && mealName.trim() && isMealType(mealType) && total && consumptionPayload);
 
   function updateRow(rowId: string, values: Partial<BuilderRow>) {
     setRows((currentRows) => currentRows.map((row) => (row.id === rowId ? { ...row, ...values } : row)));
@@ -321,6 +326,7 @@ export function InventoryMealBuilder({
           </label>
 
           <input name="lines" type="hidden" value={JSON.stringify(consumptionPayload ?? [])} />
+          <input name="request_id" type="hidden" value={requestId} />
           <input name="return_to" type="hidden" value={returnPath} />
 
           <p className="meal-builder-registration__note">
