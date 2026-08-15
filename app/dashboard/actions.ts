@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { requireAuthenticatedUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getMealLogReturnPath } from "@/modules/meals/macro-meal-mode";
-import { isMealLogId, validateMealLogInput } from "@/modules/meals/meal-validation";
+import { isMealLogId, isValidUuid, validateMealLogInput } from "@/modules/meals/meal-validation";
 
 const DASHBOARD_PATH = "/dashboard";
 const MACROS_PATH = "/macros";
@@ -28,21 +28,23 @@ export async function addMealLogAction(formData: FormData) {
     redirectMealValidationError(mealInput.error, destination);
   }
 
+  const requestId = String(formData.get("request_id") ?? "").trim();
+  if (!isValidUuid(requestId)) {
+    redirect(withMealParameter(destination, "mealError=save-failed"));
+  }
+
   const { name, mealType, calories, proteinG, carbsG, fatG } = mealInput.value;
-  const consumedOn = new Date().toISOString().slice(0, 10);
-
   const supabase = await createClient();
-  const user = await requireAuthenticatedUser(supabase, "dashboard meal log");
+  await requireAuthenticatedUser(supabase, "dashboard meal log");
 
-  const { error } = await supabase.from("daily_meal_logs").insert({
-    user_id: user.id,
-    name,
-    meal_type: mealType,
-    calories,
-    protein_g: proteinG,
-    carbs_g: carbsG,
-    fat_g: fatG,
-    consumed_on: consumedOn,
+  const { error } = await supabase.rpc("create_macro_meal_log_idempotently", {
+    p_request_id: requestId,
+    p_name: name,
+    p_meal_type: mealType,
+    p_calories: calories,
+    p_protein_g: proteinG,
+    p_carbs_g: carbsG,
+    p_fat_g: fatG,
   });
 
   if (error) {

@@ -14,12 +14,12 @@ describe("dashboard meal action Supabase contracts", () => {
     const source = await readFile(actionsPath, "utf8");
 
     expect(source).not.toMatch(/supabase as any|as unknown as|eslint-disable/);
-    expect(source).toContain('const user = await requireAuthenticatedUser(supabase, "dashboard meal log")');
+    expect(source).toContain('await requireAuthenticatedUser(supabase, "dashboard meal log")');
     expect(source).toContain('const user = await requireAuthenticatedUser(supabase, "dashboard meal update")');
-    expect(source.match(/\.from\("daily_meal_logs"\)/g)).toHaveLength(3);
+    expect(source.match(/\.from\("daily_meal_logs"\)/g)).toHaveLength(2);
 
-    expect(source).toContain('.insert({\n    user_id: user.id,');
-    expect(source).toContain('consumed_on: consumedOn,');
+    expect(source).toContain('.rpc("create_macro_meal_log_idempotently", {');
+    expect(source).toContain('p_request_id: requestId,');
     expect(source).toContain('.update({\n      name,');
     expect(source).toContain('.eq("id", id)\n    .eq("user_id", user.id)\n    .eq("consumed_on", today)');
     expect(source).toContain('.delete()\n    .eq("id", id)\n    .eq("user_id", user.id)');

@@ -51,6 +51,7 @@ export function MacroMealRecorder({
   unavailableItems,
 }: MacroMealRecorderProps) {
   const [mode, setMode] = useState<MacroMealMode>(initialMode);
+  const manualRequestId = useRef(crypto.randomUUID()).current;
   const manualTab = useRef<HTMLButtonElement>(null);
   const textAiTab = useRef<HTMLButtonElement>(null);
   const photoAiTab = useRef<HTMLButtonElement>(null);
@@ -90,6 +91,7 @@ export function MacroMealRecorder({
         {manualSuccessMessage ? <p className="auth-message success" role="status">{manualSuccessMessage}</p> : null}
         <form action={addMealLogAction} className="meal-log-form macros-meal-form">
           <input type="hidden" name="return_to" value="/macros" />
+          <input type="hidden" name="request_id" value={manualRequestId} />
           <label className="field" htmlFor="macros-meal-name"><span>Nombre</span><input id="macros-meal-name" name="name" type="text" required placeholder="Pollo con arroz" /></label>
           <label className="field" htmlFor="macros-meal-type"><span>Tipo de comida</span><select id="macros-meal-type" name="meal_type" required defaultValue=""><option value="" disabled>Selecciona un tipo</option>{MEAL_TYPES.map((type) => <option key={type} value={type}>{MEAL_TYPE_LABELS[type]}</option>)}</select></label>
           <label className="field" htmlFor="macros-calories"><span>Calorías</span><input id="macros-calories" name="calories" type="number" min="0" step="0.1" inputMode="decimal" required defaultValue="0" /></label>
