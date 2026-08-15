@@ -1,6 +1,6 @@
 # Roadmap estratégico de Lakitchenapp
 
-Última actualización: 14 de agosto de 2026.
+Última actualización: 15 de agosto de 2026.
 
 ## Principios de producto
 
@@ -26,7 +26,7 @@ Estado ya cerrado:
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
 - **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
 
-Siguiente tarea: **2.7 — Plan de rollback de despliegues**.
+Siguiente tarea: **2.8 — Ciclo de vida y rotación de secretos**.
 
 Orden de implementación acordado:
 
@@ -211,7 +211,7 @@ No permitir que la IA calcule libremente estos valores cuando puedan obtenerse d
 
 Prioridad: alta.
 
-**Estado: en curso.** Siguiente tarea: **2.7 Plan de rollback de despliegues**.
+**Estado: en curso.** Siguiente tarea: **2.8 Ciclo de vida y rotación de secretos**.
 
 ### 2.1 Caché y reutilización
 
@@ -291,7 +291,7 @@ Criterio de cierre:
 
 ### 2.6 Health checks y readiness
 
-**Estado: completada. Prioridad: alta.** Liveness público confirma únicamente que la aplicación responde. Readiness consulta el health oficial de Supabase Auth con la configuración pública existente y un timeout corto; responde mediante contratos genéricos, deterministas y `no-store`, sin consultar tablas, dependencias no críticas ni exponer diagnósticos. La validación real en producción del 14 de agosto de 2026 confirmó `/api/health/live` con `200 {"status":"ok"}` y `/api/health/ready` con `200 {"status":"ready"}`, ambos `no-store`. Siguiente tarea: **2.7 Plan de rollback de despliegues**.
+**Estado: completada. Prioridad: alta.** Liveness público confirma únicamente que la aplicación responde. Readiness consulta el health oficial de Supabase Auth con la configuración pública existente y un timeout corto; responde mediante contratos genéricos, deterministas y `no-store`, sin consultar tablas, dependencias no críticas ni exponer diagnósticos. La validación real en producción del 14 de agosto de 2026 confirmó `/api/health/live` con `200 {"status":"ok"}` y `/api/health/ready` con `200 {"status":"ready"}`, ambos `no-store`.
 
 - Añadir un endpoint de salud mínimo que confirme que la aplicación responde sin revelar configuración interna.
 - Separar, si hace falta, `liveness` de `readiness`: la segunda debe comprobar únicamente dependencias críticas necesarias para servir tráfico, como acceso básico a Supabase.
@@ -306,7 +306,7 @@ Criterio de cierre:
 
 ### 2.7 Plan de rollback de despliegues
 
-**Estado: en curso. Prioridad: alta.** Runbook operativo documentado en `docs/rollback.md`. Pendiente ejecutar y registrar un simulacro real no destructivo dentro del objetivo temporal antes de cerrar la fase.
+**Estado: completada. Prioridad: alta.** Runbook operativo documentado en `docs/rollback.md`. El simulacro real no destructivo promovió una release anterior compatible y restauró después el deployment original en 2 s por cambio, con liveness/readiness `200` y `no-store`. La validación posterior detectó y permitió corregir drift de migraciones aditivas y un bloqueo opcional de catálogo en Inventario; tras la corrección, la producción en `22f930aaf35d7d2feab559b5b2b8be4837844872` quedó `READY` y `Authenticated E2E` completó todas las suites críticas en verde. El registro completo del simulacro queda en `docs/rollback.md`.
 
 - Documentar y probar cómo volver a la última versión estable de Vercel en menos de cinco minutos.
 - Mantener despliegues identificables por SHA/release y conservar la capacidad de promover de nuevo una versión previamente validada.
