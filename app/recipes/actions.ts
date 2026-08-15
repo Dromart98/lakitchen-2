@@ -130,6 +130,7 @@ function redirectWithRecipeSuccess(mode: string): never {
 }
 
 function getSafeRecipeRpcError(error: { code?: string; message: string }): string {
+  if (error.message === "idempotency_conflict") return "consume-failed";
   if (error.message === "Inventory item not found") return "recipe-not-cookable";
   if (error.message === "Quantity exceeds available stock") return "insufficient-stock";
   if (error.message === "Incomplete inventory nutrition") return "incomplete-nutrition";
@@ -152,8 +153,10 @@ export async function cookRecipeAndLogMealAction(formData: FormData) {
   const recipeId = String(formData.get("recipe_id") ?? "").trim();
   const mealType = String(formData.get("meal_type") ?? "").trim();
   const servingsValue = String(formData.get("servings") ?? "").trim();
+  const requestId = String(formData.get("request_id") ?? "").trim();
 
   if (!UUID_PATTERN.test(recipeId)) redirectWithRecipeError(mode, "recipe-not-found");
+  if (!UUID_PATTERN.test(requestId)) redirectWithRecipeError(mode, "consume-failed");
   if (!isMealType(mealType)) redirectWithRecipeError(mode, "consume-failed");
   if (!/^[1-9]\d*$/.test(servingsValue)) redirectWithRecipeError(mode, "invalid-servings");
 
@@ -231,6 +234,7 @@ export async function cookRecipeAndLogMealAction(formData: FormData) {
   }
 
   const { error: consumeError } = await recipeClient.rpc("consume_meal_builder_items_and_log_meal", {
+    p_request_id: requestId,
     p_meal_name: buildRecipeMealName(match.recipe.title, requestedServings),
     p_meal_type: mealType,
     p_lines: consumptionLines.lines,

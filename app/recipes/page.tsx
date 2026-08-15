@@ -360,6 +360,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
             {budgetedServingOptions.length > 0 ? (
               <form className="recipes-card__form" action={cookRecipeAndLogMealAction}>
                 <input type="hidden" name="recipe_id" value={match.recipe.id} />
+                <input type="hidden" name="request_id" value={crypto.randomUUID()} />
                 <input type="hidden" name="mode" value={mode} />
                 <label htmlFor={`servings-${match.recipe.id}`}>Raciones a preparar</label>
                 <select id={`servings-${match.recipe.id}`} name="servings" defaultValue="1">
