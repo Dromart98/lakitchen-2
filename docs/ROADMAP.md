@@ -322,7 +322,7 @@ Criterio de cierre:
 
 ### 2.8 Ciclo de vida y rotación de secretos
 
-**Estado: pendiente. Prioridad: media-alta.**
+**Estado: en curso. Prioridad: media-alta.** Inventario, cadencias y procedimientos documentados en `docs/secret-lifecycle.md`. Queda pendiente el simulacro de rotación no productiva: las herramientas conectadas no exponen actualmente un ciclo completo y seguro crear → configurar → verificar → revocar sobre un entorno aislado, por lo que no se crea una credencial desechable que después no pueda revocarse.
 
 - Mantener inventario de secretos server-side y su propietario técnico: Supabase, OpenAI, USDA y cualquier proveedor futuro.
 - Definir cadencia de revisión/rotación según capacidades y riesgo de cada proveedor en lugar de asumir una única cifra universal.
