@@ -198,3 +198,16 @@ Una vez estabilizado el servicio:
 7. documentar el incidente y cualquier mejora necesaria en este runbook.
 
 No volver a promover el deployment defectuoso sin una nueva validación.
+
+## Registro de simulacros
+
+### 14–15 de agosto de 2026 — PASS
+
+- **Origen:** SHA `b89ef8b66f79eb4d9c1fca8493639487a291a0ca`, deployment `dpl_6oG6AMYERnYGDbtQDMoa4vw1F2R7`.
+- **Destino de prueba:** SHA `3373043073d46fef0cb6de1bab3c6974dee127f8`, deployment `dpl_BBE6EQ5WXbjZgmRpuEUBhPnRkHZT`.
+- **Compatibilidad:** entre ambos SHA solo había documentación; no existían migraciones ni cambios de aplicación que hicieran incompatible el retroceso.
+- **Cambio al destino:** `vercel promote` completado en 2 s. El dominio de producción quedó sirviendo el deployment objetivo y `/api/health/live` y `/api/health/ready` devolvieron `200` con contratos correctos y `no-store`.
+- **Restauración:** `vercel promote` del deployment original completado en 2 s. Se confirmó de nuevo el SHA activo y ambos health checks en `200`/`no-store`.
+- **Incidencias detectadas durante la validación posterior:** el simulacro expuso drift de migraciones aditivas ya versionadas en `main` y un bloqueo potencial del enriquecimiento opcional del catálogo nutricional al guardar Inventario. El historial de migraciones se reconcilió con las versiones canónicas y el bloqueo se corrigió en la PR #298, fusionada como `22f930aaf35d7d2feab559b5b2b8be4837844872`.
+- **Validación final sobre producción corregida:** deployment `dpl_7ccotgRMm4H8tZecVZ8yLvSy12xr` (`22f930aaf35d7d2feab559b5b2b8be4837844872`) quedó `READY`; liveness y readiness devolvieron `200`/`no-store`. La repetición final de `Authenticated E2E` (run `30746160467`, job `94992371178`) completó con éxito todas las suites: Macros, comidas, recetas, planes, historial, lista de compra, ajustes y autenticación, incluida la verificación administrativa de borrado en cascada.
+- **Resultado:** PASS. El cambio y la restauración quedaron muy por debajo del objetivo de cinco minutos y la comprobación posterior confirmó aplicación, autenticación y datos operativos funcionales.
