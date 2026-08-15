@@ -15,6 +15,7 @@ export type RecipeAiCookErrorCode =
   | "too-many-items"
   | "calorie-budget-exceeded"
   | "equivalence-conflict"
+  | "idempotency-conflict"
   | "consume-failed"
   | "unexpected-error";
 
@@ -23,12 +24,13 @@ export type RecipeAiCookResult =
   | { status: "error"; code: RecipeAiCookErrorCode };
 
 export type RecipeAiCookRequest = {
+  request_id: string;
   meal_type: MealType;
   recipe: RecipeAiSuggestion;
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const TOP_LEVEL_KEYS = ["meal_type", "recipe"];
+const TOP_LEVEL_KEYS = ["request_id", "meal_type", "recipe"];
 const RECIPE_KEYS = ["title", "description", "estimated_minutes", "servings", "ingredients", "steps"];
 const INGREDIENT_KEYS = ["inventory_item_id", "name", "quantity", "unit"];
 
@@ -46,6 +48,7 @@ function isNonEmptyString(value: unknown, maxLength: number): value is string {
 
 export function parseRecipeAiCookRequest(input: unknown): RecipeAiCookRequest | null {
   if (!isPlainObject(input) || !hasExactKeys(input, TOP_LEVEL_KEYS)) return null;
+  if (!isNonEmptyString(input.request_id, 36) || !UUID_PATTERN.test(input.request_id)) return null;
   if (!isMealType(input.meal_type) || !isPlainObject(input.recipe) || !hasExactKeys(input.recipe, RECIPE_KEYS)) return null;
 
   const recipe = input.recipe;
@@ -74,6 +77,7 @@ export function parseRecipeAiCookRequest(input: unknown): RecipeAiCookRequest | 
   }
 
   return {
+    request_id: input.request_id,
     meal_type: input.meal_type,
     recipe: {
       title: recipe.title.trim(),
@@ -130,6 +134,7 @@ export function mapRecipeConsumptionError(result: Extract<RecipeConsumptionResul
 }
 
 export function mapRecipeAiCookRpcError(error: { message?: string } | null | undefined): RecipeAiCookErrorCode {
+  if (error?.message === "idempotency_conflict") return "idempotency-conflict";
   if (error?.message === "equivalence_conflict") return "equivalence-conflict";
   if (error?.message === "Inventory item not found") return "recipe-stale";
   if (error?.message === "Quantity exceeds available stock") return "insufficient-stock";

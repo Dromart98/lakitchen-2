@@ -823,8 +823,24 @@ export async function cookGeneratedRecipeAndLogMealAction(input: unknown): Promi
     return { status: "error", code: "unauthenticated" };
   }
 
-  const inventoryItemIds = request.recipe.ingredients.map((ingredient) => ingredient.inventory_item_id);
+  const recipeFingerprint = createSavedAiRecipeFingerprint(request.recipe);
   const recipeClient = supabase as unknown as RecipeAiCookSupabaseClient;
+  const { data: replayedMealId, error: replayError } = await recipeClient.rpc("probe_generated_ai_recipe_cooking_request", {
+    p_request_id: request.request_id,
+    p_recipe_fingerprint: recipeFingerprint,
+    p_meal_type: request.meal_type,
+  }) as { data: string | null; error: { message: string } | null };
+
+  if (replayError) {
+    console.warn("Supabase could not check generated AI recipe cooking replay:", replayError.message);
+    return { status: "error", code: mapRecipeAiCookRpcError(replayError) };
+  }
+  if (replayedMealId) {
+    revalidateRecipeConsumptionPaths();
+    return { status: "success" };
+  }
+
+  const inventoryItemIds = request.recipe.ingredients.map((ingredient) => ingredient.inventory_item_id);
   const { data, error } = await recipeClient
     .from("inventory_items")
     .select("id, name, quantity, unit, expires_at, nutrition_basis, calories, protein_g, carbs_g, fat_g, food_catalog_item_id")
@@ -857,7 +873,9 @@ export async function cookGeneratedRecipeAndLogMealAction(input: unknown): Promi
   const consumptionLines = buildRecipeConsumptionLines(allocations, inventoryItems);
   if (!consumptionLines.ok) return { status: "error", code: mapRecipeConsumptionError(consumptionLines) };
 
-  const { error: consumeError } = await recipeClient.rpc("consume_meal_builder_items_and_log_meal", {
+  const { error: consumeError } = await recipeClient.rpc("consume_generated_ai_recipe_and_log_meal", {
+    p_request_id: request.request_id,
+    p_recipe_fingerprint: recipeFingerprint,
     p_meal_name: buildRecipeMealName(request.recipe.title, request.recipe.servings),
     p_meal_type: request.meal_type,
     p_lines: consumptionLines.lines,
