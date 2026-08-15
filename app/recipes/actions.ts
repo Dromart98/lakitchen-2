@@ -129,7 +129,16 @@ function redirectWithRecipeSuccess(mode: string): never {
   redirect(buildRecipesPath(mode, { recipeSuccess: "recipe-cooked" }));
 }
 
+function revalidateRecipeConsumptionPaths() {
+  revalidatePath(RECIPES_PATH);
+  revalidatePath("/inventory");
+  revalidatePath("/dashboard");
+  revalidatePath("/meal-history");
+  revalidatePath("/weekly-summary");
+}
+
 function getSafeRecipeRpcError(error: { code?: string; message: string }): string {
+  if (error.message === "idempotency_conflict") return "consume-failed";
   if (error.message === "Inventory item not found") return "recipe-not-cookable";
   if (error.message === "Quantity exceeds available stock") return "insufficient-stock";
   if (error.message === "Incomplete inventory nutrition") return "incomplete-nutrition";
@@ -152,17 +161,35 @@ export async function cookRecipeAndLogMealAction(formData: FormData) {
   const recipeId = String(formData.get("recipe_id") ?? "").trim();
   const mealType = String(formData.get("meal_type") ?? "").trim();
   const servingsValue = String(formData.get("servings") ?? "").trim();
+  const requestId = String(formData.get("request_id") ?? "").trim();
 
   if (!UUID_PATTERN.test(recipeId)) redirectWithRecipeError(mode, "recipe-not-found");
+  if (!UUID_PATTERN.test(requestId)) redirectWithRecipeError(mode, "consume-failed");
   if (!isMealType(mealType)) redirectWithRecipeError(mode, "consume-failed");
   if (!/^[1-9]\d*$/.test(servingsValue)) redirectWithRecipeError(mode, "invalid-servings");
 
   const requestedServings = Number(servingsValue);
-  if (!Number.isSafeInteger(requestedServings)) redirectWithRecipeError(mode, "invalid-servings");
+  if (!Number.isSafeInteger(requestedServings) || requestedServings > 50) redirectWithRecipeError(mode, "invalid-servings");
 
   const supabase = await createClient();
   const user = await requireAuthenticatedUser(supabase, "recipe consumption");
   const recipeClient = supabase as unknown as SupabaseRecipeClient;
+
+  const { data: replayedMealId, error: replayError } = await recipeClient.rpc("probe_catalog_recipe_cooking_request", {
+    p_request_id: requestId,
+    p_recipe_id: recipeId,
+    p_servings: requestedServings,
+    p_meal_type: mealType,
+  }) as { data: string | null; error: { code?: string; message: string } | null };
+
+  if (replayError) {
+    console.warn("Supabase could not check recipe cooking replay:", replayError.message);
+    redirectWithRecipeError(mode, getSafeRecipeRpcError(replayError));
+  }
+  if (replayedMealId) {
+    revalidateRecipeConsumptionPaths();
+    redirectWithRecipeSuccess(mode);
+  }
 
   const { data: inventoryData, error: inventoryError } = await recipeClient
     .from("inventory_items")
@@ -230,7 +257,10 @@ export async function cookRecipeAndLogMealAction(formData: FormData) {
     redirectWithRecipeError(mode, errorCode);
   }
 
-  const { error: consumeError } = await recipeClient.rpc("consume_meal_builder_items_and_log_meal", {
+  const { error: consumeError } = await recipeClient.rpc("consume_catalog_recipe_and_log_meal", {
+    p_request_id: requestId,
+    p_recipe_id: recipeId,
+    p_servings: requestedServings,
     p_meal_name: buildRecipeMealName(match.recipe.title, requestedServings),
     p_meal_type: mealType,
     p_lines: consumptionLines.lines,
@@ -241,11 +271,7 @@ export async function cookRecipeAndLogMealAction(formData: FormData) {
     redirectWithRecipeError(mode, getSafeRecipeRpcError(consumeError));
   }
 
-  revalidatePath(RECIPES_PATH);
-  revalidatePath("/inventory");
-  revalidatePath("/dashboard");
-  revalidatePath("/meal-history");
-  revalidatePath("/weekly-summary");
+  revalidateRecipeConsumptionPaths();
 
   redirectWithRecipeSuccess(mode);
 }
