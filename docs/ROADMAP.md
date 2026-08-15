@@ -26,7 +26,7 @@ Estado ya cerrado:
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
 - **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
 
-Siguiente tarea: **2.9 — Idempotencia y operaciones atómicas**.
+Siguiente tarea: **3.1 — Pruebas E2E esenciales**.
 
 Orden de implementación acordado:
 
@@ -211,7 +211,7 @@ No permitir que la IA calcule libremente estos valores cuando puedan obtenerse d
 
 Prioridad: alta.
 
-**Estado: en curso.** Siguiente tarea: **2.9 Idempotencia y operaciones atómicas**.
+**Estado: completada.** La fase queda cerrada tras completar 2.9. Siguiente tarea: **3.1 Pruebas E2E esenciales**.
 
 ### 2.1 Caché y reutilización
 
@@ -338,6 +338,10 @@ Criterio de cierre:
 
 ### 2.9 Idempotencia y operaciones atómicas
 
+**Estado: completada. Prioridad: alta.** Las escrituras críticas auditadas quedan protegidas contra doble efecto mediante operaciones transaccionales/atómicas, bloqueos o restricciones de unicidad cuando corresponden e identidades idempotentes estables en los flujos que necesitan replay seguro. La cobertura incluye registro de comidas, consumos y descuentos de inventario, cocinado de recetas del catálogo y recetas IA, transferencia de compras, guardado de planes, procesamiento/guardado por voz y persistencia de resultados asistidos. Los reintentos con la misma identidad devuelven el efecto ya comprometido cuando el contrato admite replay y los payloads incompatibles se rechazan como conflicto seguro.
+
+La validación final del 15 de agosto de 2026 confirmó la migración `20260815040000_make_generated_ai_recipe_cooking_replayable`, CI verde y producción `READY`. Tras corregir en #308 una carrera de hidratación del propio E2E —que podía pulsar el formulario SSR antes de conectar la Server Action—, el `Authenticated E2E` run #26 ejecutado contra `https://lakitchen-2.vercel.app` pasó todas las suites críticas, incluidos `MACROS-INCOMPLETE-NUTRITION`, `RECIPES-LIFECYCLE` y `PLANS-LIFECYCLE`.
+
 Auditar especialmente:
 
 - registrar comidas;
@@ -349,6 +353,13 @@ Auditar especialmente:
 - guardar resultados de IA.
 
 Un doble clic, reintento o mala conexión no debe duplicar datos.
+
+Criterio de cierre cumplido:
+
+- reintentos y doble clic en las escrituras auditadas no generan doble efecto;
+- las operaciones compuestas críticas mantienen atomicidad;
+- replay, conflicto y concurrencia están cubiertos por pruebas específicas;
+- la validación autenticada de producción queda verde tras el cierre.
 
 ## Fase 3 — Calidad técnica y mantenimiento
 
@@ -682,8 +693,8 @@ Después de validar el uso real:
 3. **Cerrado:** Corregir los demás defectos encontrados durante la validación.
 4. **Cerrado:** Implementar la capa nutricional centralizada.
 5. **Cerrado:** Añadir catálogo interno, unidades y estados de preparación.
-6. **Actual:** Reforzar caché, observabilidad, rate limiting, health checks, rollback, secretos, costes e idempotencia.
-7. Añadir pruebas E2E críticas y accesibilidad.
+6. **Cerrado:** Reforzar caché, observabilidad, rate limiting, health checks, rollback, secretos, costes e idempotencia.
+7. **Actual:** Añadir pruebas E2E críticas y accesibilidad.
 8. Limpiar dependencias y actualizar documentación.
 9. Simplificar la UX completa.
 10. Implementar en orden 5.1–5.3: Foto IA 2.0, importación de recetas y escáner de etiquetas.
@@ -716,7 +727,7 @@ Este gate no añade funciones de alimentación nuevas. Reordena como criterios d
 
 1. **Seguridad y privacidad de datos.** Auditar autenticación, RLS, Server Actions/RPC, permisos, endpoints, variables de entorno, secretos y headers de seguridad. Verificar que fotos, comidas, objetivos, inventario y demás datos privados no aparecen en logs ni quedan accesibles entre usuarios. Preparar política de privacidad y términos de uso coherentes con el comportamiento real de la aplicación y explicar el tratamiento de imágenes y funciones de IA.
 2. **Recuperación, backups y migraciones.** Promover 6.1 y 6.2 a requisito previo de lanzamiento: exportación/eliminación de datos, política de backups, restauración real probada y procedimiento de recuperación ante migraciones o despliegues defectuosos. Toda migración irreversible necesita estrategia explícita antes de producción.
-3. **Observabilidad, errores y abuso.** Cerrar 2.3–2.8: logs estructurados, monitorización de errores, rate limiting, health/readiness, rollback y rotación de secretos. Añadir estados de error, red, vacío y recuperación claros en los recorridos críticos sin exponer detalles internos.
+3. **Observabilidad, errores y abuso.** Cerrar 2.3–2.9: logs estructurados, monitorización de errores, rate limiting, health/readiness, rollback, rotación de secretos e idempotencia. Añadir estados de error, red, vacío y recuperación claros en los recorridos críticos sin exponer detalles internos.
 4. **Validación E2E y dispositivo real.** Revalidar registro/login, inventario, Macros, recetas, lotes, planes, historial, lista de compra y eliminación de cuenta. Completar las pruebas físicas pendientes de voz, cámara y código de barras en móvil/navegador real. Todo defecto bloqueante o de prioridad alta debe corregirse y volver a verificarse.
 5. **Responsive, rendimiento y accesibilidad básica.** Comprobar móvil, tablet y escritorio; carga inicial, consultas, imágenes y operaciones pesadas; foco, labels, contraste, tamaño táctil, teclado y lector de pantalla en los flujos esenciales. Mantener la auditoría sistemática de 3.2 como criterio de cierre.
 6. **Landing pública y CTA.** Crear una página pública que explique qué hace LaKitchen, con CTA principal visible para empezar/probar y, solo si aporta valor en móvil, CTA fijo. Mantener la aplicación autenticada separada de la landing y no indexar rutas privadas.
@@ -727,4 +738,4 @@ Este gate no añade funciones de alimentación nuevas. Reordena como criterios d
 
 No son requisitos actuales de lanzamiento: testimonios, casos de estudio, mapa o indicaciones, Local Schema, foto de equipo o promesas comerciales de tiempo de respuesta.
 
-**Orden global ajustado:** completar primero la Fase 2, después los requisitos críticos de Fase 3 y 6 incorporados en este gate, cerrar el gate de lanzamiento y solo entonces priorizar nuevas funciones de Fase 5 o expansión SaaS que no sean necesarias para estabilidad.
+**Orden global ajustado:** con la Fase 2 completada, continuar con los requisitos críticos de Fase 3 y 6 incorporados en este gate, cerrar el gate de lanzamiento y solo entonces priorizar nuevas funciones de Fase 5 o expansión SaaS que no sean necesarias para estabilidad.
