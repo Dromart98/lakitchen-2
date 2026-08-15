@@ -52,6 +52,7 @@ export function RecipeAiGenerator() {
   const [isPending, startTransition] = useTransition();
   const [cookingRecipeTitle, setCookingRecipeTitle] = useState<string | null>(null);
   const [selectedMealTypes, setSelectedMealTypes] = useState<Record<string, MealType>>({});
+  const [cookRequestIds, setCookRequestIds] = useState<Record<string, string>>({});
   const [lastPriorityMode, setLastPriorityMode] = useState<"balanced" | "expiration">("balanced");
   const [savingRecipeTitle, setSavingRecipeTitle] = useState<string | null>(null);
   const [saveMessages, setSaveMessages] = useState<Record<string, string>>({});
@@ -73,7 +74,8 @@ export function RecipeAiGenerator() {
       });
       setResult(nextResult);
       if (nextResult.status === "success") {
-        setSelectedMealTypes(Object.fromEntries(nextResult.recipes.map((recipe) => [recipe.title, "lunch" as MealType])));
+        setSelectedMealTypes(Object.fromEntries(nextResult.recipes.map((_, index) => [String(index), "lunch" as MealType])));
+        setCookRequestIds(Object.fromEntries(nextResult.recipes.map((_, index) => [String(index), crypto.randomUUID()])));
       }
     });
   }
@@ -102,13 +104,14 @@ export function RecipeAiGenerator() {
     setSaveMessages((current) => ({ ...current, [recipe.title]: "No se pudo guardar la receta." }));
   }
 
-  async function handleCook(recipe: Extract<RecipeAiActionResult, { status: "success" }>["recipes"][number]) {
+  async function handleCook(recipe: Extract<RecipeAiActionResult, { status: "success" }>["recipes"][number], suggestionId: string) {
     if (cookingRecipeTitle !== null || isPending || !recipe.nutrition.isComplete || !recipe.nutrition.total || !recipe.nutrition.perServing) return;
 
     setCookingRecipeTitle(recipe.title);
     const { nutrition: _nutrition, calorieValidation: _calorieValidation, ...recipePayload } = recipe;
     const cookResult = await cookGeneratedRecipeAndLogMealAction({
-      meal_type: selectedMealTypes[recipe.title] ?? "lunch",
+      request_id: cookRequestIds[suggestionId],
+      meal_type: selectedMealTypes[suggestionId] ?? "lunch",
       recipe: recipePayload,
     });
 
@@ -194,8 +197,10 @@ export function RecipeAiGenerator() {
       {result?.status === "success" ? (
         <div className="recipe-ai__results">
           <p className="recipe-ai__temporary-note">Las recetas generadas son temporales hasta que pulses “Guardar receta”. Cocinarlas seguirá descontando los ingredientes del inventario.</p>
-          {result.recipes.map((recipe) => (
-            <article className="recipe-ai__card" key={recipe.title}>
+          {result.recipes.map((recipe, recipeIndex) => {
+            const suggestionId = String(recipeIndex);
+            return (
+              <article className="recipe-ai__card" key={suggestionId}>
               <p className="recipes-eyebrow">Sugerencia generada por IA</p>
               <h3>{recipe.title}</h3>
               <p>{recipe.description}</p>
@@ -227,8 +232,11 @@ export function RecipeAiGenerator() {
                 ) : null}
               </section>
               <div className="recipe-ai__card-controls">
-                <label htmlFor={`recipe-ai-meal-type-${recipe.title}`}>Tipo de comida</label>
-                <select id={`recipe-ai-meal-type-${recipe.title}`} value={selectedMealTypes[recipe.title] ?? "lunch"} disabled={isBusy} onChange={(event) => setSelectedMealTypes((current) => ({ ...current, [recipe.title]: event.target.value as MealType }))}>
+                <label htmlFor={`recipe-ai-meal-type-${suggestionId}`}>Tipo de comida</label>
+                <select id={`recipe-ai-meal-type-${suggestionId}`} value={selectedMealTypes[suggestionId] ?? "lunch"} disabled={isBusy} onChange={(event) => {
+                  setSelectedMealTypes((current) => ({ ...current, [suggestionId]: event.target.value as MealType }));
+                  setCookRequestIds((current) => ({ ...current, [suggestionId]: crypto.randomUUID() }));
+                }}>
                   {MEAL_TYPES.map((mealType) => <option key={mealType} value={mealType}>{MEAL_TYPE_LABELS[mealType]}</option>)}
                 </select>
                 <p role="status">{saveMessages[recipe.title] ?? ""}</p>
@@ -244,13 +252,14 @@ export function RecipeAiGenerator() {
                 <button
                 type="button"
                 disabled={isBusy || !recipe.nutrition.isComplete || !recipe.nutrition.total || !recipe.nutrition.perServing}
-                onClick={() => { void handleCook(recipe); }}
+                onClick={() => { void handleCook(recipe, suggestionId); }}
               >
                 {cookingRecipeTitle === recipe.title ? "Cocinando y registrando…" : "Cocinar y registrar"}
                 </button>
               </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       ) : null}
     </section>

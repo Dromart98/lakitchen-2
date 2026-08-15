@@ -35,7 +35,7 @@ const item: RecipeAiCookInventoryItem = {
   fat_g: 1,
 };
 
-const request = { meal_type: "lunch", recipe };
+const request = { request_id: "223e4567-e89b-42d3-a456-426614174000", meal_type: "lunch", recipe };
 
 describe("parseRecipeAiCookRequest", () => {
   it("accepts a valid strict cooking request", () => {
@@ -48,6 +48,7 @@ describe("parseRecipeAiCookRequest", () => {
     { ...request, recipe: { ...recipe, calories: 1 } },
     { ...request, recipe: { ...recipe, user_id: "user" } },
     { ...request, meal_type: "brunch" },
+    { ...request, request_id: "bad" },
     { ...request, recipe: { ...recipe, ingredients: [{ ...recipe.ingredients[0], inventory_item_id: "bad" }] } },
     { ...request, recipe: { ...recipe, ingredients: [{ ...recipe.ingredients[0], quantity: 0 }] } },
     { ...request, recipe: { ...recipe, ingredients: [{ ...recipe.ingredients[0], quantity: -1 }] } },
@@ -124,6 +125,7 @@ describe("mapRecipeAiCookRpcError", () => {
     expect(mapRecipeAiCookRpcError({ message: "Incomplete inventory nutrition" })).toBe("incomplete-nutrition");
     expect(mapRecipeAiCookRpcError({ message: "Incompatible inventory nutrition unit" })).toBe("incompatible-unit");
     expect(mapRecipeAiCookRpcError({ message: "equivalence_conflict" })).toBe("equivalence-conflict");
+    expect(mapRecipeAiCookRpcError({ message: "idempotency_conflict" })).toBe("idempotency-conflict");
     expect(mapRecipeAiCookRpcError({ message: "Other" })).toBe("consume-failed");
   });
 });
