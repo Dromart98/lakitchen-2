@@ -204,6 +204,15 @@ Criterio PASS:
 
 ## Estado del simulacro de 2.8
 
-**Pendiente por infraestructura, no por código.** A 15 de agosto de 2026 no existe una rama/proyecto Supabase de desarrollo disponible. Los conectores operativos actuales permiten inspección de Vercel pero no modificar sus variables de entorno; el conector de OpenAI puede crear claves mediante flujo seguro pero no revocarlas. Crear una credencial desechable sin poder completar su revocación violaría este mismo runbook, por lo que no se inicia el simulacro hasta disponer de un entorno no productivo y ciclo crear→actualizar→verificar→revocar completo.
+**Completado — PASS (15 de agosto de 2026).** Se ejecutó un simulacro no productivo sobre la rama Preview `drill/2.8-secret-rotation` utilizando un proyecto OpenAI temporal y dos project API keys desechables identificadas únicamente por sus nombres lógicos A y B.
 
-2.8 no se considera cerrada hasta completar y registrar ese simulacro.
+Registro del simulacro:
+
+- A se configuró exclusivamente como `OPENAI_API_KEY` del Preview de la rama temporal; producción no se modificó.
+- Una sonda server-side temporal y `no-store` obligó a contactar a OpenAI sin devolver ni registrar la credencial. El deployment con A respondió `200 {"status":"ok"}`.
+- B se creó en el mismo proyecto temporal, sustituyó a A únicamente en ese Preview y se generó un deployment nuevo. La misma sonda respondió `200 {"status":"ok"}` con B.
+- A se revocó en OpenAI. El deployment antiguo, que conservaba A, pasó a `503 {"status":"rejected"}`; el deployment nuevo con B continuó en `200 {"status":"ok"}`.
+- Tras la prueba, B y el override temporal de Vercel fueron eliminados por el operador; la PR de simulacro #301 se cerró sin fusionar y la sonda se retiró de la rama temporal.
+- Producción permaneció intacta y, después del simulacro, `/api/health/live` y `/api/health/ready` continuaron respondiendo `200` y `no-store`.
+
+Resultado: se demostró el ciclo completo crear → configurar → verificar → sustituir → revocar → verificar sin interrupción del entorno de prueba y sin introducir secretos ni código de simulacro en `main`. El criterio de cierre de 2.8 queda satisfecho.
