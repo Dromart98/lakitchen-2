@@ -398,9 +398,11 @@ export async function updateInventoryItemAction(formData: FormData) {
 
 export async function consumeInventoryItemAction(formData: FormData) {
   const id = String(formData.get("id") ?? "").trim();
+  const requestId = String(formData.get("request_id") ?? "").trim();
   const consumedQuantity = Number(formData.get("consumed_quantity"));
 
   if (!isUuid(id)) redirect(`${INVENTORY_PATH}?inventoryError=consume-not-found`);
+  if (!isUuid(requestId)) redirect(`${INVENTORY_PATH}?inventoryError=consume-failed`);
   if (!Number.isFinite(consumedQuantity) || consumedQuantity <= 0) {
     redirect(`${INVENTORY_PATH}?inventoryError=invalid-quantity`);
   }
@@ -411,6 +413,7 @@ export async function consumeInventoryItemAction(formData: FormData) {
   const { data, error } = await (supabase as any).rpc("consume_inventory_item", {
     p_item_id: id,
     p_quantity: consumedQuantity,
+    p_request_id: requestId,
   }) as { data: number | string | null; error: { code?: string; message: string } | null };
 
   if (error) {
@@ -437,10 +440,12 @@ export async function consumeInventoryItemAction(formData: FormData) {
 
 export async function consumeInventoryItemAndLogMealAction(formData: FormData) {
   const id = String(formData.get("id") ?? "").trim();
+  const requestId = String(formData.get("request_id") ?? "").trim();
   const consumedQuantity = Number(formData.get("consumed_quantity"));
   const mealType = String(formData.get("meal_type") ?? "").trim();
 
   if (!isUuid(id)) redirect(`${INVENTORY_PATH}?inventoryError=consume-log-not-found`);
+  if (!isUuid(requestId)) redirect(`${INVENTORY_PATH}?inventoryError=consume-log-failed`);
   if (!Number.isFinite(consumedQuantity) || consumedQuantity <= 0) {
     redirect(`${INVENTORY_PATH}?inventoryError=consume-log-invalid-quantity`);
   }
@@ -453,6 +458,7 @@ export async function consumeInventoryItemAndLogMealAction(formData: FormData) {
     p_item_id: id,
     p_consumed_quantity: consumedQuantity,
     p_meal_type: mealType,
+    p_request_id: requestId,
   }) as { data: number | string | null; error: { code?: string; message: string } | null };
 
   if (error) {

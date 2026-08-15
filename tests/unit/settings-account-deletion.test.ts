@@ -107,7 +107,7 @@ describe("account deletion contracts", () => {
       /references\s+auth\.users\s*\(id\)\s+on\s+delete\s+\w+/gi,
     );
 
-    expect(authReferences?.length).toBe(23);
+    expect(authReferences?.length).toBe(24);
     for (const reference of authReferences ?? []) {
       expect(reference.toLowerCase()).toContain("on delete cascade");
     }
@@ -134,6 +134,9 @@ describe("account deletion contracts", () => {
     );
     expect(migrations).toMatch(
       /macro_meal_log_requests[\s\S]{0,200}user_id uuid not null references auth\.users\(id\) on delete cascade/i,
+    );
+    expect(migrations).toMatch(
+      /inventory_consumption_requests[\s\S]{0,200}user_id uuid not null references auth\.users\(id\) on delete cascade/i,
     );
   });
 });
