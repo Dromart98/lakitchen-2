@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { submitInventoryForm, waitForInventoryFormReady } from "./helpers/inventory-form";
 
 const email = process.env.E2E_EMAIL;
 const password = process.env.E2E_PASSWORD;
@@ -38,6 +39,7 @@ async function addInventoryItem(
 ) {
   await page.goto("/inventory");
   await page.getByRole("button", { name: "Añadir producto" }).click();
+  const form = await waitForInventoryFormReady(page);
   await page.locator("#inventory-name").fill(item.name);
   await page.locator("#inventory-quantity").fill("1000");
   await page.locator("#inventory-unit").selectOption("g");
@@ -46,12 +48,7 @@ async function addInventoryItem(
   await page.locator("#inventory-protein-g").fill(item.protein);
   await page.locator("#inventory-carbs-g").fill(item.carbs);
   await page.locator("#inventory-fat-g").fill(item.fat);
-  const saveResponsePromise = page.waitForResponse(
-    (response) => response.request().method() === "POST" && new URL(response.url()).pathname === "/inventory",
-  );
-  await page.getByRole("button", { name: "Guardar producto" }).click();
-  const saveResponse = await saveResponsePromise;
-  expect(saveResponse.status()).toBeLessThan(400);
+  await submitInventoryForm(page, form);
   await page.goto(`/inventory?query=${encodeURIComponent(item.name)}`);
   await expect(page.locator(".inventory-product", { hasText: item.name })).toBeVisible();
 }
