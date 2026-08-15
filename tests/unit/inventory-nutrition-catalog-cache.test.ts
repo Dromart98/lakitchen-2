@@ -20,7 +20,7 @@ describe("inventory nutrition catalog cache", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const persist = vi.fn(() => new Promise<never>(() => undefined));
 
-    const result = cacheConfirmedInventoryNutrition({}, completeNutrition, { persist, timeoutMs: 25 });
+    const result = cacheConfirmedInventoryNutrition({}, { ...completeNutrition, foodCatalogItemId: "untrusted-form-id" }, { persist, timeoutMs: 25 });
     await vi.advanceTimersByTimeAsync(25);
 
     await expect(result).resolves.toBeNull();
@@ -28,6 +28,20 @@ describe("inventory nutrition catalog cache", () => {
     expect(warn.mock.calls.flat()).not.toContain("Arroz");
     warn.mockRestore();
     vi.useRealTimers();
+  });
+
+  it("does not use a submitted identity when catalog persistence rejects it", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const persist = vi.fn(async () => { throw new Error("private persistence detail"); });
+
+    await expect(cacheConfirmedInventoryNutrition(
+      {},
+      { ...completeNutrition, foodCatalogItemId: "untrusted-form-id" },
+      { persist, timeoutMs: 25 },
+    )).resolves.toBeNull();
+    expect(warn).toHaveBeenCalledWith("Supabase could not update the nutrition catalog within the inventory save deadline.");
+    expect(warn.mock.calls.flat()).not.toContain("private persistence detail");
+    warn.mockRestore();
   });
 
   it("returns the resolved identity while preserving submitted nutrition", async () => {

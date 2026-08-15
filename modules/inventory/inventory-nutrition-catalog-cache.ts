@@ -71,6 +71,6 @@ export async function cacheConfirmedInventoryNutrition(
     return result.foodCatalogItemIds.get(catalogRequestKey(row.normalized_name, row.food_state, row.nutrition_basis)) ?? null;
   } catch {
     console.warn("Supabase could not update the nutrition catalog within the inventory save deadline.");
-    return input.foodCatalogItemId ?? null;
+    return null;
   }
 }
