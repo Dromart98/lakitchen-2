@@ -17,6 +17,7 @@ import { isMealType } from "@/modules/meals/meal-types";
 import { lookupOpenFoodFactsProduct } from "@/lib/nutrition/open-food-facts";
 import { resolveInventoryNutritionForUser } from "@/lib/nutrition/catalog-resolver";
 import { catalogRequestKey, confirmedCatalogRow, persistConfirmedNutritionBatchWithIdentities } from "@/modules/nutrition/catalog";
+import { cacheConfirmedInventoryNutrition } from "@/modules/inventory/inventory-nutrition-catalog-cache";
 import { parseInventoryNutritionAiInput, type InventoryNutritionAiEstimate, type InventoryNutritionAiInput } from "@/modules/inventory/inventory-ai-nutrition";
 import { toVoiceInventoryBatchSaveInput, VoiceInventoryBatchCatalogMetadataSchema } from "@/modules/inventory/voice-inventory-batch-save";
 import { buildObservedPackageEquivalenceProposals } from "@/modules/inventory/voice-inventory-package-equivalences";
@@ -232,19 +233,6 @@ function getValidatedInventoryFields(formData: FormData) {
     expiresAt: getOptionalExpirationDate(formData),
     ...nutritionFields,
   };
-}
-
-async function cacheConfirmedInventoryNutrition(supabase: any, input: { userId: string; name: string; unit: string; nutritionBasis: ReturnType<typeof getValidatedInventoryFields>["nutritionBasis"]; calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null; source?: "user" | "barcode-memory"; externalId?: string | null; foodCatalogItemId?: string | null }) {
-  if (!input.nutritionBasis || ![input.calories, input.proteinG, input.carbsG, input.fatG].every((value) => typeof value === "number" && Number.isFinite(value) && value >= 0)) return null;
-  try {
-    const row = confirmedCatalogRow({ ...input, nutritionBasis: input.nutritionBasis, calories: input.calories!, proteinG: input.proteinG!, carbsG: input.carbsG!, fatG: input.fatG! });
-    row.food_catalog_item_id = input.foodCatalogItemId ?? null;
-    const result = await persistConfirmedNutritionBatchWithIdentities(supabase, [row]);
-    return result.foodCatalogItemIds.get(catalogRequestKey(row.normalized_name, row.food_state, row.nutrition_basis)) ?? null;
-  } catch (error) {
-    console.warn("Supabase could not update the nutrition catalog:", error instanceof Error ? error.message : error);
-    return null;
-  }
 }
 
 export async function addInventoryItemAction(formData: FormData) {
