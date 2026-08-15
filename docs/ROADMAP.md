@@ -26,7 +26,7 @@ Estado ya cerrado:
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
 - **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
 
-Siguiente tarea: **2.8 — Ciclo de vida y rotación de secretos**.
+Siguiente tarea: **2.9 — Idempotencia y operaciones atómicas**.
 
 Orden de implementación acordado:
 
@@ -211,7 +211,7 @@ No permitir que la IA calcule libremente estos valores cuando puedan obtenerse d
 
 Prioridad: alta.
 
-**Estado: en curso.** Siguiente tarea: **2.8 Ciclo de vida y rotación de secretos**.
+**Estado: en curso.** Siguiente tarea: **2.9 Idempotencia y operaciones atómicas**.
 
 ### 2.1 Caché y reutilización
 
@@ -322,7 +322,7 @@ Criterio de cierre:
 
 ### 2.8 Ciclo de vida y rotación de secretos
 
-**Estado: en curso. Prioridad: media-alta.** Inventario, cadencias y procedimientos documentados en `docs/secret-lifecycle.md`. Queda pendiente el simulacro de rotación no productiva: las herramientas conectadas no exponen actualmente un ciclo completo y seguro crear → configurar → verificar → revocar sobre un entorno aislado, por lo que no se crea una credencial desechable que después no pueda revocarse.
+**Estado: completada. Prioridad: media-alta.** Inventario, cadencias y procedimientos están documentados en `docs/secret-lifecycle.md`. El simulacro no productivo del 15 de agosto de 2026 completó el ciclo A → B → revocación sobre un Preview aislado de Vercel: A funcionó, B sustituyó a A sin interrupción, A fue rechazada tras revocarse y B continuó funcionando. Los recursos y secretos temporales se retiraron y producción permaneció intacta.
 
 - Mantener inventario de secretos server-side y su propietario técnico: Supabase, OpenAI, USDA y cualquier proveedor futuro.
 - Definir cadencia de revisión/rotación según capacidades y riesgo de cada proveedor en lugar de asumir una única cifra universal.
