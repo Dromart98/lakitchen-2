@@ -58,6 +58,8 @@ export function InventoryConsumeForm({
   confirmedUnitMeasure,
 }: InventoryConsumeFormProps) {
   const [consumedQuantity, setConsumedQuantity] = useState("");
+  const [consumeRequestId] = useState(() => crypto.randomUUID());
+  const [consumeAndLogRequestId] = useState(() => crypto.randomUUID());
   const parsedQuantity = Number(consumedQuantity);
   const nutritionValues = { calories, protein_g, carbs_g, fat_g };
   const hasNutrition = hasInventoryNutritionValues([calories, protein_g, carbs_g, fat_g]);
@@ -108,6 +110,7 @@ export function InventoryConsumeForm({
     <div className="meal-log-form">
       <form action={consumeInventoryItemAction} className="meal-log-form">
         <input name="id" type="hidden" value={id} />
+        <input name="request_id" type="hidden" value={consumeRequestId} />
         <label className="field" htmlFor={`inventory-consumed-quantity-${id}`}>
           <span>Cantidad consumida</span>
           <input
@@ -146,6 +149,7 @@ export function InventoryConsumeForm({
 
       <form action={consumeInventoryItemAndLogMealAction} className="meal-log-form">
         <input name="id" type="hidden" value={id} />
+        <input name="request_id" type="hidden" value={consumeAndLogRequestId} />
         <input name="consumed_quantity" type="hidden" value={consumedQuantity} />
         <label className="field" htmlFor={`inventory-consumed-meal-type-${id}`}>
           <span>Registrar como comida</span>
