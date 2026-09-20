@@ -1,6 +1,6 @@
 # Roadmap estratégico de Lakitchenapp
 
-Última actualización: 15 de agosto de 2026.
+Última actualización: 20 de septiembre de 2026.
 
 ## Principios de producto
 
@@ -15,7 +15,7 @@
 
 Prioridad: cerrada el 2 de agosto de 2026.
 
-La matriz funcional ejecutable de Inventario, Macros, comidas, recetas, planes, historial, lista de compra, ajustes y autenticación está cerrada. El workflow `Authenticated E2E` validó en producción **13/13 casos PASS** sobre `main`, incluyendo persistencia tras recarga, consumos y descuentos, operaciones de recetas y planes, transferencia de compras, temas, protección de rutas, login/logout y eliminación definitiva de cuenta con verificación administrativa de cascada de datos.
+La matriz funcional ejecutable de Inventario, Macros, comidas, recetas, planes, historial, lista de compra, ajustes y autenticación está cerrada. El workflow `Authenticated E2E` valida en producción los recorridos críticos sobre `main`, incluyendo persistencia tras recarga, consumos y descuentos, operaciones de recetas y planes, transferencia de compras, temas, protección de rutas, login/logout y eliminación definitiva de cuenta con verificación administrativa de cascada de datos.
 
 La validación física de voz, cámara y código de barras sigue pendiente como comprobación manual en dispositivo/navegador real. No se considera fallo de la matriz ejecutable ni se marca como PASS hasta realizar esa validación física.
 
@@ -26,7 +26,7 @@ Estado ya cerrado:
 - La presentación de grupos al filtrar Inventario ya está corregida. Los conteos generales conservan el número real de productos y las ubicaciones excluidas por el filtro no muestran mensajes falsos de inventario vacío.
 - **Implementada/cerrada:** la categoría nutricional es opcional en alta manual, edición, dictado, guardado por lote y productos recordados por código de barras. La ausencia se persiste como `null` y se presenta como “Sin categoría”.
 
-Siguiente tarea: **3.1 — Pruebas E2E esenciales**.
+Siguiente tarea: **3.2 — Accesibilidad sistemática**.
 
 Orden de implementación acordado:
 
@@ -211,7 +211,7 @@ No permitir que la IA calcule libremente estos valores cuando puedan obtenerse d
 
 Prioridad: alta.
 
-**Estado: completada.** La fase queda cerrada tras completar 2.9. Siguiente tarea: **3.1 Pruebas E2E esenciales**.
+**Estado: completada.** La fase queda cerrada tras completar 2.9. Fase 3.1 completada; siguiente tarea: **3.2 Accesibilidad sistemática**.
 
 ### 2.1 Caché y reutilización
 
@@ -366,6 +366,8 @@ Criterio de cierre cumplido:
 Prioridad: alta.
 
 ### 3.1 Pruebas E2E esenciales
+
+**Estado: completada.** La matriz autenticada ya cubre los recorridos críticos existentes y el 20 de septiembre de 2026 se cerró el hueco específico de Inventario con `INVENTORY-LIFECYCLE`: estado vacío, alta, edición, rechazo real de sobreconsumo sin modificar stock, consumo válido, estado sin resultados y eliminación. La suite espera la hidratación de los Server Actions y su POST para evitar falsos fallos por navegación prematura. El workflow `Authenticated E2E` se validó completo contra producción en verde y CI pasó lint, build, typecheck y tests antes del merge de #311.
 
 Automatizar solo los flujos críticos:
 
@@ -694,7 +696,7 @@ Después de validar el uso real:
 4. **Cerrado:** Implementar la capa nutricional centralizada.
 5. **Cerrado:** Añadir catálogo interno, unidades y estados de preparación.
 6. **Cerrado:** Reforzar caché, observabilidad, rate limiting, health checks, rollback, secretos, costes e idempotencia.
-7. **Actual:** Añadir pruebas E2E críticas y accesibilidad.
+7. **Actual:** Completar accesibilidad sistemática (3.2); las pruebas E2E críticas de 3.1 están cerradas.
 8. Limpiar dependencias y actualizar documentación.
 9. Simplificar la UX completa.
 10. Implementar en orden 5.1–5.3: Foto IA 2.0, importación de recetas y escáner de etiquetas.
