@@ -6,7 +6,8 @@ import { MobileBottomNav } from "@/components/navigation/MobileBottomNav";
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <main className="shell app-shell">
+      <a className="skip-link" href="#main-content">Saltar al contenido</a>
+      <div className="shell app-shell">
         <header className="app-shell__header">
           <Link className="app-shell__brand-link" href="/dashboard" aria-label="Ir a Inicio">
             <LaKitchenLogo variant="horizontal" theme="light" title="LaKitchen" />
@@ -16,8 +17,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button className="logout-link" type="submit">Cerrar sesión</button>
           </form>
         </header>
-        {children}
-      </main>
+        <main id="main-content" tabIndex={-1}>{children}</main>
+      </div>
       <MobileBottomNav />
     </>
   );

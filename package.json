@@ -4,6 +4,7 @@
     "build": "next build",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -17,9 +18,11 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@playwright/test": "^1.63.0",
     "@types/node": "24.0.3",
     "@types/react": "19.1.8",
     "@types/react-dom": "19.1.6",
+    "axe-core": "4.12.1",
     "eslint": "^9.39.1",
     "eslint-config-next": "15.3.8",
     "prisma": "6.10.1",

@@ -70,13 +70,13 @@ export function LoginForm() {
       <div className="auth-form__fields">
         <label className="auth-form__field" htmlFor="email">
           <span>Email</span>
-          <input id="email" name="email" type="email" autoComplete="email" required placeholder="tu@email.com" />
+          <input id="email" name="email" type="email" autoComplete="email" required placeholder="tu@email.com" aria-describedby={state.error ? "auth-error" : undefined} />
         </label>
 
-        <label className="auth-form__field" htmlFor="password">
-          <span>Contraseña</span>
+        <div className="auth-form__field">
+          <label htmlFor="password">Contraseña</label>
           <span className="auth-password">
-            <input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required minLength={6} placeholder="Mínimo 6 caracteres" />
+            <input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required minLength={6} placeholder="Mínimo 6 caracteres" aria-describedby={state.error ? "auth-error" : undefined} />
             <button
               aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
               aria-pressed={showPassword}
@@ -87,11 +87,11 @@ export function LoginForm() {
               {showPassword ? "Ocultar" : "Mostrar"}
             </button>
           </span>
-        </label>
+        </div>
       </div>
 
       <div className="auth-form__messages" aria-live="polite">
-        {state.error ? <p className="auth-form__message auth-form__message--error" role="alert"><strong>Error</strong>{state.error}</p> : null}
+        {state.error ? <p id="auth-error" className="auth-form__message auth-form__message--error" role="alert"><strong>Error</strong>{state.error}</p> : null}
         {state.message ? <p className="auth-form__message auth-form__message--success" role="status"><strong>Información</strong>{state.message}</p> : null}
       </div>
 

@@ -18,13 +18,30 @@
   --brand-logo-light: #657433;
   --brand-logo-dark: #fffdf8;
   --border: #dbe4ee;
-  --ring: #86efac;
+  --ring: #15803d;
   --warn: #f59e0b;
   --shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
 }
 
 * {
   box-sizing: border-box;
+}
+
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 1000;
+  transform: translateY(calc(-100% - 16px));
+  padding: 12px 16px;
+  background: var(--card);
+  color: var(--text);
+}
+
+.skip-link:focus {
+  transform: none;
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
 }
 
 body {
@@ -5861,7 +5878,7 @@ h3 {
 .auth-intro__summary {
   max-width: 58ch;
   margin: 0;
-  color: var(--muted);
+  color: var(--text);
   font-size: 0.94rem;
   line-height: 1.55;
 }
@@ -5881,7 +5898,7 @@ h3 {
 }
 
 .auth-intro__benefit > span {
-  color: var(--brand-accent);
+  color: var(--brand-dark);
   font-size: 0.72rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -5896,7 +5913,7 @@ h3 {
 .auth-intro__benefit p {
   display: none;
   margin: 4px 0 0;
-  color: var(--muted);
+  color: var(--text);
   font-size: 0.84rem;
   line-height: 1.45;
 }
