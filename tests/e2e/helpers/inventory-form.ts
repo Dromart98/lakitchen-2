@@ -40,23 +40,13 @@ async function formDiagnostics(form: Locator, button: Locator): Promise<string> 
   return JSON.stringify({ form: formState, button: buttonState });
 }
 
-export async function waitForInventoryFormReady(page: Page): Promise<Locator> {
-  const button = page.getByRole("button", { name: "Guardar producto" });
-  const form = button.locator("xpath=ancestor::form");
-  await expect(form).toBeVisible();
+async function waitForReactButtonHydration(page: Page, button: Locator): Promise<void> {
   await expect(button).toBeEnabled();
-
-  // React adds its current props to a DOM node when that node is hydrated. Waiting
-  // for this marker prevents a click on server-rendered markup before the Server
-  // Action submit handler is attached.
   await page.waitForFunction((element) =>
     Object.keys(element as HTMLButtonElement).some((key) => key.startsWith("__reactProps$")), await button.elementHandle());
-
-  return form;
 }
 
-export async function submitInventoryForm(page: Page, form: Locator): Promise<void> {
-  const button = form.getByRole("button", { name: "Guardar producto" });
+async function assertValidForm(form: Locator): Promise<void> {
   const invalidControls = await form.evaluate((element): InvalidControl[] =>
     Array.from((element as HTMLFormElement).elements)
       .filter((control): control is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
@@ -69,6 +59,30 @@ export async function submitInventoryForm(page: Page, form: Locator): Promise<vo
       })),
   );
   expect(invalidControls, `El formulario de inventario no es válido: ${JSON.stringify(invalidControls)}`).toEqual([]);
+}
+
+export async function waitForInventoryFormReady(page: Page): Promise<Locator> {
+  const button = page.getByRole("button", { name: "Guardar producto" });
+  const form = button.locator("xpath=ancestor::form");
+  await expect(form).toBeVisible();
+
+  // React adds its current props to a DOM node when that node is hydrated. Waiting
+  // for this marker prevents a click on server-rendered markup before the Server
+  // Action submit handler is attached.
+  await waitForReactButtonHydration(page, button);
+
+  return form;
+}
+
+export async function submitInventoryServerAction(
+  page: Page,
+  form: Locator,
+  buttonName: string,
+): Promise<void> {
+  const button = form.getByRole("button", { name: buttonName, exact: true });
+  await expect(form).toBeVisible();
+  await waitForReactButtonHydration(page, button);
+  await assertValidForm(form);
 
   const requestPromise = page.waitForRequest(inventoryPost, { timeout: INVENTORY_POST_START_TIMEOUT_MS });
   await button.click();
@@ -78,7 +92,7 @@ export async function submitInventoryForm(page: Page, form: Locator): Promise<vo
     request = await requestPromise;
   } catch (error) {
     throw new Error(
-      `No comenzó el POST /inventory tras pulsar "Guardar producto". Estado: ${await formDiagnostics(form, button)}`,
+      `No comenzó el POST /inventory tras pulsar "${buttonName}". Estado: ${await formDiagnostics(form, button)}`,
       { cause: error },
     );
   }
@@ -86,4 +100,8 @@ export async function submitInventoryForm(page: Page, form: Locator): Promise<vo
   const response = await request.response();
   expect(response, "El POST /inventory comenzó pero no produjo respuesta HTTP").not.toBeNull();
   expect(response!.status(), "El POST /inventory debe responder sin error").toBeLessThan(400);
+}
+
+export async function submitInventoryForm(page: Page, form: Locator): Promise<void> {
+  await submitInventoryServerAction(page, form, "Guardar producto");
 }
