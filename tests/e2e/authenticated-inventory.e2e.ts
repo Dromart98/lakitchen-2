@@ -61,11 +61,25 @@ test("INVENTORY-LIFECYCLE: vacío, alta, edición, error, consumo y eliminación
 
   await product.getByText("Gestionar").click();
   await product.getByText("Descontar cantidad").click();
-  const consumedQuantity = product.getByLabel("Cantidad consumida");
+  let consumedQuantity = product.getByLabel("Cantidad consumida");
   await consumedQuantity.fill("451");
   await expect(product.getByText("La cantidad supera el stock disponible.")).toBeVisible();
+  let consumeButton = product.getByRole("button", { name: "Confirmar consumo" });
+  let consumeForm = consumeButton.locator("xpath=ancestor::form");
+  await submitInventoryServerAction(page, consumeForm, "Confirmar consumo");
+  await expect(page).toHaveURL(/inventoryError=consume-too-much/);
+
+  await page.goto(`/inventory?query=${encodeURIComponent(editedName)}`);
+  product = page.locator(".inventory-product", { hasText: editedName });
+  await expect(product).toContainText("450 g");
+  await product.getByText("Gestionar").click();
+  await product.getByText("Descontar cantidad").click();
+  consumedQuantity = product.getByLabel("Cantidad consumida");
   await consumedQuantity.fill("50");
-  await product.getByRole("button", { name: "Confirmar consumo" }).click();
+  consumeButton = product.getByRole("button", { name: "Confirmar consumo" });
+  consumeForm = consumeButton.locator("xpath=ancestor::form");
+  await submitInventoryServerAction(page, consumeForm, "Confirmar consumo");
+  await expect(page).toHaveURL(/inventorySuccess=item-consumed/);
 
   await page.goto(`/inventory?query=${encodeURIComponent(editedName)}`);
   product = page.locator(".inventory-product", { hasText: editedName });
