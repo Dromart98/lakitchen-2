@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { submitInventoryForm, waitForInventoryFormReady } from "./helpers/inventory-form";
+import {
+  submitInventoryForm,
+  submitInventoryServerAction,
+  waitForInventoryFormReady,
+} from "./helpers/inventory-form";
 
 const email = process.env.E2E_EMAIL;
 const password = process.env.E2E_PASSWORD;
@@ -44,9 +48,11 @@ test("INVENTORY-LIFECYCLE: vacío, alta, edición, error, consumo y eliminación
 
   await product.getByText("Gestionar").click();
   await product.getByText("Editar", { exact: true }).click();
-  await product.locator('input[name="name"]').fill(editedName);
-  await product.locator('input[name="quantity"]').fill("450");
-  await product.getByRole("button", { name: "Guardar cambios" }).click();
+  const editButton = product.getByRole("button", { name: "Guardar cambios" });
+  const editForm = editButton.locator("xpath=ancestor::form");
+  await editForm.locator('input[name="name"]').fill(editedName);
+  await editForm.locator('input[name="quantity"]').fill("450");
+  await submitInventoryServerAction(page, editForm, "Guardar cambios");
 
   await page.goto(`/inventory?query=${encodeURIComponent(editedName)}`);
   product = page.locator(".inventory-product", { hasText: editedName });
@@ -71,7 +77,9 @@ test("INVENTORY-LIFECYCLE: vacío, alta, edición, error, consumo y eliminación
   await page.goto(`/inventory?query=${encodeURIComponent(editedName)}`);
   product = page.locator(".inventory-product", { hasText: editedName });
   await product.getByText("Gestionar").click();
-  await product.getByRole("button", { name: "Eliminar" }).click();
+  const deleteButton = product.getByRole("button", { name: "Eliminar" });
+  const deleteForm = deleteButton.locator("xpath=ancestor::form");
+  await submitInventoryServerAction(page, deleteForm, "Eliminar");
 
   await page.goto("/inventory");
   await expect(page.getByRole("heading", { name: "Tu inventario está vacío" })).toBeVisible();
